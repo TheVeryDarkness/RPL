@@ -691,18 +691,6 @@ impl<'pcx, 'tcx> CheckMirCtxt<'_, 'pcx, 'tcx> {
                 .all(|(operand_pat, operand)| self.match_operand(operand_pat, operand))
     }
 
-    #[expect(dead_code)]
-    fn path_to_ty(&self, path_with_args: pat::PathWithArgs<'pcx>) -> Option<pat::Ty<'pcx>> {
-        if !path_with_args.args.is_empty() {
-            info!(?path_with_args, "generics not supported yet")
-        }
-        match path_with_args.path {
-            pat::Path::Item(path) => ty_res(self.pattern.pcx, self.tcx, path.0, &[]),
-            pat::Path::TypeRelative(..) => None,
-            pat::Path::LangItem(..) => None,
-        }
-    }
-
     fn match_ty(&self, ty_pat: pat::Ty<'pcx>, ty: ty::Ty<'tcx>) -> bool {
         let ty_pat_kind = *ty_pat.kind();
         let ty_kind = *ty.kind();
