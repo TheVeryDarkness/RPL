@@ -564,6 +564,7 @@ impl<'pcx, 'tcx> CheckMirCtxt<'_, 'pcx, 'tcx> {
             (pat::Operand::Constant(konst_pat), mir::Operand::Constant(box konst)) => {
                 self.match_const_operand(konst_pat, konst.const_)
             },
+            (pat::Operand::Any, _) => true,
             _ => return false,
         };
         debug!(?pat, ?operand, matched, "match_operand");
