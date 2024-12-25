@@ -29,3 +29,14 @@ rpl_patterns_lengthless_buffer_passed_to_extern_function = it is usually a bug t
 rpl_patterns_wrong_assumption_of_layout_compatibility = wrong assumption of layout compatibility from `{$type_from}` to `{$type_to}`
     .note  = casted from this
     .help  = it's not guaranteed by Rust standard library. See https://github.com/rust-lang/rust/pull/78802
+
+rpl_patterns_trust_exact_size_iterator = it is unsound to trust return value of `std::iter::ExactSizeIterator::len` and pass it to an unsafe function like `std::vec::Vec::set_len`, which may leak uninitialized memory
+    .len_label = `std::iter::ExactSizeIterator::len` used here
+    .help = incorrect implementation of `std::iter::ExactSizeIterator::len` must not cause safety issues
+
+rpl_patterns_slice_from_raw_parts_uninitialized = it violates the precondition of `{$fn_name}` to create a slice from uninitialized data
+    .slice_label = slice created here
+    .vec_label   = `std::vec::Vec` created but not initialized
+    .len_label   = slice created with this length
+    .ptr_label   = slice created with this pointer
+    .help        = See https://doc.rust-lang.org/std/slice/fn.{$fn_name}.html
