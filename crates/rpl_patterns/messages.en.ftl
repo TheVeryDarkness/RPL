@@ -78,8 +78,14 @@ rpl_patterns_deref_null_pointer = Dereference of a possibly null pointer
     .deref_label = dereference here
     .note = this is because the pointer may be null
 
-rpl_patterns_unchecked_ptr_offset = it is unsound to dereference a pointer that is offset using an unchecked integer
+rpl_patterns_deref_unchecked_ptr_offset = it is unsound to dereference a pointer that is offset using an unchecked integer
     .reference_label = dereferenced here
     .ptr_label = pointer created here
     .offset_label = offset passed in here
     .help = check whether it's in bound before dereferencing
+
+rpl_patterns_unchecked_ptr_offset = it is an undefined behavior to offset a pointer using an unchecked integer
+    .offset_label = offset here
+    .ptr_label = pointer created here
+    .help = check whether it's in bound before offsetting
+    .note = See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
