@@ -22,3 +22,5 @@ mir_dump
 
 # mdbook
 /docs/book/book
+/docs/reference/book
+tmp/
