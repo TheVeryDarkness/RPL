@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rpl_context::PatCtxt;
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
@@ -49,7 +51,13 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         if self.tcx.visibility(def_id).is_public() && self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let pattern = pattern_vec_set_len_to_extend(self.pcx);
+            let mut records = HashSet::new();
             for matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern.pattern, pattern.fn_pat).check() {
+                let record = (pattern.vec, pattern.set_len);
+                if records.contains(&record) {
+                    continue;
+                }
+                records.insert(record);
                 let set_len = matches[pattern.set_len].span_no_inline(body);
                 let vec = matches[pattern.vec].span_no_inline(body);
                 self.tcx.emit_node_span_lint(
