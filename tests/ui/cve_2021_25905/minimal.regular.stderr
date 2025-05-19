@@ -60,7 +60,7 @@ LL |       cases!(Vec::with_capacity(0));
    = note: this error originates in the macro `cases` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
-  --> tests/ui/cve_2021_25905/minimal.rs:36:32
+  --> tests/ui/cve_2021_25905/minimal.rs:31:32
    |
 LL |             let b = buf.len();
    |                     --------- slice created with this length
@@ -101,7 +101,7 @@ LL |       cases!(Vec::with_capacity(1));
    = note: this error originates in the macro `cases` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
-  --> tests/ui/cve_2021_25905/minimal.rs:36:32
+  --> tests/ui/cve_2021_25905/minimal.rs:31:32
    |
 LL |             let b = buf.len();
    |                     --------- slice created with this length
