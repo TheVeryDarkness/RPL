@@ -1,4 +1,4 @@
-//@ ignore-on-host
+//@check-pass
 
 use std::{
     cell::UnsafeCell,
