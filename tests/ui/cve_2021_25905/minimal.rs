@@ -10,15 +10,16 @@ macro_rules! cases {
             let mut buf: Vec<u8> = $init;
             let b = buf.len();
 
+            //FIXME: deduplication
             let buf = unsafe {
                 std::slice::from_raw_parts_mut(
-                    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+                    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized part of a `Vec`
                     //~[regular]| HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
-                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized part of a `Vec`
                     //~[regular]| HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
-                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized part of a `Vec`
                     //~[regular]| HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
-                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+                    //~[regular]| ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized part of a `Vec`
                     //~[regular]| HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
                     //~[regular]| NOTE: `#[deny(rpl::slice_from_raw_parts_uninitialized)]` on by default
                     buf.as_mut_ptr().offset(b as isize),
@@ -33,6 +34,10 @@ macro_rules! cases {
             let b = buf.len();
 
             let buf = unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr(), b) };
+            //~[regular]^ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
+            //~[regular]|HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
+            //~[regular]|ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
+            //~[regular]|HELP: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
         }
 
         fn deref_coerce() {

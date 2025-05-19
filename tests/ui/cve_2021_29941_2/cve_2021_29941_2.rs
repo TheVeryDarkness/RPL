@@ -7,7 +7,7 @@ pub fn swap_index_for_enumerate_(bla: impl ExactSizeIterator<Item = u32>) -> Vec
     let len = bla.len();
     let mut vec = Vec::with_capacity(len);
     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mut_ptr(), bla.len()) };
-    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
     for (i, a) in bla.enumerate() {
         arr[a as usize] = i as u32;
     }
@@ -31,8 +31,8 @@ pub fn with_capacity_write_from_raw_parts(bla: impl ExactSizeIterator<Item = u32
         }
     }
     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mut_ptr(), len) };
-    //FIXME: may be a false negative, `vec` is not initialized
-    //ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+    //~[regular]^ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
+    // not all elements of `vec` are guaranteed to be initialized
     vec
 }
 
@@ -40,7 +40,7 @@ pub fn swap_index_range_loop_next(bla: std::ops::Range<u32>) -> Vec<u32> {
     let len = bla.len();
     let mut vec = Vec::with_capacity(len);
     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mut_ptr(), bla.len()) };
-    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+    //~[regular]^ ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
     /* for (i, a) in bla.enumerate() {
         arr[a as usize] = i as u32;
     } */
@@ -67,8 +67,8 @@ pub fn swap_index_for_enumerate(bla: impl ExactSizeIterator<Item = u32>) -> Vec<
     let len = bla.len();
     let mut vec = Vec::with_capacity(len);
     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mut_ptr(), len) };
-    //FIXME: a false negative, `vec` is not initialized
-    //ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
+    //~[regular]^ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
+    // `vec` is not initialized
     for (i, a) in bla.enumerate() {
         arr[a as usize] = i as u32;
     }
