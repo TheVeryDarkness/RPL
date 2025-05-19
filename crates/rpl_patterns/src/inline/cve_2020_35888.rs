@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rpl_context::PatCtxt;
 use rpl_mir::{CheckMirCtxt, pat};
 use rustc_hir as hir;
@@ -51,7 +53,13 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let pattern = pattern_drop_unit_value(self.pcx);
+            let mut records = HashSet::new();
             for matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern.pattern, pattern.fn_pat).check() {
+                let record = (pattern.drop, pattern.alloc, pattern.ptr, pattern.assign);
+                if records.contains(&record) {
+                    continue;
+                }
+                records.insert(record);
                 let drop = matches[pattern.drop].span_no_inline(body);
                 let alloc = matches[pattern.alloc].span_no_inline(body);
                 let ptr = matches[pattern.ptr].span_no_inline(body);

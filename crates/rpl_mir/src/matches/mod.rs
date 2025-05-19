@@ -9,7 +9,7 @@ use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::{MutatingUseContext, PlaceContext};
-use rustc_middle::mir::{self, Const, PlaceRef};
+use rustc_middle::mir::{self, Const, HasLocalDecls, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::Span;
 
@@ -840,6 +840,22 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         }
         self.matching[loc_pat].matched.set(None);
     }
+    fn place_context_compatible(place_context_pat: PlaceContext, place_context: PlaceContext, is_copy: bool) -> bool {
+        let _ = place_context;
+        let _ = place_context_pat;
+        let _ = is_copy;
+        true
+        // place_context_pat == place_context
+        // || match (place_context_pat, place_context) {
+        //     (PlaceContext::MutatingUse(_), PlaceContext::MutatingUse(_))
+        //     | (PlaceContext::NonMutatingUse(_), PlaceContext::NonMutatingUse(_)) => true,
+        //     (PlaceContext::NonMutatingUse(_), PlaceContext::MutatingUse(_))
+        //     | (PlaceContext::MutatingUse(_), PlaceContext::NonMutatingUse(_)) => is_copy,
+        //     _ => false,
+        // }
+    }
+    /// Check if the statement accesses the local variable matched by `local_pat` in the expected
+    /// way.
     #[instrument(level = "debug", skip(self), ret)]
     fn match_stmt_locals(&self, loc_pat: pat::Location, stmt_match: StatementMatch) -> bool {
         let accesses_pat = self.cx.pat_ddg[loc_pat.block].accesses(loc_pat.statement_index);
@@ -862,14 +878,23 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                 // .is_some_and(|&(local, _)| self.match_local(local_pat, local));
                 .is_some_and(|&(local, _)| self.matching[local_pat].force_get_matched() == local);
         }
-        let mut iter = accesses.iter();
+        // let mut iter = accesses.iter();
         accesses_pat.iter().all(|&(local_pat, access_pat)| {
             debug!(?local_pat, ?access_pat);
-            iter.by_ref()
-                .inspect(|&&(local, access)| debug!(?local, ?access))
-                .find(|&&(_, access)| access == access_pat)
-                // .is_some_and(|&(local, _)| self.match_local(local_pat, local))
-                .is_some_and(|&(local, _)| self.matching[local_pat].force_get_matched() == local)
+            let matched_loc = self.matching[local_pat].force_get_matched();
+            let tcx = self.cx.ty.tcx;
+            let ty = self.cx.body.local_decls()[matched_loc].ty;
+            let is_copy = tcx.type_is_copy_modulo_regions(self.cx.ty.typing_env, ty);
+            accesses
+                .iter()
+                .inspect(|&(local, access)| debug!(?local, ?access))
+                .any(|&(local, access)| {
+                    Self::place_context_compatible(access, access_pat, is_copy) && matched_loc == local
+                })
+            // .find(|&&(_, access)| Self::place_context_compatible(access, access_pat, is_copy))
+            // .is_some_and(|&(local, _)| self.match_local(local_pat, local))
+            // .is_some_and(|&(local, _)| matched_loc == local)
+            // .any(|&(local, _)| self.matching[local_pat].force_get_matched() == local)
         })
     }
     /// Match a local variable in the pattern graph with a local variable in the MIR graph.
