@@ -2,13 +2,14 @@ use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_middle::hir::nested_filter::All;
-use rustc_middle::ty::TyCtxt;
-use rustc_span::{Span, Symbol};
+use rustc_middle::mir;
+use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_span::{Span, Symbol, sym};
 
 use rpl_context::{PatCtxt, pat};
 use rpl_mir::CheckMirCtxt;
 
-use crate::lints::{UNCHECKED_ALLOCATED_POINTER, USE_AFTER_REALLOC};
+use crate::lints::{MISALIGNED_POINTER, USE_AFTER_REALLOC};
 
 #[instrument(level = "info", skip_all)]
 pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item_id: hir::ItemId) {
@@ -60,19 +61,24 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
 
-            let pattern = alloc_misaligned_cast(self.pcx);
+            if kind.header().is_none_or(|header| !header.is_unsafe()) {
+                let pattern = alloc_misaligned_cast(self.pcx);
 
-            for matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern.pattern, pattern.fn_pat).check() {
-                let alloc = matches[pattern.alloc].span_no_inline(body);
-                let write = matches[pattern.cast].span_no_inline(body);
-                let ty = matches[pattern.ty.idx];
+                for matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern.pattern, pattern.fn_pat).check() {
+                    let alloc = matches[pattern.alloc].span_no_inline(body);
+                    let write = matches[pattern.cast].span_no_inline(body);
+                    let ty = matches[pattern.ty.idx];
+                    let alignment = matches[pattern.alignment.idx];
 
-                self.tcx.emit_node_span_lint(
-                    UNCHECKED_ALLOCATED_POINTER,
-                    self.tcx.local_def_id_to_hir_id(def_id),
-                    write,
-                    crate::errors::UncheckedAllocatedPointer { alloc, write, ty },
-                );
+                    if maybe_misaligned(self.tcx, body, ty, alignment) {
+                        self.tcx.emit_node_span_lint(
+                            MISALIGNED_POINTER,
+                            self.tcx.local_def_id_to_hir_id(def_id),
+                            write,
+                            crate::errors::MisalignedPointer { alloc, write, ty },
+                        );
+                    }
+                }
             }
 
             for pattern in [
@@ -111,6 +117,7 @@ struct Pattern2<'pcx> {
     alloc: pat::Location,
     cast: pat::Location,
     ty: pat::TyVar,
+    alignment: pat::ConstVar<'pcx>,
 }
 
 #[rpl_macros::pattern_def]
@@ -118,16 +125,17 @@ fn alloc_misaligned_cast(pcx: PatCtxt<'_>) -> Pattern2<'_> {
     let alloc;
     let cast;
     let ty;
+    let alignment;
     let pattern = rpl! {
-        #[meta(#[export(ty)] $T:ty, $alignment: const(usize))]
+        #[meta(#[export(ty)] $T:ty = is_all_safe_trait, #[export(alignment)] $alignment: const(usize))]
         fn $pattern(..) -> _ = mir! {
             let $layout_result: core::result::Result<core::alloc::Layout, _> = alloc::alloc::Layout::from_size_align(
                 _,
                 const $alignment
             );
-            let $layout: core::alloc::Layout = _;
+            let $layout: core::alloc::Layout = core::result::Result::unwrap(move $layout_result);
             #[export(alloc)]
-            let $ptr_1: *mut u8 = alloc::alloc::alloc(move $layout);
+            let $ptr_1: *mut u8 = alloc::alloc::alloc(copy $layout);
             #[export(cast)]
             let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr);
         }
@@ -140,6 +148,48 @@ fn alloc_misaligned_cast(pcx: PatCtxt<'_>) -> Pattern2<'_> {
         alloc,
         cast,
         ty,
+        alignment,
+    }
+}
+
+#[instrument(level = "debug", skip(tcx), ret)]
+fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, self_ty: Ty<'tcx>) -> bool {
+    // Some unsafe traits that are not related to alignment
+    const EXCLUDED_DIAG_ITEMS: &[Symbol] = &[sym::Send, sym::Sync];
+    typing_env
+        .param_env
+        .caller_bounds()
+        .iter()
+        .filter_map(|clause| clause.as_trait_clause())
+        .filter(|clause| clause.self_ty().no_bound_vars().expect("Unhandled bound vars") == self_ty)
+        .map(|clause| clause.def_id())
+        .filter(|&def_id| {
+            tcx.get_diagnostic_name(def_id)
+                .is_none_or(|name| !EXCLUDED_DIAG_ITEMS.contains(&name))
+        })
+        .map(|def_id| tcx.trait_def(def_id))
+        .inspect(|trait_def| debug!(?trait_def))
+        .all(|trait_def| matches!(trait_def.safety, hir::Safety::Safe))
+}
+
+#[instrument(level = "debug", skip(tcx), ret)]
+fn maybe_misaligned<'tcx>(
+    tcx: ty::TyCtxt<'tcx>,
+    body: &mir::Body<'tcx>,
+    ty: Ty<'tcx>,
+    alignment: mir::Const<'tcx>,
+) -> bool {
+    let typing_env = ty::TypingEnv::post_analysis(tcx, body.source.def_id());
+    match ty.kind() {
+        // Param types can be anything, and we don't know the alignment.
+        // Also, param types with unsafe traits have been filtered out in `is_all_safe_trait`.
+        ty::TyKind::Param(_) => true,
+        // foreign types are opaque to Rust
+        ty::TyKind::Foreign(_) => true,
+        _ => {
+            let layout = tcx.layout_of(typing_env.as_query_input(ty)).unwrap();
+            alignment.eval_target_usize(tcx, typing_env) < layout.align.pref.bytes()
+        },
     }
 }
 
