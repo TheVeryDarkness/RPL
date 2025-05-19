@@ -1,4 +1,4 @@
-//@ ignore-on-host
+//@check-pass
 
 use std::cmp::Ordering;
 use std::fmt;

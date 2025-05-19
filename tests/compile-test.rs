@@ -34,6 +34,7 @@ extern crate quote;
 extern crate scoped_threadpool;
 extern crate serde;
 extern crate serde_json;
+extern crate smallvec;
 extern crate syn;
 extern crate tokio;
 extern crate tokio_util;
@@ -60,6 +61,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "serde",
     "serde_derive",
     "serde_json",
+    "smallvec",
     "syn",
     "scoped_threadpool",
     "thiserror",
