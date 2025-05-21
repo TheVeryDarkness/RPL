@@ -4,7 +4,7 @@ use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir};
 use rustc_middle::hir::nested_filter::All;
-use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, Symbol};
 
 use crate::lints::UNSOUND_PIN_PROJECT;
@@ -95,7 +95,7 @@ struct PatternPin<'pcx> {
     fn_pat: &'pcx pat::Fn<'pcx>,
     mut_self: pat::Local,
     pin_new: pat::Location,
-    ty_var: pat::TyVar,
+    ty_var: pat::TyVar<'pcx>,
 }
 
 #[rpl_macros::pattern_def]
@@ -110,7 +110,7 @@ fn pattern_pin(pcx: PatCtxt<'_>) -> PatternPin<'_> {
             $field: $S,
         }
 
-        #[meta(#[export(ty_var)] $S:ty = is_not_unpin)]
+        #[meta(#[export(ty_var)] $S:ty where rpl_predicates::is_not_unpin)]
         fn $pattern(..) -> _ = mir! {
             #[export(mut_self)]
             let $self: &mut $SizedStream;
@@ -144,7 +144,7 @@ fn pattern_pin_field(pcx: PatCtxt<'_>) -> PatternPin<'_> {
             $field: $T,
         }
 
-        #[meta(#[export(ty_var)] $T:ty = is_not_unpin)]
+        #[meta(#[export(ty_var)] $T:ty where rpl_predicates::is_not_unpin)]
         fn $pattern(..) -> _ = mir! {
             #[export(mut_self)]
             let $self: &mut $Framed;
@@ -162,9 +162,4 @@ fn pattern_pin_field(pcx: PatCtxt<'_>) -> PatternPin<'_> {
         pin_new,
         ty_var,
     }
-}
-
-#[instrument(level = "debug", skip(tcx), ret)]
-fn is_not_unpin<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
-    !ty.is_unpin(tcx, typing_env)
 }
