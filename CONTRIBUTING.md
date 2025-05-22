@@ -109,3 +109,13 @@ To fix this, you can add the following to your `launch.json`(There may be some s
     "LD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-unknown-linux-gnu/lib"
 },
 ```
+
+## Pass environment variables to RPL
+
+Pass pattern path to RPL by setting the `RPL_ARGS` environment variable.
+
+For example:
+
+```
+RPL_PATS=~/home/code/projects/RPL/docs/patterns/CVE-2019-16138-MIR.rpl RUSTFLAGS=-Zinline-mir=false cargo rpl
+```

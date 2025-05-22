@@ -65,6 +65,7 @@ fn test_arg_value() {
     assert_eq!(arg_value(args, "--foo", |_| true), None);
 }
 
+#[allow(unused)]
 fn consume_arg_values(args: &mut Vec<String>, find_arg: &str) -> Vec<String> {
     let mut found_values = Vec::new();
     let find_arg_with_eq = format!("{}=", find_arg);
@@ -146,9 +147,6 @@ pub fn main() {
     exit(rustc_driver::catch_with_exit_code(move || {
         let mut orig_args: Vec<String> = rustc_driver::args::raw_args(&early_dcx);
 
-        // collect pattern paths from `--pat` and consume them
-        let pattern_paths = consume_arg_values(&mut orig_args, "--pat");
-
         let has_sysroot_arg = |args: &mut [String]| -> bool {
             if arg_value(args, "--sysroot", |_| true).is_some() {
                 return true;
@@ -215,6 +213,9 @@ pub fn main() {
         let mut args: Vec<String> = orig_args.clone();
         pass_sysroot_env_if_given(&mut args, sys_root_env);
 
+        let pattern_paths = env::var("RPL_PATS")
+            .expect("RPL_PATS is not set. Pass pattern path to RPL by setting the `RPL_PATS` environment variable.");
+
         let mut no_deps = false;
         let rpl_args_var = env::var(rpl_interface::RPL_ARGS_ENV).ok();
         let rpl_args = rpl_args_var
@@ -247,7 +248,7 @@ pub fn main() {
             /* rustc_driver::RunCompiler::new(&args, &mut RplCallbacks::new(rpl_args_var))
             .set_using_internal_features(using_internal_features)
             .run() */
-            rustc_driver::run_compiler(&args, &mut RplCallbacks::new(rpl_args_var, pattern_paths))
+            rustc_driver::run_compiler(&args, &mut RplCallbacks::new(rpl_args_var, vec![pattern_paths]))
         } else {
             rustc_driver::run_compiler(&args, &mut RustcCallbacks::new(rpl_args_var))
         }
@@ -261,12 +262,11 @@ fn help_message() -> &'static str {
 Run <cyan>rpl-driver</> with the same arguments you use for <cyan>rustc</>
 
 <green,bold>Usage</>:
-    <cyan,bold>rpl-driver</> <cyan>[OPTIONS] INPUT</>
+    <cyan,bold>RPL_PATS=path/to/patterns rpl-driver</> <cyan>[OPTIONS] INPUT</>
 
 <green,bold>Common options:</>
     <cyan,bold>-h</>, <cyan,bold>--help</>               Print this message
     <cyan,bold>-V</>, <cyan,bold>--version</>            Print version info and exit
-    <cyan,bold>--pat</>                    Path to the pattern file(s), won't be passed to rustc
     <cyan,bold>--rustc</>                  Pass all arguments to <cyan>rustc</>
 "
     )

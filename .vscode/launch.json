@@ -22,8 +22,6 @@
                 // as it uses a hash in the file name.
                 // "--extern",
                 // "libc=${workspaceFolder}/target/debug/deps/liblibc-f5b3b8a882fe8188.rlib",
-                "--pat",
-                "docs/patterns/CVE-2021-27376-MIR.rpl",
                 "tests/ui/cve_2018_21000/cve_2018_21000.rs"
             ],
             "env": {
