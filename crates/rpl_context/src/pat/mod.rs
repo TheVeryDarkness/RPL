@@ -1,3 +1,4 @@
+use either::Either;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::NonLocalMetaSymTab;
 use rpl_meta::utils::Ident;
@@ -23,13 +24,13 @@ pub use ty::*;
 
 #[derive(Default, Debug)]
 pub struct NonLocalMetaVars<'pcx> {
-    pub ty_vars: IndexVec<TyVarIdx, TyVar>,
+    pub ty_vars: IndexVec<TyVarIdx, TyVar<'pcx>>,
     pub const_vars: IndexVec<ConstVarIdx, ConstVar<'pcx>>,
     pub place_vars: IndexVec<PlaceVarIdx, PlaceVar<'pcx>>,
 }
 
 impl<'pcx> NonLocalMetaVars<'pcx> {
-    pub fn add_ty_var(&mut self, name: Symbol, pred: Option<TyPred>) {
+    pub fn add_ty_var(&mut self, name: Symbol, pred: &'pcx [&'pcx [Either<TyPred, TyPred>]]) {
         let idx = self.ty_vars.next_index();
         let ty_var = TyVar { idx, name, pred };
         self.ty_vars.push(ty_var);
@@ -69,7 +70,7 @@ impl<'pcx> NonLocalMetaVars<'pcx> {
                 }
             }
             for ident in type_vars {
-                meta.add_ty_var(ident, None);
+                meta.add_ty_var(ident, &[]);
             }
             for (ident, konst) in konst_vars {
                 let ty = Ty::from(konst.get_matched().2, pcx, sym_tab.clone());

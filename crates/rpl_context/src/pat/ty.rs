@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use either::Either;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::NonLocalMetaSymTab;
 use rpl_parser::generics::{Choice2, Choice3, Choice4, Choice10, Choice12, Choice14};
@@ -122,7 +123,7 @@ impl<'pcx> Ty<'pcx> {
                     rpl_meta::symbol_table::MetaVariableType::Type => TyVar {
                         idx: idx.into(),
                         name: Symbol::intern(ty_meta_var.span.as_str()),
-                        pred: None,
+                        pred: &[],
                     },
                     _ => panic!("A non-type meta variable used as a type variable"),
                 };
@@ -168,7 +169,7 @@ impl RegionKind {
 
 #[derive(Clone, Copy)]
 pub enum TyKind<'pcx> {
-    TyVar(TyVar),
+    TyVar(TyVar<'pcx>),
     AdtPat(Symbol),
     Array(Ty<'pcx>, Const<'pcx>),
     Slice(Ty<'pcx>),
@@ -620,10 +621,10 @@ impl From<IntValue> for Const<'_> {
 }
 
 #[derive(Clone, Copy)]
-pub struct TyVar {
+pub struct TyVar<'pcx> {
     pub idx: TyVarIdx,
     pub name: Symbol,
-    pub pred: Option<TyPred>,
+    pub pred: &'pcx [&'pcx [Either<TyPred, TyPred>]],
 }
 
 #[derive(Clone, Copy)]

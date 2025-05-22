@@ -1311,6 +1311,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpl_predicates"
+version = "0.1.0"
+dependencies = [
+ "rpl_match",
+ "tracing",
+]
+
+[[package]]
 name = "rpl_utils"
 version = "0.1.0"
 dependencies = [
