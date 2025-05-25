@@ -5,6 +5,7 @@ use super::utils::mutability_from_pair_mutability;
 use super::{FnSymbolTable, MirPattern, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
 use crate::PatCtxt;
 use rpl_meta::collect_elems_separated_by_comma;
+use rpl_meta::symbol_table::WithPath;
 use rpl_parser::generics::Choice4;
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
@@ -121,9 +122,12 @@ pub struct Impl<'pcx> {
 
 #[derive(Default)]
 pub struct Fns<'pcx> {
-    pub fns: FxHashMap<Symbol, Fn<'pcx>>,
-    pub fn_pats: FxHashMap<Symbol, Fn<'pcx>>,
-    pub unnamed_fns: Vec<Fn<'pcx>>,
+    /// all function patterns, indexed with the pattern name but not the function name
+    pub fns: FxHashMap<Symbol, &'pcx Fn<'pcx>>,
+    /// fn some_name (..) -> _ { .. }
+    pub(crate) named_fns: FxHashMap<Symbol, &'pcx Fn<'pcx>>,
+    /// fn _ (..) -> _ { .. }
+    pub(crate) unnamed_fns: Vec<&'pcx Fn<'pcx>>,
 }
 
 pub struct Fn<'pcx> {
@@ -143,13 +147,14 @@ pub enum FnBody<'pcx> {
 
 impl<'pcx> Fn<'pcx> {
     pub fn from(
-        pair: &pairs::Fn<'pcx>,
+        pair: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &FnSymbolTable<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
     ) -> Self {
+        let p = pair.path;
         let (sig, body) = pair.get_matched();
-        let (safety, visibility, name, params, ret) = Self::from_sig(sig, pcx, fn_sym_tab);
+        let (safety, visibility, name, params, ret) = Self::from_sig(WithPath::new(p, sig), pcx, fn_sym_tab);
 
         let (decls, stmts) = if let Some(body) = body.MirBody() {
             let (decls, stmts) = body.get_matched();
@@ -158,10 +163,12 @@ impl<'pcx> Fn<'pcx> {
             (Vec::new(), Vec::new())
         };
 
-        let raw_stmts = stmts.into_iter().map(|stmt| RawStatement::from(stmt, pcx, fn_sym_tab));
+        let raw_stmts = stmts
+            .into_iter()
+            .map(|stmt| RawStatement::from(WithPath::new(p, stmt), pcx, fn_sym_tab));
         let raw_decls = decls
             .into_iter()
-            .map(|decl| RawDecleration::from(decl, pcx, fn_sym_tab));
+            .map(|decl| RawDecleration::from(WithPath::new(p, decl), pcx, fn_sym_tab));
 
         let mut builder = MirPattern::builder();
         builder.mk_locals(fn_sym_tab, pcx);
@@ -182,10 +189,11 @@ impl<'pcx> Fn<'pcx> {
     }
 
     pub fn from_sig(
-        sig: &pairs::FnSig<'_>,
+        sig: WithPath<'pcx, &'pcx pairs::FnSig<'_>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &FnSymbolTable<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> (Safety, Visibility, Symbol, Params<'pcx>, Option<Ty<'pcx>>) {
+        let p = sig.path;
         let (unsafety, visibility, _, fn_name, _, params_pair, _, ret) = sig.get_matched();
         let safety = if unsafety.is_some() {
             Safety::Unsafe
@@ -199,13 +207,13 @@ impl<'pcx> Fn<'pcx> {
         };
         let fn_name = Symbol::intern(fn_name.span.as_str());
         let params = if let Some(params_pair) = params_pair {
-            Params::from(params_pair, pcx, fn_sym_tab)
+            Params::from(WithPath::new(p, params_pair), pcx, fn_sym_tab)
         } else {
             Params::default()
         };
         let ret = ret
             .as_ref()
-            .map(|ret| Ty::from_fn_ret(ret, pcx, fn_sym_tab.meta_vars.clone()));
+            .map(|ret| Ty::from_fn_ret(WithPath::new(p, ret), pcx, fn_sym_tab));
         (safety, visibility, fn_name, params, ret)
     }
 }
@@ -237,11 +245,12 @@ pub struct Param<'pcx> {
 impl<'pcx> Param<'pcx> {
     /// The bool indicates whether the parameter is a `..`, which makes params non-
     pub fn from(
-        param: &pairs::FnParam<'_>,
+        param: WithPath<'pcx, &'pcx pairs::FnParam<'_>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &FnSymbolTable<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> (Option<Self>, bool) {
-        match param.deref() {
+        let p = param.path;
+        match param.inner.deref() {
             Choice4::_0(_self_param) => {
                 // FIXME: implement self param
                 (None, false)
@@ -250,13 +259,13 @@ impl<'pcx> Param<'pcx> {
                 let (mutability, ident, _, ty) = normal.get_matched();
                 let mutability = mutability_from_pair_mutability(mutability);
                 let ident = Symbol::intern(ident.span.as_str());
-                let ty = Ty::from(ty, pcx, fn_sym_tab.meta_vars.clone());
+                let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);
                 (Some(Self { mutability, ident, ty }), false)
             },
             Choice4::_2(place_holder_with_type) => {
                 let (mutability, placeholder, _, ty) = place_holder_with_type.get_matched();
                 let mutability = mutability_from_pair_mutability(mutability);
-                let ty = Ty::from(ty, pcx, fn_sym_tab.meta_vars.clone());
+                let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);
                 (
                     Some(Self {
                         mutability,
@@ -274,8 +283,8 @@ impl<'pcx> Param<'pcx> {
 pub struct TraitDef {}
 
 impl<'pcx> Fns<'pcx> {
-    pub fn get_fn_pat(&self, name: Symbol) -> Option<&Fn<'pcx>> {
-        self.fn_pats.get(&name)
+    pub fn get_fn_pat(&self, name: Symbol) -> Option<&'pcx Fn<'pcx>> {
+        self.named_fns.get(&name).copied()
     }
     // pub fn new_fn(&mut self, name: Symbol) -> &mut Fn<'pcx> {
     //     self.fns.entry(name).or_insert_with(|| Fn::new(name))
@@ -318,16 +327,17 @@ impl<'pcx> Fn<'pcx> {
 
 impl<'pcx> Params<'pcx> {
     pub fn from(
-        pair: &pairs::FnParamsSeparatedByComma<'_>,
+        pair: WithPath<'pcx, &'pcx pairs::FnParamsSeparatedByComma<'_>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &FnSymbolTable<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
+        let p = pair.path;
         let params = collect_elems_separated_by_comma!(pair);
         let mut non_exhaustive: bool = false;
         let params = params
             .into_iter()
             .filter_map(|param| {
-                let (param, ne) = Param::from(param, pcx, fn_sym_tab);
+                let (param, ne) = Param::from(WithPath::new(p, param), pcx, fn_sym_tab);
                 non_exhaustive |= ne;
                 param
             })

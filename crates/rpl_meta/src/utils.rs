@@ -1,9 +1,11 @@
+use derive_more::Debug;
 use parser::generics::Choice2;
 use parser::pairs;
 use pest_typed::Span;
 use rustc_span::Symbol;
 
 #[derive(Copy, Clone, Debug)]
+#[debug("{name}")]
 pub struct Ident<'i> {
     pub name: Symbol,
     pub span: Span<'i>,
@@ -17,6 +19,7 @@ impl PartialEq for Ident<'_> {
 
 impl Eq for Ident<'_> {}
 
+use std::fmt;
 use std::hash::{Hash, Hasher};
 
 impl Hash for Ident<'_> {
@@ -73,7 +76,7 @@ impl<'i> From<Span<'i>> for Ident<'i> {
 
 impl std::fmt::Display for Ident<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.name.fmt(f)
+        std::fmt::Display::fmt(&self.name, f)
     }
 }
 
@@ -101,6 +104,7 @@ impl<'i> From<&'i pairs::Path<'i>> for Path<'i> {
 }
 
 impl<'i> Path<'i> {
+    /// Returns `Some(ident)` if `self` is a single identifier.
     pub fn as_ident(&self) -> Option<Ident<'i>> {
         if self.leading.is_none() && self.segments.len() == 1 {
             Some(Ident::from(self.segments[0]))
@@ -108,9 +112,23 @@ impl<'i> Path<'i> {
             None
         }
     }
-    pub fn ident(&self) -> Option<Ident<'i>> {
-        let last = self.segments.last()?;
-        Some(Ident::from(*last))
+    /// Returns the last segment.
+    pub fn ident(&self) -> Ident<'i> {
+        //FIXME: use a non-empty `Vec` type
+        let last = self.segments.last().unwrap();
+        Ident::from(*last)
+    }
+}
+
+impl<'i> fmt::Debug for Path<'i> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(leading) = self.leading {
+            write!(f, "{}", leading.span.as_str())?;
+        }
+        for segment in &self.segments {
+            write!(f, "::{}", segment.span.as_str())?;
+        }
+        Ok(())
     }
 }
 
@@ -123,4 +141,32 @@ macro_rules! collect_elems_separated_by_comma {
             .map(|comma_with_elem| comma_with_elem.get_matched().1);
         std::iter::once(first).chain(following)
     }};
+}
+
+pub trait Record: Sized {
+    type Ok;
+    type Err;
+
+    fn or_record(self, errors: &mut Vec<Self::Err>) -> Option<Self::Ok>;
+    fn or_record_and_default(self, errors: &mut Vec<Self::Err>) -> Self::Ok
+    where
+        Self::Ok: Default,
+    {
+        self.or_record(errors).unwrap_or_default()
+    }
+}
+
+impl<T, E> Record for Result<T, E> {
+    type Ok = T;
+    type Err = E;
+
+    fn or_record(self, errors: &mut Vec<<Self as Record>::Err>) -> Option<<Self as Record>::Ok> {
+        match self {
+            Ok(value) => Some(value),
+            Err(err) => {
+                errors.push(err);
+                None
+            },
+        }
+    }
 }

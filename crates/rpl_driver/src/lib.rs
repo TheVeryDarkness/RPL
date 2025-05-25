@@ -108,15 +108,15 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
-                for _matches in
-                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern, &pattern.fns.unnamed_fns[0]).check()
-                {
-                    self.tcx.emit_node_span_lint(
-                        ERROR_FOUND,
-                        self.tcx.local_def_id_to_hir_id(def_id),
-                        body.span,
-                        ErrorFound,
-                    );
+                for (&name, fn_pat) in &pattern.fns.fns {
+                    for _matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern, name, fn_pat).check() {
+                        self.tcx.emit_node_span_lint(
+                            ERROR_FOUND,
+                            self.tcx.local_def_id_to_hir_id(def_id),
+                            body.span,
+                            ErrorFound,
+                        );
+                    }
                 }
             });
         }

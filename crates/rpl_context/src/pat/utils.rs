@@ -1,5 +1,6 @@
 use crate::pat::mir::Operand;
 use rpl_meta::collect_elems_separated_by_comma;
+use rpl_meta::symbol_table::WithPath;
 use rpl_parser::generics::{Choice2, Choice3, Choice12};
 use rpl_parser::pairs::{self};
 use rustc_middle::mir;
@@ -7,7 +8,7 @@ use std::ops::Deref;
 
 use crate::PatCtxt;
 
-use super::FnSymbolTable;
+use super::{FnSymbolTable, with_path};
 
 pub(crate) fn mutability_from_pair_mutability(pair: &pairs::Mutability<'_>) -> mir::Mutability {
     if pair.kw_mut().is_some() {
@@ -68,13 +69,14 @@ pub(crate) fn unop_from_pair(pair: &pairs::MirUnOp<'_>) -> mir::UnOp {
 }
 
 pub(crate) fn collect_operands<'pcx>(
-    operands: &Option<pairs::MirOperandsSeparatedByComma<'pcx>>,
+    operands: Option<WithPath<'pcx, &'pcx pairs::MirOperandsSeparatedByComma<'pcx>>>,
     pcx: PatCtxt<'pcx>,
-    fn_sym_tab: &FnSymbolTable<'pcx>,
+    fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
 ) -> Vec<Operand<'pcx>> {
     if let Some(operands) = operands {
+        let p = operands.path;
         collect_elems_separated_by_comma!(operands)
-            .map(|operand| Operand::from(operand, pcx, fn_sym_tab))
+            .map(|operand| Operand::from(with_path(p, operand), pcx, fn_sym_tab))
             .collect()
     } else {
         vec![]

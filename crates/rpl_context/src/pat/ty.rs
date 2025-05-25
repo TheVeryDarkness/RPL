@@ -1,9 +1,8 @@
 use std::ops::Deref;
-use std::sync::Arc;
 
 use either::Either;
-use rpl_meta::collect_elems_separated_by_comma;
-use rpl_meta::symbol_table::NonLocalMetaSymTab;
+use rpl_meta::symbol_table::{GetType, TypeOrPath, WithPath};
+use rpl_meta::{collect_elems_separated_by_comma, utils};
 use rpl_parser::generics::{Choice2, Choice3, Choice4, Choice10, Choice12, Choice14};
 use rpl_parser::pairs;
 use rustc_data_structures::packed::Pu128;
@@ -15,6 +14,8 @@ use rustc_span::Symbol;
 
 use crate::PatCtxt;
 use crate::cvt_prim_ty::CvtPrimTy;
+
+use super::FnSymbolTable;
 
 rustc_index::newtype_index! {
     #[debug_format = "?T{}"]
@@ -51,27 +52,36 @@ impl<'pcx> Ty<'pcx> {
         pcx.mk_ty(TyKind::Def(def_id, args))
     }
 
-    pub fn from(ty: &pairs::Type<'_>, pcx: PatCtxt<'pcx>, meta_var_sym_tab: Arc<NonLocalMetaSymTab>) -> Self {
-        match ty.deref() {
+    pub fn from(
+        ty: WithPath<'pcx, &'pcx pairs::Type<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
+    ) -> Self {
+        let p = ty.path;
+        match ty.inner.deref() {
             Choice14::_0(ty_array) => {
                 let (_, ty, _, len, _) = ty_array.get_matched();
-                let ty = Self::from(ty, pcx, meta_var_sym_tab);
+                let ty = WithPath::new(p, ty);
+                let ty = Self::from(ty, pcx, fn_sym_tab);
                 pcx.mk_array_ty(ty, IntValue::from_integer(len).into())
             },
             Choice14::_1(ty_group) => {
                 let (_, ty) = ty_group.get_matched();
-                Self::from(ty, pcx, meta_var_sym_tab)
+                let ty = WithPath::new(p, ty);
+                Self::from(ty, pcx, fn_sym_tab)
             },
             Choice14::_2(_ty_never) => {
                 todo!("implement `TyKind::Never`")
             },
             Choice14::_3(ty_paren) => {
                 let (_, ty, _) = ty_paren.get_matched();
-                Self::from(ty, pcx, meta_var_sym_tab)
+                let ty = WithPath::new(p, ty);
+                Self::from(ty, pcx, fn_sym_tab)
             },
             Choice14::_4(ty_ptr) => {
                 let (_, mutability, ty) = ty_ptr.get_matched();
-                let ty = Self::from(ty, pcx, meta_var_sym_tab);
+                let ty = WithPath::new(p, ty);
+                let ty = Self::from(ty, pcx, fn_sym_tab);
                 let mutability = if mutability.kw_mut().is_some() {
                     mir::Mutability::Mut
                 } else {
@@ -81,7 +91,8 @@ impl<'pcx> Ty<'pcx> {
             },
             Choice14::_5(ty_ref) => {
                 let (_, region, mutability, ty) = ty_ref.get_matched();
-                let ty = Self::from(ty, pcx, meta_var_sym_tab);
+                let ty = WithPath::new(p, ty);
+                let ty = Self::from(ty, pcx, fn_sym_tab);
                 let region = if let Some(region) = region {
                     RegionKind::from(region)
                 } else {
@@ -96,7 +107,8 @@ impl<'pcx> Ty<'pcx> {
             },
             Choice14::_6(ty_slice) => {
                 let (_, ty, _) = ty_slice.get_matched();
-                let ty = Self::from(ty, pcx, meta_var_sym_tab);
+                let ty = WithPath::new(p, ty);
+                let ty = Self::from(ty, pcx, fn_sym_tab);
                 pcx.mk_slice_ty(ty)
             },
             Choice14::_7(ty_tuple) => {
@@ -104,7 +116,10 @@ impl<'pcx> Ty<'pcx> {
                 let tys = if let Some(tys) = tys {
                     let tys = collect_elems_separated_by_comma!(tys).collect::<Vec<_>>();
                     tys.iter()
-                        .map(|ty| Self::from(ty, pcx, meta_var_sym_tab.clone()))
+                        .map(|ty| {
+                            let ty = WithPath::new(p, *ty);
+                            Self::from(ty, pcx, fn_sym_tab)
+                        })
                         .collect::<Vec<_>>()
                 } else {
                     vec![]
@@ -113,9 +128,7 @@ impl<'pcx> Ty<'pcx> {
             },
             Choice14::_8(ty_meta_var) => {
                 // FIXME: judge whether it is a type variable or a adt pattern;
-                let (ty, idx) = meta_var_sym_tab
-                    .get_type_and_idx_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
-                    .unwrap(); // unwrap should be safe here because of the meta pass.
+                let (ty, idx) = fn_sym_tab.get_type_var(ty_meta_var);
                 // FIXME: Information loss, the pred is not stored.
                 // Solution:
                 // Store the pred in the meta_pass.
@@ -132,22 +145,57 @@ impl<'pcx> Ty<'pcx> {
             Choice14::_9(_ty_self) => todo!(),
             Choice14::_10(primitive_types) => pcx.mk_ty(TyKind::from_primitive_type(primitive_types)),
             Choice14::_11(_place_holder) => pcx.mk_any_ty(),
-            Choice14::_12(ty_path) => {
-                let path_with_args = PathWithArgs::from_type_path(ty_path, pcx, meta_var_sym_tab);
-                pcx.mk_path_ty(path_with_args)
-            },
+            Choice14::_12(ty_path) => Self::from_type_path(WithPath::new(p, ty_path), pcx, fn_sym_tab),
             Choice14::_13(lang_item) => {
-                let lang_item = PathWithArgs::from_lang_item(lang_item, pcx, meta_var_sym_tab);
+                let lang_item = PathWithArgs::from_lang_item(WithPath::new(p, lang_item), pcx, fn_sym_tab);
                 pcx.mk_path_ty(lang_item)
             },
         }
     }
 
-    pub fn from_fn_ret(ty: &pairs::FnRet<'_>, pcx: PatCtxt<'pcx>, sym_tab: Arc<NonLocalMetaSymTab>) -> Self {
+    fn from_type_path(
+        ty_path: WithPath<'pcx, &'pcx pairs::TypePath<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
+    ) -> Self {
+        let p = ty_path.path;
+        let (qself, path) = ty_path.get_matched();
+        if qself.is_some() {
+            todo!("qself is not supported yet");
+        }
+        if let Some(ident) = utils::Path::from(path).as_ident() {
+            if let Ok(path) = fn_sym_tab.get_type(&WithPath::new(p, ident)) {
+                return match path {
+                    TypeOrPath::Path(path) => {
+                        let args = GenericArgsRef::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
+                        let path = Path::from(path, pcx);
+                        let path_with_args = PathWithArgs { path, args };
+                        pcx.mk_path_ty(path_with_args)
+                    },
+                    TypeOrPath::Type(ty) => {
+                        let ty = WithPath::new(p, ty);
+                        Ty::from(ty, pcx, fn_sym_tab)
+                    },
+                };
+            }
+        }
+        let args = GenericArgsRef::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
+        let path = Path::from(path, pcx);
+        // fn_sym_tab.inner.get_type(mctx, path.ident(), errors);
+        let path_with_args = PathWithArgs { path, args };
+        pcx.mk_path_ty(path_with_args)
+    }
+
+    pub fn from_fn_ret(
+        ty: WithPath<'pcx, &'pcx pairs::FnRet<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let p = ty.path;
         let (_, placeholder_or_ty) = ty.get_matched();
         match placeholder_or_ty {
             Choice2::_0(_) => pcx.mk_any_ty(),
-            Choice2::_1(ty) => Self::from(ty, pcx, sym_tab.clone()),
+            Choice2::_1(ty) => Self::from(WithPath::new(p, ty), pcx, fn_sym_tab),
         }
     }
 }
@@ -271,13 +319,14 @@ pub enum GenericArgKind<'pcx> {
 
 impl<'pcx> GenericArgKind<'pcx> {
     fn from(
-        arg: &pairs::GenericArgument<'_>,
+        arg: WithPath<'pcx, &'pcx pairs::GenericArgument<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: Arc<NonLocalMetaSymTab>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
     ) -> GenericArgKind<'pcx> {
-        match arg.deref() {
+        let p = arg.path;
+        match arg.inner.deref() {
             Choice3::_0(region) => RegionKind::from(region).into(),
-            Choice3::_1(ty) => GenericArgKind::Type(Ty::from(ty, pcx, sym_tab)),
+            Choice3::_1(ty) => GenericArgKind::Type(Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab)),
             Choice3::_2(konst) => GenericArgKind::Const(Const::from_gconst(konst)),
         }
     }
@@ -351,13 +400,18 @@ impl<'pcx> From<(Ty<'pcx>, Symbol)> for Path<'pcx> {
 pub struct GenericArgsRef<'pcx>(pub &'pcx [GenericArgKind<'pcx>]);
 
 impl<'pcx> GenericArgsRef<'pcx> {
-    pub fn from_path(args: &pairs::Path<'_>, pcx: PatCtxt<'pcx>, sym_tab: Arc<NonLocalMetaSymTab>) -> Self {
-        let path: rpl_meta::utils::Path<'_> = args.into();
+    pub fn from_path(
+        args: WithPath<'pcx, &'pcx pairs::Path<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
+    ) -> Self {
+        let p = args.path;
+        let path: rpl_meta::utils::Path<'_> = args.inner.into();
         let mut items: Vec<GenericArgKind<'_>> = Vec::new();
         path.segments.iter().for_each(|seg| {
             let args = seg.get_matched().1;
             if let Some(args) = args {
-                Self::from_angle_bracketed_generic_arguments(args.deref(), pcx, sym_tab.clone())
+                Self::from_angle_bracketed_generic_arguments(WithPath::new(p, args.deref()), pcx, fn_sym_tab)
                     .iter()
                     .for_each(|arg| {
                         items.push(*arg);
@@ -368,15 +422,16 @@ impl<'pcx> GenericArgsRef<'pcx> {
     }
 
     pub fn from_angle_bracketed_generic_arguments(
-        args: &pairs::AngleBracketedGenericArguments<'_>,
+        args: WithPath<'pcx, &'pcx pairs::AngleBracketedGenericArguments<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: Arc<NonLocalMetaSymTab>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
     ) -> Self {
+        let p = args.path;
         let (_, _, args, _) = args.get_matched();
         let args = collect_elems_separated_by_comma!(args).collect::<Vec<_>>();
         let args = args
             .into_iter()
-            .map(|arg| GenericArgKind::from(arg, pcx, sym_tab.clone()))
+            .map(|arg| GenericArgKind::from(WithPath::new(p, arg), pcx, fn_sym_tab))
             .collect::<Vec<_>>();
         GenericArgsRef(pcx.mk_slice(&args))
     }
@@ -403,32 +458,55 @@ pub struct PathWithArgs<'pcx> {
 }
 
 impl<'pcx> PathWithArgs<'pcx> {
-    pub fn from_path(path: &pairs::Path<'_>, pcx: PatCtxt<'pcx>, sym_tab: Arc<NonLocalMetaSymTab>) -> Self {
-        let args = GenericArgsRef::from_path(path, pcx, sym_tab);
-        let path = Path::from(path, pcx);
+    pub fn from_path(
+        path: WithPath<'pcx, &'pcx pairs::Path<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let args = GenericArgsRef::from_path(path, pcx, fn_sym_tab);
+        let path = Path::from(path.inner, pcx);
         Self { path, args }
     }
 
-    pub fn from_type_path(path: &pairs::TypePath<'_>, pcx: PatCtxt<'pcx>, sym_tab: Arc<NonLocalMetaSymTab>) -> Self {
+    pub fn from_type_path(
+        path: WithPath<'pcx, &'pcx pairs::TypePath<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let p = path.path;
         let (qself, path) = path.get_matched();
         if qself.is_some() {
             todo!("qself is not supported yet");
         }
-        let args = GenericArgsRef::from_path(path, pcx, sym_tab);
+        if let Some(ident) = utils::Path::from(path).as_ident() {
+            if let Ok(path) = fn_sym_tab.get_type(&WithPath::new(p, ident)) {
+                match path {
+                    TypeOrPath::Path(path) => {
+                        let args = GenericArgsRef::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
+                        let path = Path::from(path, pcx);
+                        return Self { path, args };
+                    },
+                    TypeOrPath::Type(_ty) => (), //FIXME: check if this is reasonable
+                }
+            }
+        }
+        let args = GenericArgsRef::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
         let path = Path::from(path, pcx);
+        // fn_sym_tab.inner.get_type(mctx, path.ident(), errors);
         Self { path, args }
     }
 
     pub fn from_lang_item(
-        lang_item: &pairs::LangItemWithArgs<'_>,
+        lang_item: WithPath<'pcx, &'pcx pairs::LangItemWithArgs<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: Arc<NonLocalMetaSymTab>,
+        fn_sym_tab: &'pcx impl GetType<'pcx>,
     ) -> Self {
+        let p = lang_item.path;
         let (_, _, _, _, lang_item, _, args) = lang_item.get_matched();
         let lang_item =
             LangItem::from_name(rustc_span::Symbol::intern(lang_item.span.as_str())).expect("Unknown lang item");
         let args = if let Some(args) = args {
-            GenericArgsRef::from_angle_bracketed_generic_arguments(args, pcx, sym_tab.clone())
+            GenericArgsRef::from_angle_bracketed_generic_arguments(WithPath::new(p, args), pcx, fn_sym_tab)
         } else {
             GenericArgsRef(&[])
         };
@@ -437,13 +515,14 @@ impl<'pcx> PathWithArgs<'pcx> {
     }
 
     pub fn from_path_or_lang_item(
-        path_or_lang_item: &pairs::PathOrLangItem<'_>,
+        path_or_lang_item: WithPath<'pcx, &'pcx pairs::PathOrLangItem<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: Arc<NonLocalMetaSymTab>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
-        match path_or_lang_item.deref() {
-            Choice2::_0(path) => Self::from_path(path, pcx, sym_tab.clone()),
-            Choice2::_1(lang_item) => Self::from_lang_item(lang_item, pcx, sym_tab),
+        let p = path_or_lang_item.path;
+        match path_or_lang_item.inner.deref() {
+            Choice2::_0(path) => Self::from_path(WithPath::new(p, path), pcx, fn_sym_tab),
+            Choice2::_1(lang_item) => Self::from_lang_item(WithPath::new(p, lang_item), pcx, fn_sym_tab),
         }
     }
 }

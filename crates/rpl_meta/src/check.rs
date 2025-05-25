@@ -1,18 +1,25 @@
 use crate::context::MetaContext;
 use crate::symbol_table::{
-    EnumInner, FnInner, ImplInner, NonLocalMetaSymTab, SymbolTable, Variant, ident_is_primitive,
+    EnumInner, FnInner, GetType as _, ImplInner, NonLocalMetaSymTab, SymbolTable, Variant, WithMetaTable, WithPath,
+    ident_is_primitive,
 };
-use crate::utils::{Ident, Path};
+use crate::utils::{Ident, Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
 use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
+use rustc_hash::FxHashSet;
 use rustc_span::Symbol;
 use std::ops::Deref;
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct CheckCtxt<'i> {
     pub(crate) name: Symbol,
     pub(crate) symbol_table: SymbolTable<'i>,
+    /// Should be inserted into [`FnInner::types`].
+    ///
+    /// See [`SymbolTable::imports`] and [`CheckFnCtxt::imports`].
+    pub(crate) imports: FxHashSet<&'i pairs::Path<'i>>,
     pub(crate) errors: Vec<RPLMetaError<'i>>,
 }
 
@@ -22,7 +29,15 @@ impl<'i> CheckCtxt<'i> {
             name,
             symbol_table: SymbolTable::default(),
             errors: Vec::new(),
+            imports: Default::default(),
         }
+    }
+
+    pub fn check_import(&mut self, _mctx: &MetaContext<'i>, import: &'i pairs::UsePath<'i>) {
+        // let path = Path::from(import.Path());
+        // FIXME: check duplicates
+        // self.imports.insert(path.ident().name, path);
+        self.imports.insert(import.Path());
     }
 
     pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::pattBlockItem<'i>) {
@@ -56,7 +71,7 @@ impl<'i> CheckCtxt<'i> {
         rust_item_or_patt_operation: &'i pairs::RustItemOrPatternOperation<'i>,
     ) {
         match rust_item_or_patt_operation.deref() {
-            Choice3::_2(_patt_operation) => {
+            Choice3::_2(_patt_operations) => {
                 // FIXME: process the patt operation
             },
             _ => {
@@ -92,6 +107,7 @@ impl<'i> CheckCtxt<'i> {
                 meta_vars: fn_def.meta_vars.clone(),
                 _impl_def: None,
                 fn_def: &mut fn_def.inner,
+                imports: &self.imports,
                 errors: &mut self.errors,
             }
             .check_fn(mctx, rust_fn);
@@ -129,6 +145,7 @@ struct CheckFnCtxt<'i, 'r> {
     meta_vars: Arc<NonLocalMetaSymTab>,
     _impl_def: Option<&'r ImplInner<'i>>,
     fn_def: &'r mut FnInner<'i>,
+    imports: &'r FxHashSet<&'i pairs::Path<'i>>,
     errors: &'r mut Vec<RPLMetaError<'i>>,
 }
 
@@ -192,6 +209,9 @@ impl<'i> CheckFnCtxt<'i, '_> {
 impl<'i> CheckFnCtxt<'i, '_> {
     fn check_mir(&mut self, mctx: &MetaContext<'i>, mir: &'i pairs::MirBody<'i>) {
         let (mir_decls, mir_stmts) = mir.get_matched();
+        for path in self.imports.iter() {
+            self.fn_def.add_import(mctx, path, self.errors);
+        }
         mir_decls
             .iter_matched()
             .for_each(|decl| self.check_mir_decl(mctx, decl));
@@ -564,7 +584,9 @@ impl<'i> CheckFnCtxt<'i, '_> {
         let path: Path<'i> = path.into();
         if let Some(ident) = path.as_ident() {
             if !ident_is_primitive(&ident) {
-                _ = self.fn_def.get_type(mctx, &ident, self.errors);
+                WithMetaTable::from((&*self.fn_def, self.meta_vars.clone()))
+                    .get_type(&WithPath::with_ctx(mctx, ident))
+                    .or_record(self.errors);
             }
         } else {
             for segment in path.segments {

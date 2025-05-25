@@ -45,6 +45,14 @@ fn find_rustfmt_path() -> Result<String, Box<dyn std::error::Error>> {
         .collect::<Vec<_>>();
 
     for toolchain in toolchains {
+        if !toolchain
+            .file_stem()
+            // Remember to update the date in the condition below if you change the nightly toolchain date.
+            // FIXME: This is a temporary solution to use a specific nightly toolchain.
+            .is_some_and(|stem| stem.to_str().is_some_and(|stem| stem.starts_with("nightly-2025-02-14")))
+        {
+            continue; // Use only the nightly toolchain from 2025-02-14
+        }
         let rustfmt_candidate = toolchain.join("bin/rustfmt");
         if rustfmt_candidate.exists() {
             return Ok(rustfmt_candidate.to_str().unwrap().to_string());

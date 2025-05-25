@@ -3,6 +3,7 @@ use std::ops::Deref;
 
 use rpl_meta::idx::RPLIdx;
 use rpl_meta::meta::collect_blocks;
+use rpl_meta::utils::Path;
 use rpl_parser::pairs;
 use rustc_arena::DroplessArena;
 use rustc_data_structures::fx::FxHashMap;
@@ -11,7 +12,7 @@ use rustc_hir as hir;
 use rustc_middle::{mir, ty};
 use rustc_span::Symbol;
 
-use crate::pat::{self, Ty, TyKind};
+use crate::pat::{self, Ty, TyKind, with_path};
 
 pub struct PrimitiveTypes<'pcx> {
     pub u8: Ty<'pcx>,
@@ -73,6 +74,7 @@ pub struct PatternCtxt<'pcx> {
     arena: &'pcx WorkerLocal<crate::Arena<'pcx>>,
     patterns: Lock<FxHashMap<RPLIdx, &'pcx pat::Pattern<'pcx>>>,
     pub primitive_types: PrimitiveTypes<'pcx>,
+    pub(crate) imports: Lock<FxHashMap<Symbol, Path<'pcx>>>,
 }
 
 impl PatternCtxt<'_> {
@@ -82,6 +84,7 @@ impl PatternCtxt<'_> {
             arena,
             patterns: Default::default(),
             primitive_types: PrimitiveTypes::new(&arena.dropless),
+            imports: Default::default(),
         };
         f(PatCtxt { pcx })
     }
@@ -174,6 +177,9 @@ impl<'pcx> PatCtxt<'pcx> {
     pub fn mk_mir_pattern(self, pattern: pat::MirPattern<'pcx>) -> &'pcx pat::MirPattern<'pcx> {
         self.arena.alloc(pattern)
     }
+    pub fn alloc_fn(self, pat: pat::Fn<'pcx>) -> &'pcx mut pat::Fn<'pcx> {
+        self.arena.alloc(pat)
+    }
     pub fn add_parsed_patterns<'mcx: 'pcx>(self, mctx: &'mcx rpl_meta::context::MetaContext<'mcx>) {
         for (id, syntax_tree) in mctx.syntax_trees.iter() {
             self.add_parsed_pattern(*id, syntax_tree, mctx);
@@ -187,11 +193,21 @@ impl<'pcx> PatCtxt<'pcx> {
     pub fn add_parsed_pattern<'mcx: 'pcx>(
         self,
         id: RPLIdx,
-        main: &pairs::main<'pcx>,
+        main: &'pcx pairs::main<'pcx>,
         mctx: &'mcx rpl_meta::context::MetaContext<'mcx>,
     ) {
         // FIXME
         let (_utils, patts, _diags) = collect_blocks(main);
+
+        // FIXME
+        let patt_imports = patts.iter().flat_map(|patt| patt.get_matched().2.iter_matched());
+
+        patt_imports.for_each(|import| {
+            let (_, path, _) = import.get_matched();
+            let path = Path::from(path);
+            // FIXME: check duplicates
+            self.imports.borrow_mut().insert(path.ident().name, path);
+        });
 
         let patt_items = patts.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
         let patt_symbol_tables = &mctx.symbol_tables.get(&id).unwrap().patt_symbol_tables;
@@ -200,7 +216,11 @@ impl<'pcx> PatCtxt<'pcx> {
         patt_items
             .zip(patt_symbol_tables.iter())
             .for_each(|(item, symbol_table)| {
-                let pattern = self.arena.alloc(pat::Pattern::from_parsed(self, item, symbol_table.1));
+                let pattern = self.arena.alloc(pat::Pattern::from_parsed(
+                    self,
+                    with_path(mctx.get_active_path(), item),
+                    symbol_table.1,
+                ));
                 self.patterns.lock().insert(id, pattern);
             });
     }

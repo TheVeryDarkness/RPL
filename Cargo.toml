@@ -63,6 +63,7 @@ radium = "0.3"
 tokio = "1.43"
 tokio-util = { version = "0.2", features = ["codec"] }
 bytes = "1.10"
+log = "0.4"
 # cassandra-cpp-sys = "1.1.1"
 
 [package]
@@ -104,7 +105,7 @@ syn = { workspace = true, features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12"
 tracing.workspace = true
-log = "0.4"
+log.workspace = true
 libc.workspace = true
 scoped_threadpool = "0.1"
 serde_json.workspace = true

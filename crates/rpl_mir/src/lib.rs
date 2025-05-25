@@ -60,6 +60,7 @@ pub struct CheckMirCtxt<'a, 'pcx, 'tcx> {
     ty: MatchTyCtxt<'pcx, 'tcx>,
     place: MatchPlaceCtxt<'pcx, 'tcx>,
     body: &'a mir::Body<'tcx>,
+    pat_name: Symbol,
     fn_pat: &'a pat::Fn<'pcx>,
     mir_pat: &'a pat::MirPattern<'pcx>,
     pat_cfg: PatControlFlowGraph,
@@ -78,6 +79,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         pcx: PatCtxt<'pcx>,
         body: &'a mir::Body<'tcx>,
         pat: &'pcx pat::Pattern<'pcx>,
+        pat_name: Symbol,
         fn_pat: &'a pat::Fn<'pcx>,
     ) -> Self {
         let typing_env = ty::TypingEnv::post_analysis(tcx, body.source.def_id());
@@ -95,6 +97,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
             ty,
             place,
             body,
+            pat_name,
             fn_pat,
             mir_pat,
             pat_cfg,

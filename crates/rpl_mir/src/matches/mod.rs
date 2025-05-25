@@ -435,7 +435,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             matches.candidates = std::mem::take(&mut *candidates.borrow_mut());
         }
     }
-    #[instrument(level = "info", skip(self))]
+    #[instrument(level = "info", skip(self), fields(?pat_name = self.cx.pat_name, ?fn_name = self.cx.fn_pat.name))]
     fn do_match(&mut self) {
         self.build_candidates();
         self.matching.log_candidates();

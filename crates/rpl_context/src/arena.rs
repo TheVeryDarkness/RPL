@@ -7,6 +7,7 @@ macro_rules! arena_types {
         $macro!([
             [] patterns: $crate::pat::Pattern<'tcx>,
             [] mir_patterns: $crate::pat::MirPattern<'tcx>,
+            [] fn_pats: $crate::pat::Fn<'tcx>,
         ]);
     )
 }
