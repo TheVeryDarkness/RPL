@@ -765,7 +765,7 @@ pub trait GetType<'i> {
     fn get_type_var<'s>(&'s self, ty_meta_var: &TypeMetaVariable<'i>) -> (MetaVariableType, usize);
 }
 
-impl<'i, 's> GetType<'i> for Fn<'i> {
+impl<'i> GetType<'i> for Fn<'i> {
     fn get_type(&self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
         FnInner::get_type(&self.inner, ident.path, &ident.inner)
     }
@@ -776,9 +776,9 @@ impl<'i, 's> GetType<'i> for Fn<'i> {
     }
 }
 
-impl<'i, 's> GetType<'i> for WithMetaTable<&'_ FnInner<'i>> {
+impl<'i> GetType<'i> for WithMetaTable<&'_ FnInner<'i>> {
     fn get_type(&self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
-        FnInner::get_type(&self.inner, ident.path, &ident.inner)
+        FnInner::get_type(self.inner, ident.path, &ident.inner)
     }
     fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, usize) {
         self.meta_vars
@@ -787,7 +787,7 @@ impl<'i, 's> GetType<'i> for WithMetaTable<&'_ FnInner<'i>> {
     }
 }
 
-impl<'i, 's> GetType<'i> for SymbolTable<'i> {
+impl<'i> GetType<'i> for SymbolTable<'i> {
     fn get_type(&self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
         self.imports
             .get(&ident.name)

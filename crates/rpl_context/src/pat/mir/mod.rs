@@ -1293,6 +1293,6 @@ impl BasicBlockData<'_> {
     }
 }
 
-pub(crate) fn with_path<'a, T>(path: &'a std::path::Path, inner: T) -> WithPath<'a, T> {
+pub(crate) fn with_path<T>(path: &'_ std::path::Path, inner: T) -> WithPath<'_, T> {
     WithPath { path, inner }
 }

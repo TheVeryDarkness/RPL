@@ -120,7 +120,7 @@ impl<'i> Path<'i> {
     }
 }
 
-impl<'i> fmt::Debug for Path<'i> {
+impl fmt::Debug for Path<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(leading) = self.leading {
             write!(f, "{}", leading.span.as_str())?;
