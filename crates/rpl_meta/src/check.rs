@@ -11,7 +11,6 @@ use rustc_hash::FxHashSet;
 use rustc_span::Symbol;
 use std::ops::Deref;
 use std::sync::Arc;
-use tracing::instrument;
 
 pub struct CheckCtxt<'i> {
     pub(crate) name: Symbol,
