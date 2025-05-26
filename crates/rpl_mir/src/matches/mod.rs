@@ -52,6 +52,21 @@ impl Matched<'_> {
     }
 }
 
+impl<'tcx> pat::Matched<'tcx> for Matched<'tcx> {
+    fn named_span(&self, name: &str) -> Span {
+        todo!()
+    }
+    fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
+        self.ty_vars[idx]
+    }
+    fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
+        self.const_vars[idx]
+    }
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
+        self.place_vars[idx]
+    }
+}
+
 pub struct MatchedBlock {
     pub statements: Vec<StatementMatch>,
     pub start: Option<mir::BasicBlock>,

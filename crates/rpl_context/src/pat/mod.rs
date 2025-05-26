@@ -1,4 +1,5 @@
 use either::Either;
+use error::{DynamicError, DynamicErrorBuilder};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{GetType, WithPath};
 use rpl_meta::utils::Ident;
@@ -12,13 +13,16 @@ use std::sync::Arc;
 
 use crate::PatCtxt;
 
+mod error;
 mod item;
+mod matched;
 mod mir;
 mod pretty;
 mod ty;
 mod utils;
 
 pub use item::*;
+pub use matched::Matched;
 pub use mir::*;
 pub use ty::*;
 
@@ -86,24 +90,25 @@ impl<'pcx> NonLocalMetaVars<'pcx> {
     }
 }
 
+/// Corresponds to a pattern file in RPL, not a pattern item.
 pub struct Pattern<'pcx> {
     // FIXME: remove it
     pub pcx: PatCtxt<'pcx>,
-    pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub adts: FxHashMap<Symbol, Adt<'pcx>>,
     pub fns: Fns<'pcx>,
     #[expect(dead_code)]
     impls: Vec<Impl<'pcx>>,
+    pub diag: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
 }
 
 impl<'pcx> Pattern<'pcx> {
     pub(crate) fn new(pcx: PatCtxt<'pcx>) -> Self {
         Self {
             pcx,
-            meta: Default::default(),
             adts: Default::default(),
             fns: Default::default(),
             impls: Default::default(),
+            diag: Default::default(),
         }
     }
 
@@ -120,25 +125,46 @@ impl<'pcx> Pattern<'pcx> {
     pub fn get_adt(&self, name: Symbol) -> Option<&Adt<'pcx>> {
         self.adts.get(&name)
     }
+
+    pub fn get_diag<'tcx>(&self, pat_name: Symbol, matched: &impl Matched<'tcx>) -> DynamicError {
+        self.diag.get(&pat_name).unwrap().build(matched)
+    }
 }
 
 impl<'pcx> Pattern<'pcx> {
-    pub fn from_parsed(
-        pcx: PatCtxt<'pcx>,
+    // pub fn from_parsed(
+    //     pcx: PatCtxt<'pcx>,
+    //     pat_item: WithPath<'pcx, &'pcx pairs::pattBlockItem<'pcx>>,
+    //     symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
+    // ) -> Self {
+    //     let p = pat_item.path;
+    //     let mut pattern = Self::new(pcx);
+    //     let (name, meta_decls, _, _, item_or_patt_op, _) = pat_item.get_matched();
+    //     pattern.meta = Arc::new(NonLocalMetaVars::from_meta_decls(
+    //         meta_decls.as_ref().map(|meta_decls| with_path(p, meta_decls)),
+    //         pcx,
+    //         symbol_table,
+    //     ));
+    //     let name = Symbol::intern(name.span.as_str());
+    //     pattern.add_item_or_patt_op(Some(name), with_path(p, item_or_patt_op), symbol_table);
+    //     pattern
+    // }
+
+    pub fn add_pattern(
+        &mut self,
         pat_item: WithPath<'pcx, &'pcx pairs::pattBlockItem<'pcx>>,
-        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
-    ) -> Self {
+        symbol_tables: &'pcx FxHashMap<Symbol, rpl_meta::symbol_table::SymbolTable<'_>>,
+    ) {
         let p = pat_item.path;
-        let mut pattern = Self::new(pcx);
         let (name, meta_decls, _, _, item_or_patt_op, _) = pat_item.get_matched();
-        pattern.meta = Arc::new(NonLocalMetaVars::from_meta_decls(
+        let name = Symbol::intern(name.span.as_str());
+        let symbol_table = symbol_tables.get(&name).unwrap();
+        let meta = Arc::new(NonLocalMetaVars::from_meta_decls(
             meta_decls.as_ref().map(|meta_decls| with_path(p, meta_decls)),
-            pcx,
+            self.pcx,
             symbol_table,
         ));
-        let name = Symbol::intern(name.span.as_str());
-        pattern.add_item_or_patt_op(Some(name), with_path(p, item_or_patt_op), symbol_table);
-        pattern
+        self.add_item_or_patt_op(Some(name), with_path(p, item_or_patt_op), symbol_table, meta);
     }
 
     fn add_item_or_patt_op(
@@ -146,6 +172,7 @@ impl<'pcx> Pattern<'pcx> {
         pat_name: Option<Symbol>,
         item_or_patt_op: WithPath<'pcx, &'pcx pairs::RustItemOrPatternOperation<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
+        meta: Arc<NonLocalMetaVars<'pcx>>,
     ) {
         let p = item_or_patt_op.path;
         match &***item_or_patt_op {
@@ -163,7 +190,7 @@ impl<'pcx> Pattern<'pcx> {
                     vec![item.unwrap()]
                 };
                 for item in items {
-                    self.add_item(pat_name, with_path(p, item), self.meta.clone(), symbol_table);
+                    self.add_item(pat_name, with_path(p, item), meta.clone(), symbol_table);
                 }
             },
         }
@@ -185,6 +212,14 @@ impl<'pcx> Pattern<'pcx> {
             Choice4::_1(rust_struct) => self.add_struct(rust_struct),
             Choice4::_2(rust_enum) => self.add_enum(rust_enum),
             Choice4::_3(_rust_impl) => todo!("check impl in meta pass"),
+        }
+    }
+
+    pub fn add_diag(&mut self, diag: &'pcx pairs::diagBlock<'_>) {
+        for item in diag.get_matched().2.iter_matched() {
+            let (diag, name) = DynamicErrorBuilder::from_item(item);
+            let prev = self.diag.insert(name, diag);
+            debug_assert!(prev.is_none(), "Duplicate diagnostic for {:?}", name); //FIXME: raise an error
         }
     }
 }

@@ -853,7 +853,7 @@ MetaVariableWithDiagMessageSeparatedByComma = {
 
 // diag block Item
 diagBlockItem = {
-    Identifier ~ Assign ~ LeftBrace ~ (String ~ Comma)? ~ MetaVariableWithDiagMessageSeparatedByComma? ~ RightBrace
+    Identifier ~ Assign ~ LeftBrace ~ (Identifier ~ (LeftParen ~ Identifier ~ RightParen)? ~ Assign ~ String ~ Comma)* ~ MetaVariableWithDiagMessageSeparatedByComma? ~ RightBrace
 }
 
 // RPL Blocks

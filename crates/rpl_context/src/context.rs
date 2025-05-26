@@ -197,7 +197,7 @@ impl<'pcx> PatCtxt<'pcx> {
         mctx: &'mcx rpl_meta::context::MetaContext<'mcx>,
     ) {
         // FIXME
-        let (_utils, patts, _diags) = collect_blocks(main);
+        let (_utils, patts, diags) = collect_blocks(main);
 
         // FIXME
         let patt_imports = patts.iter().flat_map(|patt| patt.get_matched().2.iter_matched());
@@ -211,17 +211,17 @@ impl<'pcx> PatCtxt<'pcx> {
 
         let patt_items = patts.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
         let patt_symbol_tables = &mctx.symbol_tables.get(&id).unwrap().patt_symbol_tables;
+        let pattern = self.new_pattern();
 
         // zip patt_items and patt_symbol_tables
-        patt_items
-            .zip(patt_symbol_tables.iter())
-            .for_each(|(item, symbol_table)| {
-                let pattern = self.arena.alloc(pat::Pattern::from_parsed(
-                    self,
-                    with_path(mctx.get_active_path(), item),
-                    symbol_table.1,
-                ));
-                self.patterns.lock().insert(id, pattern);
-            });
+        patt_items.for_each(|item| {
+            pattern.add_pattern(with_path(mctx.get_active_path(), item), patt_symbol_tables);
+        });
+
+        for diag in diags {
+            pattern.add_diag(diag)
+        }
+
+        self.patterns.lock().insert(id, pattern);
     }
 }

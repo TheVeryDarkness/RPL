@@ -109,12 +109,13 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             let body = self.tcx.optimized_mir(def_id);
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, fn_pat) in &pattern.fns.fns {
-                    for _matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern, name, fn_pat).check() {
+                    for matched in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern, name, fn_pat).check() {
+                        let error = pattern.get_diag(name, &matched);
                         self.tcx.emit_node_span_lint(
                             ERROR_FOUND,
                             self.tcx.local_def_id_to_hir_id(def_id),
-                            body.span,
-                            ErrorFound,
+                            error.primary_span(),
+                            error,
                         );
                     }
                 }

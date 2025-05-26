@@ -698,7 +698,7 @@ impl DiagSymbolTable {
     ) -> FxHashMap<Symbol, DiagSymbolTable> {
         let mut diag_symbols = FxHashMap::default();
         for diag in diags {
-            let name = diag.Identifier();
+            let name = diag.get_matched().0;
             let symbol_table = Self::collect_diag_symbol_table(mctx, diag, errors);
             _ = diag_symbols
                 .try_insert(Symbol::intern(name.span.as_str()), symbol_table)
