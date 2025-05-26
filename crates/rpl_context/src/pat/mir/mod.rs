@@ -72,6 +72,7 @@ pub struct MirPattern<'pcx> {
     pub return_idx: Option<Local>,
     pub locals: IndexVec<Local, Ty<'pcx>>,
     pub basic_blocks: IndexVec<BasicBlock, BasicBlockData<'pcx>>,
+    pub labels: LabelMap,
 }
 
 impl<'pcx> Index<BasicBlock> for MirPattern<'pcx> {
@@ -395,7 +396,8 @@ pub enum StatementKind<'pcx> {
 pub enum RawDecleration<'pcx> {
     TypeAlias(Symbol, Ty<'pcx>),
     UsePath(Path<'pcx>),
-    LocalInit(Local, Option<RvalueOrCall<'pcx>>), // In meta pass, we have already collect the local and its ty
+    LocalInit(Option<Label>, Local, Option<RvalueOrCall<'pcx>>), /* In meta pass, we have already collect the local
+                                                                  * and its ty */
 }
 
 impl<'pcx> RawDecleration<'pcx> {
@@ -415,7 +417,7 @@ impl<'pcx> RawDecleration<'pcx> {
             },
             Choice3::_1(use_path) => Self::UsePath(Path::from(use_path.get_matched().1, pcx)),
             Choice3::_2(local_init) => {
-                let (_, _, local, _, _, init, _) = local_init.get_matched();
+                let (label, _, _, local, _, _, init, _) = local_init.get_matched();
                 let local = Local::from(fn_sym_tab.inner.get_local_idx(Symbol::intern(local.span.as_str())));
                 let rvalue_or_call = if let Some(init) = init {
                     let (_, init) = init.get_matched();
@@ -424,14 +426,17 @@ impl<'pcx> RawDecleration<'pcx> {
                 } else {
                     None
                 };
-                Self::LocalInit(local, rvalue_or_call)
+                let label = label
+                    .as_ref()
+                    .map(|label| Symbol::intern(label.Label().Identifier().span.as_str()));
+                Self::LocalInit(label, local, rvalue_or_call)
             },
         }
     }
 }
 
 pub enum RawStatement<'pcx> {
-    Assign(Place<'pcx>, Rvalue<'pcx>),
+    Assign(Option<Label>, Place<'pcx>, Rvalue<'pcx>),
     CallIgnoreRet(Call<'pcx>),
     Drop(Place<'pcx>),
     Break,
@@ -469,13 +474,16 @@ impl<'pcx> RawStatement<'pcx> {
         sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
         let p = stmt.path;
-        let (_, place, _, rvalue_or_call) = stmt.get_matched();
+        let (label, place, _, rvalue_or_call) = stmt.get_matched();
         let place = Place::from(place, pcx, sym_tab);
         let rvalue = match rvalue_or_call.deref() {
             Choice2::_0(_call) => todo!("call in mir assign"),
             Choice2::_1(rvalue) => Rvalue::from_rvalue(WithPath::new(p, rvalue), pcx, sym_tab),
         };
-        Self::Assign(place, rvalue)
+        let label = label
+            .as_ref()
+            .map(|label| Symbol::intern(label.Label().Identifier().span.as_str()));
+        Self::Assign(label, place, rvalue)
     }
 
     pub fn from_call_ignore_ret(
@@ -1046,6 +1054,7 @@ impl<'pcx> MirPatternBuilder<'pcx> {
             return_idx: None,
             self_idx: None,
             basic_blocks: IndexVec::new(),
+            labels: FxHashMap::default(),
         };
         let current = pattern.basic_blocks.push(BasicBlockData::default());
         Self {
@@ -1101,7 +1110,7 @@ impl<'pcx> MirPatternBuilder<'pcx> {
 
     fn mk_raw_stmt(&mut self, kind: RawStatement<'pcx>) -> Location {
         match kind {
-            RawStatement::Assign(place, rvalue) => self.mk_assign(StatementKind::Assign(place, rvalue)),
+            RawStatement::Assign(label, place, rvalue) => self.mk_assign(label, StatementKind::Assign(place, rvalue)),
             RawStatement::CallIgnoreRet(Call(func, args)) => self.mk_fn_call(func, args.into_boxed_slice(), None),
             RawStatement::Drop(place) => self.mk_drop(place),
             RawStatement::Break => self.mk_break(),
@@ -1122,22 +1131,26 @@ impl<'pcx> MirPatternBuilder<'pcx> {
     }
 
     fn mk_raw_decl(&mut self, kind: RawDecleration<'pcx>) {
-        if let RawDecleration::LocalInit(local, Some(rvalue_or_call)) = kind {
+        if let RawDecleration::LocalInit(label, local, Some(rvalue_or_call)) = kind {
             match rvalue_or_call {
-                RvalueOrCall::Rvalue(rvalue) => _ = self.mk_assign(StatementKind::Assign(local.into(), rvalue)),
+                RvalueOrCall::Rvalue(rvalue) => _ = self.mk_assign(label, StatementKind::Assign(local.into(), rvalue)),
                 RvalueOrCall::Call(call) => _ = self.mk_fn_call(call.0, call.1.into_boxed_slice(), Some(local.into())),
             }
         }
     }
 
-    fn mk_assign(&mut self, assign: StatementKind<'pcx>) -> Location {
+    fn mk_assign(&mut self, label: Option<Label>, assign: StatementKind<'pcx>) -> Location {
         self.new_block_if_terminated();
 
         let block = self.current;
         let statement_index = self.pattern.basic_blocks[block].statements.len();
 
         self.pattern.basic_blocks[block].statements.push(assign);
-        Location { block, statement_index }
+        let loc = Location { block, statement_index };
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, loc);
+        }
+        loc
     }
 
     fn set_terminator(&mut self, kind: TerminatorKind<'pcx>) -> Location {
@@ -1160,10 +1173,13 @@ impl<'pcx> MirPatternBuilder<'pcx> {
             )) = func
             && let Target::Variant | Target::Struct | Target::Union = lang_item.target()
         {
-            return self.mk_assign(StatementKind::Assign(
-                place,
-                Rvalue::Aggregate(AggKind::Adt(path_with_args, AggAdtKind::Tuple), args),
-            ));
+            return self.mk_assign(
+                None,
+                StatementKind::Assign(
+                    place,
+                    Rvalue::Aggregate(AggKind::Adt(path_with_args, AggAdtKind::Tuple), args),
+                ),
+            );
         }
         let target = self.next_block();
         self.set_terminator(TerminatorKind::Call {

@@ -680,7 +680,7 @@ MirTypeDecl = {
 }
 
 MirLocalDecl = {
-    kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon
+    LabelWithColon? ~ kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon
 }
 
 UsePath = {

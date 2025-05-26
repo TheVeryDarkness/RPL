@@ -344,7 +344,8 @@ impl<'i> CheckFnCtxt<'i, '_> {
     }
 
     fn check_mir_local_decl(&mut self, mctx: &MetaContext<'i>, local_decl: &'i pairs::MirLocalDecl<'i>) {
-        let (_, _, local, _, ty, rvalue_or_call, _) = local_decl.get_matched();
+        //FIXME: check whether label names conflict
+        let (_, _, _, local, _, ty, rvalue_or_call, _) = local_decl.get_matched();
         self.fn_def.add_place_local(mctx, local, ty, self.errors);
         self.check_type(mctx, ty);
         if let Some(rvalue_or_call) = rvalue_or_call {
