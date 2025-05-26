@@ -2,11 +2,11 @@ use crate::context::MetaContext;
 use crate::error::RPLMetaError;
 use crate::idx::RPLIdx;
 use crate::symbol_table::{DiagSymbolTable, SymbolTable};
-use colored::Colorize;
 use parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_span::Symbol;
 use std::path::Path;
+use tracing::{error, info};
 
 /// Meta data of a single rpl file.
 pub struct SymbolTables<'mcx> {
@@ -65,29 +65,22 @@ impl<'mcx> SymbolTables<'mcx> {
 }
 
 impl SymbolTables<'_> {
-    pub fn show_error(&self, f: &mut impl std::io::Write) {
+    pub fn show_error(&self) {
         if !self.errors.is_empty() {
-            writeln!(
-                f,
-                "{}",
-                format!(
-                    "{:?} generated {} error{}.",
-                    self.path,
-                    self.errors.len(),
-                    if self.errors.len() > 1 { "s" } else { "" }
-                )
-                .red()
-                .bold(),
-            )
-            .unwrap();
+            error!(
+                "{:?} generated {} error{}.",
+                self.path,
+                self.errors.len(),
+                if self.errors.len() > 1 { "s" } else { "" }
+            );
 
             let mut cnt = 1usize;
             for error in &self.errors {
-                writeln!(f, "{}. {}", cnt, error).unwrap();
+                error!("{}. {}", cnt, error);
                 cnt += 1;
             }
         } else {
-            writeln!(f, "{}", format!("No error found in {:?}", self.path).green().bold(),).unwrap();
+            info!("{}", format!("No error found in {:?}", self.path));
         }
     }
 }

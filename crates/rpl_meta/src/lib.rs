@@ -53,7 +53,7 @@ pub fn parse_and_collect<'mcx>(
                 mctx.syntax_trees.insert(*idx, main);
                 // Perform meta collection
                 let meta = SymbolTables::collect(path, main, *idx, &mctx);
-                meta.show_error(&mut std::io::stderr());
+                meta.show_error();
                 mctx.symbol_tables.insert(*idx, meta);
             },
             Err(err) => {
