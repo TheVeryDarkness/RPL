@@ -7,6 +7,7 @@ use rpl_parser::generics::{Choice2, Choice3, Choice4};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_index::IndexVec;
+use rustc_middle::mir::Body;
 use rustc_span::Symbol;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -25,6 +26,9 @@ pub use item::*;
 pub use matched::Matched;
 pub use mir::*;
 pub use ty::*;
+
+pub type Label = Symbol;
+pub type LabelMap = FxHashMap<Label, mir::Location>;
 
 #[derive(Default, Debug)]
 pub struct NonLocalMetaVars<'pcx> {
@@ -98,7 +102,7 @@ pub struct Pattern<'pcx> {
     pub fns: Fns<'pcx>,
     #[expect(dead_code)]
     impls: Vec<Impl<'pcx>>,
-    pub diag: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
+    diag: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
 }
 
 impl<'pcx> Pattern<'pcx> {
@@ -126,8 +130,14 @@ impl<'pcx> Pattern<'pcx> {
         self.adts.get(&name)
     }
 
-    pub fn get_diag<'tcx>(&self, pat_name: Symbol, matched: &impl Matched<'tcx>) -> DynamicError {
-        self.diag.get(&pat_name).unwrap().build(matched)
+    pub fn get_diag<'tcx>(
+        &self,
+        pat_name: Symbol,
+        label_map: &LabelMap,
+        body: &Body<'tcx>,
+        matched: &impl Matched<'tcx>,
+    ) -> DynamicError {
+        self.diag.get(&pat_name).unwrap().build(label_map, body, matched)
     }
 }
 

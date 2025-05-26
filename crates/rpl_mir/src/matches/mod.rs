@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
+use rpl_context::pat::LabelMap;
 use rpl_match::CountedMatch;
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
@@ -11,7 +12,7 @@ use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::{MutatingUseContext, PlaceContext};
 use rustc_middle::mir::{self, Const, PlaceRef};
 use rustc_middle::ty::Ty;
-use rustc_span::Span;
+use rustc_span::{Span, Symbol};
 
 use crate::{CheckMirCtxt, pat};
 
@@ -53,8 +54,13 @@ impl Matched<'_> {
 }
 
 impl<'tcx> pat::Matched<'tcx> for Matched<'tcx> {
-    fn named_span(&self, name: &str) -> Span {
-        todo!()
+    fn location(&self, labels: &LabelMap, name: &str) -> pat::Location {
+        *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
+            panic!("label `{name}` not found in pattern labels: {labels:?}");
+        })
+    }
+    fn span(&self, labels: &LabelMap, body: &rustc_middle::mir::Body<'_>, name: &str) -> Span {
+        self[self.location(labels, name)].span_no_inline(body)
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]
