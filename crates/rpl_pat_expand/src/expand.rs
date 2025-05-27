@@ -890,6 +890,10 @@ impl ToTokens for ExpandPat<'_, &LocalDecl> {
         {
             let stmt = &inner.ident;
             quote_each_token!(tokens #stmt = #ident;);
+        } else if let Some(export) = export {
+            // If the declaration is not an assignment, we can export the local instead.
+            let local = &export.inner.ident;
+            quote_each_token!(tokens #local = #ident;);
         }
     }
 }

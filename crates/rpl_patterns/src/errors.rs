@@ -74,6 +74,18 @@ pub struct MisalignedPointer<'tcx> {
 }
 
 #[derive(LintDiagnostic)]
+#[diag(rpl_patterns_alloc_maybe_zero)]
+#[note]
+pub struct AllocMaybeZero {
+    #[label(rpl_patterns_alloc_label)]
+    pub alloc: Span,
+    #[label(rpl_patterns_size_label)]
+    pub size: Span,
+    pub fn_name: Symbol,
+    pub alloc_fn: &'static str,
+}
+
+#[derive(LintDiagnostic)]
 #[diag(rpl_patterns_use_after_realloc)]
 #[note]
 pub struct UseAfterRealloc<'tcx> {
