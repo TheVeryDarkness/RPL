@@ -832,15 +832,15 @@ PatternOperation = {
     PatternConfiguration
 }
 
-RustItemOrPatternOperation = {
+RustItemsOrPatternOperation = {
     RustItem
   | RustItems
   | PatternOperation
 }
 
 // patt block Item
-pattBlockItem = {
-    Identifier ~ MetaVariableDeclList? ~ Assign ~ PreItemAttribute? ~ RustItemOrPatternOperation ~ PostItemAttribute?
+RPLPatternItem = {
+    Identifier ~ MetaVariableDeclList? ~ Assign ~ PreItemAttribute? ~ RustItemsOrPatternOperation ~ PostItemAttribute?
 }
 
 MetaVariableWithDiagMessage = {
@@ -858,10 +858,10 @@ diagBlockItem = {
 
 // RPL Blocks
 pattBlock =  {
-    kw_patt ~ LeftBrace ~ (UsePath)* ~ (pattBlockItem)* ~ RightBrace
+    kw_patt ~ LeftBrace ~ (UsePath)* ~ (RPLPatternItem)* ~ RightBrace
 }
 utilBlock =  {
-    kw_util ~ LeftBrace ~ (UsePath)* ~ (pattBlockItem)* ~ RightBrace
+    kw_util ~ LeftBrace ~ (UsePath)* ~ (RPLPatternItem)* ~ RightBrace
 }
 diagBlock =  {
     kw_diag ~ LeftBrace ~ (diagBlockItem)* ~ RightBrace

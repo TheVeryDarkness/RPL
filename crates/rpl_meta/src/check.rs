@@ -39,7 +39,7 @@ impl<'i> CheckCtxt<'i> {
         self.imports.insert(import.Path());
     }
 
-    pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::pattBlockItem<'i>) {
+    pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::RPLPatternItem<'i>) {
         let (_, meta_decl_list, _, _, rust_item_or_patt_operation, _) = pat_item.get_matched();
         if let Some(meta_decl_list) = meta_decl_list {
             self.check_meta_decl_list(mctx, meta_decl_list);
@@ -67,7 +67,7 @@ impl<'i> CheckCtxt<'i> {
     fn check_rust_item_or_patt_operation(
         &mut self,
         mctx: &MetaContext<'i>,
-        rust_item_or_patt_operation: &'i pairs::RustItemOrPatternOperation<'i>,
+        rust_item_or_patt_operation: &'i pairs::RustItemsOrPatternOperation<'i>,
     ) {
         match rust_item_or_patt_operation.deref() {
             Choice3::_2(_patt_operations) => {

@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use super::utils::mutability_from_pair_mutability;
-use super::{FnSymbolTable, MirPattern, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
+use super::{FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
 use crate::PatCtxt;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;
@@ -20,18 +20,6 @@ pub struct Adt<'pcx> {
 }
 
 impl<'pcx> Adt<'pcx> {
-    pub(crate) fn new_struct() -> Self {
-        Self {
-            meta: NonLocalMetaVars::default(),
-            kind: AdtKind::Struct(Default::default()),
-        }
-    }
-    pub(crate) fn new_enum() -> Self {
-        Self {
-            meta: NonLocalMetaVars::default(),
-            kind: AdtKind::Enum(Default::default()),
-        }
-    }
     pub fn non_enum_variant_mut(&mut self) -> &mut Variant<'pcx> {
         match &mut self.kind {
             AdtKind::Struct(variant) => variant,
@@ -117,35 +105,28 @@ pub struct Impl<'pcx> {
     #[expect(dead_code)]
     trait_id: Option<Path<'pcx>>,
     #[expect(dead_code)]
-    fns: FxHashMap<Symbol, Fn<'pcx>>,
+    fns: FxHashMap<Symbol, FnPattern<'pcx>>,
 }
 
 #[derive(Default)]
-pub struct Fns<'pcx> {
-    /// all function patterns, indexed with the pattern name but not the function name
-    pub fns: FxHashMap<Symbol, &'pcx Fn<'pcx>>,
+pub struct FnPatterns<'pcx> {
     /// fn some_name (..) -> _ { .. }
-    pub(crate) named_fns: FxHashMap<Symbol, &'pcx Fn<'pcx>>,
+    pub named_fns: FxHashMap<Symbol, &'pcx FnPattern<'pcx>>,
     /// fn _ (..) -> _ { .. }
-    pub(crate) unnamed_fns: Vec<&'pcx Fn<'pcx>>,
+    pub unnamed_fns: Vec<&'pcx FnPattern<'pcx>>,
 }
 
-pub struct Fn<'pcx> {
+pub struct FnPattern<'pcx> {
     pub safety: Safety,
     pub visibility: Visibility,
     pub name: Symbol,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub params: Params<'pcx>,
     pub ret: Option<Ty<'pcx>>,
-    pub body: Option<FnBody<'pcx>>,
+    pub body: Option<&'pcx FnPatternBody<'pcx>>,
 }
 
-#[derive(Clone, Copy)]
-pub enum FnBody<'pcx> {
-    Mir(&'pcx MirPattern<'pcx>),
-}
-
-impl<'pcx> Fn<'pcx> {
+impl<'pcx> FnPattern<'pcx> {
     pub fn from(
         pair: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -170,12 +151,12 @@ impl<'pcx> Fn<'pcx> {
             .into_iter()
             .map(|decl| RawDecleration::from(WithPath::new(p, decl), pcx, fn_sym_tab));
 
-        let mut builder = MirPattern::builder();
+        let mut builder = FnPatternBody::builder();
         builder.mk_locals(fn_sym_tab, pcx);
         builder.mk_raw_decls(raw_decls);
         builder.mk_raw_stmts(raw_stmts);
         let mir = builder.build();
-        let body = Some(FnBody::Mir(pcx.mk_mir_pattern(mir)));
+        let body = Some(pcx.mk_mir_pattern(mir));
 
         Self {
             safety,
@@ -282,8 +263,8 @@ impl<'pcx> Param<'pcx> {
 
 pub struct TraitDef {}
 
-impl<'pcx> Fns<'pcx> {
-    pub fn get_fn_pat(&self, name: Symbol) -> Option<&'pcx Fn<'pcx>> {
+impl<'pcx> FnPatterns<'pcx> {
+    pub fn get_fn_pat(&self, name: Symbol) -> Option<&'pcx FnPattern<'pcx>> {
         self.named_fns.get(&name).copied()
     }
     // pub fn new_fn(&mut self, name: Symbol) -> &mut Fn<'pcx> {
@@ -298,7 +279,7 @@ impl<'pcx> Fns<'pcx> {
     // }
 }
 
-impl<'pcx> Fn<'pcx> {
+impl<'pcx> FnPattern<'pcx> {
     // pub(crate) fn new(name: Symbol) -> Self {
     //     Self {
     //         name,
@@ -317,9 +298,9 @@ impl<'pcx> Fn<'pcx> {
     //     self.body = Some(body);
     // }
     // FIXME: remove this when all kinds of patterns are implemented
-    pub fn expect_mir_body(&self) -> &'pcx MirPattern<'pcx> {
+    pub fn expect_mir_body(&self) -> &'pcx FnPatternBody<'pcx> {
         match self.body {
-            Some(FnBody::Mir(mir_body)) => mir_body,
+            Some(mir_body) => mir_body,
             _ => panic!("expected MIR body"),
         }
     }

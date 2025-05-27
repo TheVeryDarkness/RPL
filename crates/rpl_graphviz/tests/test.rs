@@ -13,7 +13,7 @@ use std::io::{Read, Write};
 use pretty_assertions::assert_eq;
 use rpl_context::{PatCtxt, PatternCtxt};
 use rpl_graphviz::{pat_cfg_to_graphviz, pat_ddg_to_graphviz};
-use rpl_mir::pat::MirPattern;
+use rpl_mir::pat::FnPatternBody;
 use rustc_span::Symbol;
 
 fn read_from_file(file: &str) -> std::io::Result<String> {

@@ -72,7 +72,7 @@ impl<'pcx> Deref for PatCtxt<'pcx> {
 
 pub struct PatternCtxt<'pcx> {
     arena: &'pcx WorkerLocal<crate::Arena<'pcx>>,
-    patterns: Lock<FxHashMap<RPLIdx, &'pcx pat::Pattern<'pcx>>>,
+    rpl_patterns: Lock<FxHashMap<RPLIdx, &'pcx pat::RPLPattern<'pcx>>>,
     pub primitive_types: PrimitiveTypes<'pcx>,
     pub(crate) imports: Lock<FxHashMap<Symbol, Path<'pcx>>>,
 }
@@ -82,7 +82,7 @@ impl PatternCtxt<'_> {
         let arena = &WorkerLocal::<crate::Arena<'_>>::default();
         let pcx = &PatternCtxt {
             arena,
-            patterns: Default::default(),
+            rpl_patterns: Default::default(),
             primitive_types: PrimitiveTypes::new(&arena.dropless),
             imports: Default::default(),
         };
@@ -171,13 +171,13 @@ impl<'pcx> PatCtxt<'pcx> {
 }
 
 impl<'pcx> PatCtxt<'pcx> {
-    pub fn new_pattern(self) -> &'pcx mut pat::Pattern<'pcx> {
-        self.arena.alloc(pat::Pattern::new(self))
+    pub fn new_pattern(self) -> &'pcx mut pat::RPLPattern<'pcx> {
+        self.arena.alloc(pat::RPLPattern::new(self))
     }
-    pub fn mk_mir_pattern(self, pattern: pat::MirPattern<'pcx>) -> &'pcx pat::MirPattern<'pcx> {
+    pub fn mk_mir_pattern(self, pattern: pat::FnPatternBody<'pcx>) -> &'pcx pat::FnPatternBody<'pcx> {
         self.arena.alloc(pattern)
     }
-    pub fn alloc_fn(self, pat: pat::Fn<'pcx>) -> &'pcx mut pat::Fn<'pcx> {
+    pub fn alloc_fn(self, pat: pat::FnPattern<'pcx>) -> &'pcx mut pat::FnPattern<'pcx> {
         self.arena.alloc(pat)
     }
     pub fn add_parsed_patterns<'mcx: 'pcx>(self, mctx: &'mcx rpl_meta::context::MetaContext<'mcx>) {
@@ -185,8 +185,8 @@ impl<'pcx> PatCtxt<'pcx> {
             self.add_parsed_pattern(*id, syntax_tree, mctx);
         }
     }
-    pub fn for_each_rpl_pattern(self, mut f: impl FnMut(RPLIdx, &'pcx pat::Pattern<'pcx>)) {
-        for (&id, pattern) in self.patterns.lock().iter() {
+    pub fn for_each_rpl_pattern(self, mut f: impl FnMut(RPLIdx, &'pcx pat::RPLPattern<'pcx>)) {
+        for (&id, pattern) in self.rpl_patterns.lock().iter() {
             f(id, pattern);
         }
     }
@@ -215,13 +215,17 @@ impl<'pcx> PatCtxt<'pcx> {
 
         // zip patt_items and patt_symbol_tables
         patt_items.for_each(|item| {
-            pattern.add_pattern(with_path(mctx.get_active_path(), item), patt_symbol_tables);
+            pattern.add_pattern_item(
+                with_path(mctx.get_active_path(), item),
+                patt_symbol_tables,
+                pat::PattOrUtil::Patt,
+            );
         });
 
         for diag in diags {
             pattern.add_diag(diag)
         }
 
-        self.patterns.lock().insert(id, pattern);
+        self.rpl_patterns.lock().insert(id, pattern);
     }
 }

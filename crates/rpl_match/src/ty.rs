@@ -19,7 +19,7 @@ use crate::{AdtMatch, MatchAdtCtxt};
 pub struct MatchTyCtxt<'pcx, 'tcx> {
     pub tcx: TyCtxt<'tcx>,
     pub pcx: PatCtxt<'pcx>,
-    pub pat: &'pcx pat::Pattern<'pcx>,
+    pub pat: &'pcx pat::RPLRustItems<'pcx>,
     pub typing_env: ty::TypingEnv<'tcx>,
     pub const_vars: IndexVec<pat::ConstVarIdx, RefCell<FxIndexSet<mir::Const<'tcx>>>>,
     pub ty_vars: IndexVec<pat::TyVarIdx, RefCell<FxIndexSet<ty::Ty<'tcx>>>>,
@@ -31,7 +31,7 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
         typing_env: ty::TypingEnv<'tcx>,
-        pat: &'pcx pat::Pattern<'pcx>,
+        pat: &'pcx pat::RPLRustItems<'pcx>,
         meta: &pat::NonLocalMetaVars<'pcx>,
     ) -> Self {
         Self {

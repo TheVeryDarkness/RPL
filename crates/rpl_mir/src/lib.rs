@@ -61,8 +61,8 @@ pub struct CheckMirCtxt<'a, 'pcx, 'tcx> {
     place: MatchPlaceCtxt<'pcx, 'tcx>,
     body: &'a mir::Body<'tcx>,
     pat_name: Symbol,
-    fn_pat: &'a pat::Fn<'pcx>,
-    mir_pat: &'a pat::MirPattern<'pcx>,
+    fn_pat: &'a pat::FnPattern<'pcx>,
+    mir_pat: &'a pat::FnPatternBody<'pcx>,
     pat_cfg: PatControlFlowGraph,
     pat_ddg: PatDataDepGraph,
     mir_cfg: MirControlFlowGraph,
@@ -78,9 +78,11 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
         body: &'a mir::Body<'tcx>,
-        pat: &'pcx pat::Pattern<'pcx>,
+        pat: &'pcx pat::RPLRustItems<'pcx>,
         pat_name: Symbol,
-        fn_pat: &'a pat::Fn<'pcx>,
+        fn_pat: &'a pat::FnPattern<'pcx>,
+        mir_cfg: MirControlFlowGraph,
+        mir_ddg: MirDataDepGraph,
     ) -> Self {
         let typing_env = ty::TypingEnv::post_analysis(tcx, body.source.def_id());
         let ty = MatchTyCtxt::new(tcx, pcx, typing_env, pat, &fn_pat.meta);
@@ -91,8 +93,6 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         // let mir_pdg = crate::graph::mir_program_dep_graph(body);
         let pat_cfg = crate::graph::pat_control_flow_graph(mir_pat, tcx.pointer_size().bytes());
         let pat_ddg = crate::graph::pat_data_dep_graph(mir_pat, &pat_cfg);
-        let mir_cfg = crate::graph::mir_control_flow_graph(body);
-        let mir_ddg = crate::graph::mir_data_dep_graph(body, &mir_cfg);
         Self {
             ty,
             place,

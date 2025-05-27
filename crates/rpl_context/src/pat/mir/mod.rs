@@ -67,7 +67,7 @@ impl Location {
     }
 }
 
-pub struct MirPattern<'pcx> {
+pub struct FnPatternBody<'pcx> {
     pub self_idx: Option<Local>,
     pub return_idx: Option<Local>,
     pub locals: IndexVec<Local, Ty<'pcx>>,
@@ -75,7 +75,7 @@ pub struct MirPattern<'pcx> {
     pub labels: LabelMap,
 }
 
-impl<'pcx> Index<BasicBlock> for MirPattern<'pcx> {
+impl<'pcx> Index<BasicBlock> for FnPatternBody<'pcx> {
     type Output = BasicBlockData<'pcx>;
 
     fn index(&self, bb: BasicBlock) -> &Self::Output {
@@ -349,7 +349,7 @@ impl<'pcx> PlaceTy<'pcx> {
     pub fn from_ty(ty: Ty<'pcx>) -> Self {
         Self { ty, variant: None }
     }
-    pub fn projection_ty(&self, pat: &'pcx Pattern<'pcx>, proj: PlaceElem<'pcx>) -> Option<Self> {
+    pub fn projection_ty(&self, pat: &'pcx RPLRustItems<'pcx>, proj: PlaceElem<'pcx>) -> Option<Self> {
         match proj {
             PlaceElem::Deref => match self.ty.kind() {
                 &TyKind::Ref(_, ty, _) | &TyKind::RawPtr(ty, _) => Some(PlaceTy::from_ty(ty)),
@@ -1023,8 +1023,8 @@ impl From<FieldIdx> for FieldAcc {
     }
 }
 
-pub struct MirPatternBuilder<'pcx> {
-    pattern: MirPattern<'pcx>,
+pub struct FnPatternBodyBuilder<'pcx> {
+    pattern: FnPatternBody<'pcx>,
     loop_stack: Vec<Loop>,
     current: BasicBlock,
 }
@@ -1034,9 +1034,9 @@ struct Loop {
     exit: BasicBlock,
 }
 
-impl<'pcx> MirPattern<'pcx> {
-    pub fn builder() -> MirPatternBuilder<'pcx> {
-        MirPatternBuilder::new()
+impl<'pcx> FnPatternBody<'pcx> {
+    pub fn builder() -> FnPatternBodyBuilder<'pcx> {
+        FnPatternBodyBuilder::new()
     }
     pub fn stmt_at(&self, loc: Location) -> Either<&StatementKind<'pcx>, &TerminatorKind<'pcx>> {
         if loc.statement_index < self[loc.block].statements.len() {
@@ -1047,9 +1047,9 @@ impl<'pcx> MirPattern<'pcx> {
     }
 }
 
-impl<'pcx> MirPatternBuilder<'pcx> {
+impl<'pcx> FnPatternBodyBuilder<'pcx> {
     fn new() -> Self {
-        let mut pattern = MirPattern {
+        let mut pattern = FnPatternBody {
             locals: IndexVec::new(),
             return_idx: None,
             self_idx: None,
@@ -1064,7 +1064,7 @@ impl<'pcx> MirPatternBuilder<'pcx> {
         }
     }
 
-    pub fn build(mut self) -> MirPattern<'pcx> {
+    pub fn build(mut self) -> FnPatternBody<'pcx> {
         self.new_block_if_terminated();
         self.pattern.basic_blocks[self.current].set_terminator(TerminatorKind::PatEnd);
         self.pattern
@@ -1277,15 +1277,15 @@ impl<'pcx> MirPatternBuilder<'pcx> {
     }
 }
 
-impl<'pcx> std::ops::Deref for MirPatternBuilder<'pcx> {
-    type Target = MirPattern<'pcx>;
+impl<'pcx> std::ops::Deref for FnPatternBodyBuilder<'pcx> {
+    type Target = FnPatternBody<'pcx>;
 
     fn deref(&self) -> &Self::Target {
         &self.pattern
     }
 }
 
-impl MirPattern<'_> {
+impl FnPatternBody<'_> {
     pub fn terminator_loc(&self, block: BasicBlock) -> Location {
         // assert the terminator is set
         let _ = self.basic_blocks[block].terminator();
@@ -1294,7 +1294,7 @@ impl MirPattern<'_> {
     }
 }
 
-impl<'pcx> MirPattern<'pcx> {
+impl<'pcx> FnPatternBody<'pcx> {
     pub fn mk_zeroed(&self, path_with_args: PathWithArgs<'pcx>) -> ConstOperand<'pcx> {
         ConstOperand::ZeroSized(path_with_args)
     }

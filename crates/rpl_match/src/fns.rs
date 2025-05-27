@@ -8,15 +8,15 @@ use crate::MatchTyCtxt;
 
 pub struct MatchFnCtxt<'a, 'pcx, 'tcx> {
     ty: MatchTyCtxt<'pcx, 'tcx>,
-    fn_pat: &'a pat::Fn<'pcx>,
+    fn_pat: &'a pat::FnPattern<'pcx>,
 }
 
 impl<'a, 'pcx, 'tcx> MatchFnCtxt<'a, 'pcx, 'tcx> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
-        pat: &'pcx pat::Pattern<'pcx>,
-        fn_pat: &'a pat::Fn<'pcx>,
+        pat: &'pcx pat::RPLRustItems<'pcx>,
+        fn_pat: &'a pat::FnPattern<'pcx>,
     ) -> Self {
         let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &fn_pat.meta); // FIXME
         Self { ty, fn_pat }

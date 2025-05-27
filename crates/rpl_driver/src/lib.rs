@@ -107,16 +107,37 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     ) -> Self::Result {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
+            let mir_cfg = rpl_mir::graph::mir_control_flow_graph(body);
+            let mir_ddg = rpl_mir::graph::mir_data_dep_graph(body, &mir_cfg);
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
-                for (&name, fn_pat) in &pattern.fns.fns {
-                    for matched in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern, name, fn_pat).check() {
-                        let error = pattern.get_diag(name, &fn_pat.expect_mir_body().labels, body, &matched);
-                        self.tcx.emit_node_span_lint(
-                            error.lint(),
-                            self.tcx.local_def_id_to_hir_id(def_id),
-                            error.primary_span(),
-                            error,
-                        );
+                for (&name, pat_item) in &pattern.patt_block {
+                    match pat_item {
+                        rpl_context::pat::RPLPatternItem::RPLRustItems(rpl_rust_items) => {
+                            for fn_pat in &rpl_rust_items.fns.unnamed_fns {
+                                for matched in CheckMirCtxt::new(
+                                    self.tcx,
+                                    self.pcx,
+                                    body,
+                                    rpl_rust_items,
+                                    name,
+                                    fn_pat,
+                                    mir_cfg.clone(),
+                                    mir_ddg.clone(),
+                                )
+                                .check()
+                                {
+                                    let error =
+                                        pattern.get_diag(name, &fn_pat.expect_mir_body().labels, body, &matched);
+                                    self.tcx.emit_node_span_lint(
+                                        error.lint(),
+                                        self.tcx.local_def_id_to_hir_id(def_id),
+                                        error.primary_span(),
+                                        error,
+                                    );
+                                }
+                            }
+                        },
+                        _ => unreachable!(),
                     }
                 }
             });

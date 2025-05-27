@@ -1,6 +1,10 @@
+use rustc_data_structures::fx::FxHashMap;
 use rustc_data_structures::packed::Pu128;
+use rustc_data_structures::sync::OnceLock;
+use rustc_hir::def_id::LocalDefId;
 use rustc_middle::mir::visit::{PlaceContext, Visitor};
 use rustc_middle::mir::{self};
+use std::sync::Mutex;
 
 use rpl_mir_graph::{ControlFlowGraph, DataDepGraph, ProgramDepGraph, SwitchTargets, TerminatorEdges};
 

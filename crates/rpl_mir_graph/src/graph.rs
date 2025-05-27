@@ -276,6 +276,7 @@ impl<'a, BasicBlock: Idx, Local: Idx> ProgramDepGraphBuilder<'a, BasicBlock, Loc
     }
 }
 
+#[derive(Clone)]
 pub struct ControlFlowGraph<BasicBlock: Idx> {
     pub(crate) terminator_edges: IndexVec<BasicBlock, TerminatorEdges<BasicBlock>>,
 }
@@ -302,7 +303,7 @@ impl<BasicBlock: Idx> Index<BasicBlock> for ControlFlowGraph<BasicBlock> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TerminatorEdges<BasicBlock: Idx> {
     /// For terminators that have no successor, like `return`.
     None,
@@ -342,7 +343,7 @@ impl<BasicBlock: Idx> TerminatorEdges<BasicBlock> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SwitchTargets<BasicBlock: Idx> {
     pub targets: FxIndexMap<Pu128, BasicBlock>,
     pub otherwise: Option<BasicBlock>,
@@ -366,6 +367,7 @@ impl<BasicBlock> Location<BasicBlock> {
     }
 }
 
+#[derive(Clone)]
 pub struct DataDepGraph<BasicBlock: Idx, Local: Idx> {
     num_locals: usize,
     pub blocks: IndexVec<BasicBlock, BlockDataDepGraph<Local>>,
@@ -502,6 +504,7 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
     }
 }
 
+#[derive(Clone)]
 struct InterblockEdges<BasicBlock, Local> {
     /// deps[stmt] records the interblock dependencies of the `stmt` in basic block.
     deps: Vec<InterblockEdgesEntry<BasicBlock, Local>>,
@@ -551,6 +554,7 @@ impl<BasicBlock: Idx, Local: Idx> InterblockEdgesEntry<BasicBlock, Local> {
 }
 
 /// Record the data dependencies of a BasicBlock.
+#[derive(Clone)]
 pub struct BlockDataDepGraph<Local: Idx> {
     /// Records the dependencies of each statement.
     /// If deps[stmt].get(&prev_stmt) == Some(local),

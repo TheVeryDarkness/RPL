@@ -171,7 +171,7 @@ impl fmt::Display for ConstVar<'_> {
     }
 }
 
-impl fmt::Display for Fn<'_> {
+impl fmt::Display for FnPattern<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -183,7 +183,7 @@ impl fmt::Display for Fn<'_> {
     }
 }
 
-impl fmt::Debug for Fn<'_> {
+impl fmt::Debug for FnPattern<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.body {
             None => write!(f, "{self};"),
@@ -210,17 +210,6 @@ impl fmt::Debug for Param<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}{:?}: ", self.mutability.prefix_str(), self.ident)?;
         write!(f, "{:?}", self.ty)
-    }
-}
-
-impl fmt::Debug for FnBody<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mir(mir_body) => {
-                f.write_str(" = mir!")?;
-                f.debug_set().entry(mir_body).finish()
-            },
-        }
     }
 }
 

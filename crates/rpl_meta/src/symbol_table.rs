@@ -318,7 +318,7 @@ impl<'i> SymbolTable<'i> {
     pub fn collect_symbol_tables(
         mctx: &MetaContext<'i>,
         pat_imports: &[&'i pairs::UsePath<'i>],
-        pat_items: impl Iterator<Item = &'i pairs::pattBlockItem<'i>>,
+        pat_items: impl Iterator<Item = &'i pairs::RPLPatternItem<'i>>,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) -> FxHashMap<Symbol, Self> {
         let mut symbol_tables = FxHashMap::default();
@@ -345,7 +345,7 @@ impl<'i> SymbolTable<'i> {
     fn collect_symbol_table(
         mctx: &MetaContext<'i>,
         imports: &[&'i pairs::UsePath<'i>],
-        pat_item: &'i pairs::pattBlockItem<'i>,
+        pat_item: &'i pairs::RPLPatternItem<'i>,
     ) -> CheckCtxt<'i> {
         let pat_item_name = Symbol::intern(pat_item.Identifier().span.as_str());
         let mut cctx = CheckCtxt::new(pat_item_name);

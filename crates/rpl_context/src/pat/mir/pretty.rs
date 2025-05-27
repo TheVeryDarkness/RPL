@@ -225,7 +225,7 @@ impl fmt::Debug for FieldAcc {
     }
 }
 
-impl fmt::Debug for MirPattern<'_> {
+impl fmt::Debug for FnPatternBody<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let new_line = if f.alternate() { "\n" } else { " " };
         let indent = if f.alternate() { "    " } else { "" };
