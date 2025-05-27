@@ -3,7 +3,6 @@ use std::ops::Deref;
 
 use rpl_meta::idx::RPLIdx;
 use rpl_meta::meta::collect_blocks;
-use rpl_meta::utils::Path;
 use rpl_parser::pairs;
 use rustc_arena::DroplessArena;
 use rustc_data_structures::fx::FxHashMap;
@@ -74,7 +73,6 @@ pub struct PatternCtxt<'pcx> {
     arena: &'pcx WorkerLocal<crate::Arena<'pcx>>,
     rpl_patterns: Lock<FxHashMap<RPLIdx, &'pcx pat::RPLPattern<'pcx>>>,
     pub primitive_types: PrimitiveTypes<'pcx>,
-    pub(crate) imports: Lock<FxHashMap<Symbol, Path<'pcx>>>,
 }
 
 impl PatternCtxt<'_> {
@@ -84,7 +82,6 @@ impl PatternCtxt<'_> {
             arena,
             rpl_patterns: Default::default(),
             primitive_types: PrimitiveTypes::new(&arena.dropless),
-            imports: Default::default(),
         };
         f(PatCtxt { pcx })
     }
@@ -196,24 +193,11 @@ impl<'pcx> PatCtxt<'pcx> {
         main: &'pcx pairs::main<'pcx>,
         mctx: &'mcx rpl_meta::context::MetaContext<'mcx>,
     ) {
-        // FIXME
+        let pattern = self.new_pattern();
+        // FIXME: process utils
         let (_utils, patts, diags) = collect_blocks(main);
-
-        // FIXME
-        let patt_imports = patts.iter().flat_map(|patt| patt.get_matched().2.iter_matched());
-
-        patt_imports.for_each(|import| {
-            let (_, path, _) = import.get_matched();
-            let path = Path::from(path);
-            // FIXME: check duplicates
-            self.imports.borrow_mut().insert(path.ident().name, path);
-        });
-
         let patt_items = patts.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
         let patt_symbol_tables = &mctx.symbol_tables.get(&id).unwrap().patt_symbol_tables;
-        let pattern = self.new_pattern();
-
-        // zip patt_items and patt_symbol_tables
         patt_items.for_each(|item| {
             pattern.add_pattern_item(
                 with_path(mctx.get_active_path(), item),
@@ -221,11 +205,9 @@ impl<'pcx> PatCtxt<'pcx> {
                 pat::PattOrUtil::Patt,
             );
         });
-
         for diag in diags {
             pattern.add_diag(diag)
         }
-
         self.rpl_patterns.lock().insert(id, pattern);
     }
 }

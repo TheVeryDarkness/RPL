@@ -261,43 +261,13 @@ impl<'pcx> Param<'pcx> {
     }
 }
 
-pub struct TraitDef {}
-
 impl<'pcx> FnPatterns<'pcx> {
     pub fn get_fn_pat(&self, name: Symbol) -> Option<&'pcx FnPattern<'pcx>> {
         self.named_fns.get(&name).copied()
     }
-    // pub fn new_fn(&mut self, name: Symbol) -> &mut Fn<'pcx> {
-    //     self.fns.entry(name).or_insert_with(|| Fn::new(name))
-    // }
-    // pub fn new_fn_pat(&mut self, name: Symbol) -> &mut Fn<'pcx> {
-    //     self.fn_pats.entry(name).or_insert_with(|| Fn::new(name))
-    // }
-    // pub fn new_unnamed(&mut self) -> &mut Fn<'pcx> {
-    //     self.unnamed_fns.push(Fn::new(kw::Underscore));
-    //     self.unnamed_fns.last_mut().unwrap()
-    // }
 }
 
 impl<'pcx> FnPattern<'pcx> {
-    // pub(crate) fn new(name: Symbol) -> Self {
-    //     Self {
-    //         name,
-    //         safety: Safety::Safe,
-    //         visibility: Visibility::Public,
-    //         meta: MetaVars::default(),
-    //         params: Params::default(),
-    //         ret: None,
-    //         body: None,
-    //     }
-    // }
-    // pub fn set_ret_ty(&mut self, ty: Ty<'pcx>) {
-    //     self.ret = Some(ty);
-    // }
-    // pub fn set_body(&mut self, body: FnBody<'pcx>) {
-    //     self.body = Some(body);
-    // }
-    // FIXME: remove this when all kinds of patterns are implemented
     pub fn expect_mir_body(&self) -> &'pcx FnPatternBody<'pcx> {
         match self.body {
             Some(mir_body) => mir_body,
