@@ -15,7 +15,7 @@ impl<'a, 'pcx, 'tcx> MatchFnCtxt<'a, 'pcx, 'tcx> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
-        pat: &'pcx pat::RPLRustItems<'pcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
         fn_pat: &'a pat::FnPattern<'pcx>,
     ) -> Self {
         let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &fn_pat.meta); // FIXME

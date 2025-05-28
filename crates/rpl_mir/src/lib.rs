@@ -78,7 +78,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
         body: &'a mir::Body<'tcx>,
-        pat: &'pcx pat::RPLRustItems<'pcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
         pat_name: Symbol,
         fn_pat: &'a pat::FnPattern<'pcx>,
         mir_cfg: MirControlFlowGraph,

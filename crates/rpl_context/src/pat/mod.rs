@@ -36,19 +36,19 @@ pub enum PattOrUtil {
     Util,
 }
 
-pub enum RPLPatternItem<'pcx> {
-    RPLRustItems(RPLRustItems<'pcx>),
+pub enum PatternItem<'pcx> {
+    RustItems(RustItems<'pcx>),
     RPLPatternOperation,
 }
 
-pub struct RPLRustItems<'pcx> {
+pub struct RustItems<'pcx> {
     pub pcx: PatCtxt<'pcx>,
     pub adts: FxHashMap<Symbol, Adt<'pcx>>,
     pub fns: FnPatterns<'pcx>,
     pub impls: Vec<Impl<'pcx>>,
 }
 
-impl<'pcx> RPLRustItems<'pcx> {
+impl<'pcx> RustItems<'pcx> {
     pub(crate) fn new(pcx: PatCtxt<'pcx>) -> Self {
         Self {
             pcx,
@@ -116,14 +116,14 @@ impl<'pcx> RPLRustItems<'pcx> {
 }
 
 /// Corresponds to a pattern file in RPL, not a pattern item.
-pub struct RPLPattern<'pcx> {
+pub struct Pattern<'pcx> {
     pub pcx: PatCtxt<'pcx>,
-    pub patt_block: FxHashMap<Symbol, RPLPatternItem<'pcx>>, // indexed by pat_name
-    pub util_block: FxHashMap<Symbol, RPLPatternItem<'pcx>>, // indexed by pat_name
+    pub patt_block: FxHashMap<Symbol, PatternItem<'pcx>>, // indexed by pat_name
+    pub util_block: FxHashMap<Symbol, PatternItem<'pcx>>, // indexed by pat_name
     diag_block: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
 }
 
-impl<'pcx> RPLPattern<'pcx> {
+impl<'pcx> Pattern<'pcx> {
     pub(crate) fn new(pcx: PatCtxt<'pcx>) -> Self {
         Self {
             pcx,
@@ -144,7 +144,7 @@ impl<'pcx> RPLPattern<'pcx> {
     }
 }
 
-impl<'pcx> RPLPattern<'pcx> {
+impl<'pcx> Pattern<'pcx> {
     pub fn add_pattern_item(
         &mut self,
         pat_item: WithPath<'pcx, &'pcx pairs::RPLPatternItem<'pcx>>,
@@ -190,14 +190,14 @@ impl<'pcx> RPLPattern<'pcx> {
                     PattOrUtil::Patt => self
                         .patt_block
                         .entry(pat_name)
-                        .or_insert_with(|| RPLPatternItem::RPLRustItems(RPLRustItems::new(self.pcx))),
+                        .or_insert_with(|| PatternItem::RustItems(RustItems::new(self.pcx))),
                     PattOrUtil::Util => self
                         .util_block
                         .entry(pat_name)
-                        .or_insert_with(|| RPLPatternItem::RPLRustItems(RPLRustItems::new(self.pcx))),
+                        .or_insert_with(|| PatternItem::RustItems(RustItems::new(self.pcx))),
                 };
                 let rpl_rust_items = match rpl_pattern_item {
-                    RPLPatternItem::RPLRustItems(rust_items) => rust_items,
+                    PatternItem::RustItems(rust_items) => rust_items,
                     _ => unreachable!(),
                 };
                 for item in items {

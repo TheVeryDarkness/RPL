@@ -349,7 +349,7 @@ impl<'pcx> PlaceTy<'pcx> {
     pub fn from_ty(ty: Ty<'pcx>) -> Self {
         Self { ty, variant: None }
     }
-    pub fn projection_ty(&self, pat: &'pcx RPLRustItems<'pcx>, proj: PlaceElem<'pcx>) -> Option<Self> {
+    pub fn projection_ty(&self, pat: &'pcx RustItems<'pcx>, proj: PlaceElem<'pcx>) -> Option<Self> {
         match proj {
             PlaceElem::Deref => match self.ty.kind() {
                 &TyKind::Ref(_, ty, _) | &TyKind::RawPtr(ty, _) => Some(PlaceTy::from_ty(ty)),
