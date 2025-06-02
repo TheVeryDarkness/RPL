@@ -1,5 +1,5 @@
 use either::Either;
-use rpl_match::resolve::{PatItemKind, def_path_res};
+use rpl_resolve::{PatItemKind, def_path_res};
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::{
@@ -7,6 +7,13 @@ use rustc_hir::{
 };
 use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, Symbol};
+
+pub type TranslatePredicateTy = fn(
+    mir_location: rustc_middle::mir::Location,
+    hir_fn_path: &str,
+    tcx: TyCtxt<'_>,
+    body: &rustc_middle::mir::Body<'_>,
+) -> bool;
 
 // Make sure a mir statement is translated from a hir function
 // Example: make sure the following code is translated from `std::mem::transmute`
@@ -60,7 +67,7 @@ impl<'v> Visitor<'v> for FindExprBySpanAndFnPath<'v> {
     }
 }
 
-pub fn get_body_id_from_hir_node(node: Node<'_>) -> Option<BodyId> {
+fn get_body_id_from_hir_node(node: Node<'_>) -> Option<BodyId> {
     match node {
         Node::TraitItem(TraitItem {
             kind: TraitItemKind::Fn(_fn_sig, TraitFn::Provided(body_id)),
@@ -85,10 +92,10 @@ pub fn get_body_id_from_hir_node(node: Node<'_>) -> Option<BodyId> {
 }
 
 pub fn translate_from_hir_function(
-    tcx: TyCtxt<'_>,
     mir_location: rustc_middle::mir::Location,
-    body: &rustc_middle::mir::Body<'_>,
     hir_fn_path: &str,
+    tcx: TyCtxt<'_>,
+    body: &rustc_middle::mir::Body<'_>,
 ) -> bool {
     let mir_stmt = body.stmt_at(mir_location);
     let (span, scope) = match mir_stmt {

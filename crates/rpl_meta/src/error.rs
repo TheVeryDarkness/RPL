@@ -113,6 +113,11 @@ error_type!(
                 span: SpanWrapper<'i>,
             }
                 "The return value `RET` in MIR pattern is not declared. \n{span}",
+            319 UnknownPredicate {
+                pred_name: String,
+                span: SpanWrapper<'i>,
+            }
+                "Unknown predicate `{pred_name}`. \n{span}",
         }
 );
 

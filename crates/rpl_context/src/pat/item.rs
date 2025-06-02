@@ -224,7 +224,6 @@ pub struct Param<'pcx> {
 }
 
 impl<'pcx> Param<'pcx> {
-    /// The bool indicates whether the parameter is a `..`, which makes params non-
     pub fn from(
         param: WithPath<'pcx, &'pcx pairs::FnParam<'_>>,
         pcx: PatCtxt<'pcx>,

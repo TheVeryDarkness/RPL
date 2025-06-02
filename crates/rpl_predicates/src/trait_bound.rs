@@ -2,6 +2,8 @@ use rustc_hir as hir;
 use rustc_middle::ty::{self, Ty, TyCtxt, TypingMode};
 use rustc_span::{Symbol, sym};
 
+pub type TraitBoundPredicateTy = for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, Ty<'tcx>) -> bool;
+
 /// Check if self_ty's trait bounds are all safe.
 #[instrument(level = "debug", skip(tcx), ret)]
 pub fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, self_ty: Ty<'tcx>) -> bool {

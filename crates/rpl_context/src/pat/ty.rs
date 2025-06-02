@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use either::Either;
 use rpl_meta::symbol_table::{GetType, TypeOrPath, WithPath};
 use rpl_meta::{collect_elems_separated_by_comma, utils};
 use rpl_parser::generics::{Choice2, Choice3, Choice4, Choice10, Choice12, Choice14};
@@ -9,28 +8,14 @@ use rustc_data_structures::packed::Pu128;
 use rustc_hir::def_id::DefId;
 use rustc_hir::{LangItem, PrimTy};
 use rustc_middle::mir;
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::{self};
 use rustc_span::Symbol;
 
 use crate::PatCtxt;
 use crate::cvt_prim_ty::CvtPrimTy;
+use crate::pat::non_local_meta_vars::{ConstVar, TyVar};
 
 use super::FnSymbolTable;
-
-rustc_index::newtype_index! {
-    #[debug_format = "?T{}"]
-    pub struct TyVarIdx {}
-}
-
-rustc_index::newtype_index! {
-    #[debug_format = "?C{}"]
-    pub struct ConstVarIdx {}
-}
-
-rustc_index::newtype_index! {
-    #[debug_format = "?P{}"]
-    pub struct PlaceVarIdx {}
-}
 
 // FIXME: Use interning for the types
 #[derive(Clone, Copy)]
@@ -128,15 +113,12 @@ impl<'pcx> Ty<'pcx> {
             },
             Choice14::_8(ty_meta_var) => {
                 // FIXME: judge whether it is a type variable or a adt pattern;
-                let (ty, idx) = fn_sym_tab.get_type_var(ty_meta_var);
-                // FIXME: Information loss, the pred is not stored.
-                // Solution:
-                // Store the pred in the meta_pass.
+                let (ty, (idx, pred)) = fn_sym_tab.get_type_var(ty_meta_var);
                 let ty_meta_var = match ty {
                     rpl_meta::symbol_table::MetaVariableType::Type => TyVar {
                         idx: idx.into(),
                         name: Symbol::intern(ty_meta_var.span.as_str()),
-                        pred: &[],
+                        pred,
                     },
                     _ => panic!("A non-type meta variable used as a type variable"),
                 };
@@ -215,9 +197,11 @@ impl RegionKind {
     }
 }
 
-#[derive(Clone, Copy)]
+// FIXME:
+// Can we make `TyVar` Copy?
+#[derive(Clone)]
 pub enum TyKind<'pcx> {
-    TyVar(TyVar<'pcx>),
+    TyVar(TyVar),
     AdtPat(Symbol),
     Array(Ty<'pcx>, Const<'pcx>),
     Slice(Ty<'pcx>),
@@ -661,8 +645,6 @@ impl From<bool> for IntValue {
     }
 }
 
-pub type TyPred = for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, ty::Ty<'tcx>) -> bool;
-
 #[derive(Debug, Clone, Copy)]
 pub enum Const<'pcx> {
     ConstVar(ConstVar<'pcx>),
@@ -696,32 +678,5 @@ impl Const<'_> {
 impl From<IntValue> for Const<'_> {
     fn from(value: IntValue) -> Self {
         Self::Value(value)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct TyVar<'pcx> {
-    pub idx: TyVarIdx,
-    pub name: Symbol,
-    pub pred: &'pcx [&'pcx [Either<TyPred, TyPred>]],
-}
-
-#[derive(Clone, Copy)]
-pub struct ConstVar<'pcx> {
-    pub idx: ConstVarIdx,
-    pub name: Symbol,
-    pub ty: Ty<'pcx>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct PlaceVar<'pcx> {
-    pub idx: PlaceVarIdx,
-    pub name: Symbol,
-    pub ty: Ty<'pcx>,
-}
-
-impl<'pcx> PlaceVar<'pcx> {
-    pub fn new(idx: PlaceVarIdx, name: Symbol, ty: Ty<'pcx>) -> Self {
-        Self { idx, name, ty }
     }
 }

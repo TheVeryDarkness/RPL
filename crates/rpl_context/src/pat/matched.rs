@@ -2,7 +2,8 @@ use rustc_middle::mir::{Body, Const, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::Span;
 
-use super::{ConstVarIdx, LabelMap, Location, PlaceVarIdx, TyVarIdx};
+use super::non_local_meta_vars::{ConstVarIdx, PlaceVarIdx, TyVarIdx};
+use super::{LabelMap, Location};
 
 pub trait Matched<'tcx> {
     fn location(&self, labels: &LabelMap, name: &str) -> Location;

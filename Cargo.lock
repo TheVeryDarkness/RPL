@@ -1197,6 +1197,7 @@ version = "0.1.0"
 dependencies = [
  "rpl_meta",
  "rpl_parser",
+ "rpl_predicates",
  "sync-arena",
 ]
 
@@ -1238,6 +1239,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "rpl_context",
+ "rpl_resolve",
 ]
 
 [[package]]
@@ -1255,6 +1257,7 @@ dependencies = [
  "pest_typed_generator",
  "pretty_assertions",
  "rpl_parser",
+ "rpl_predicates",
  "schemars",
  "serde",
  "serde_json",
@@ -1315,9 +1318,14 @@ dependencies = [
 name = "rpl_predicates"
 version = "0.1.0"
 dependencies = [
- "rpl_match",
+ "rpl_parser",
+ "rpl_resolve",
  "tracing",
 ]
+
+[[package]]
+name = "rpl_resolve"
+version = "0.1.0"
 
 [[package]]
 name = "rpl_utils"

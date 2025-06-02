@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 derive_more.workspace = true
 rpl_context.workspace = true
+rpl_resolve.workspace = true
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

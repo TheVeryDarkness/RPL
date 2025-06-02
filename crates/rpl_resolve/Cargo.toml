@@ -1,5 +1,5 @@
 [package]
-name = "rpl_predicates"
+name = "rpl_resolve"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -9,9 +9,6 @@ keywords.workspace = true
 repository.workspace = true
 
 [dependencies]
-tracing.workspace = true
-rpl_parser.workspace = true
-rpl_resolve.workspace = true
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

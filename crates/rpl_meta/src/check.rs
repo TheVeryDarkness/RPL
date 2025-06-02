@@ -7,6 +7,7 @@ use crate::utils::{Ident, Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
 use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
+use rpl_predicates::PredicateConjunction;
 use rustc_hash::FxHashSet;
 use rustc_span::Symbol;
 use std::ops::Deref;
@@ -40,7 +41,7 @@ impl<'i> CheckCtxt<'i> {
     }
 
     pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::RPLPatternItem<'i>) {
-        let (_, meta_decl_list, _, _, rust_item_or_patt_operation, _) = pat_item.get_matched();
+        let (_, meta_decl_list, _, rust_item_or_patt_operation, _) = pat_item.get_matched();
         if let Some(meta_decl_list) = meta_decl_list {
             self.check_meta_decl_list(mctx, meta_decl_list);
         }
@@ -55,12 +56,58 @@ impl<'i> CheckCtxt<'i> {
         if let Some(decls) = meta_decl_list.get_matched().1 {
             let decls = collect_elems_separated_by_comma!(decls).collect::<Vec<_>>();
             for decl in decls {
-                let (ident, _, ty) = decl.get_matched();
+                let (ident, _, ty, preds) = decl.get_matched();
+                let preds = preds.as_ref().map(|preds| preds.get_matched().1);
+                self.check_pred_conjunction_opt(mctx, preds);
+                // FIXME:
+                // The following code relies on some assumptions:
+                // - The predicate after the declaration of the meta variable is always like
+                //   `is_all_safe_trait(self) && !is_primitive(self)`
+                let preds = PredicateConjunction::from_pairs_opt(preds);
                 // unwrap here is safe because we check the meta decl list before checking the rust items
                 // so the Arc is not cloned
                 let meta_vars_ref = Arc::get_mut(&mut self.symbol_table.meta_vars).unwrap();
-                meta_vars_ref.add_non_local_meta_var(mctx, ident.into(), ty, &mut self.errors);
+                meta_vars_ref.add_non_local_meta_var(mctx, ident.into(), ty, preds, &mut self.errors);
             }
+        }
+    }
+
+    fn check_pred_conjunction_opt(
+        &mut self,
+        mctx: &MetaContext<'i>,
+        preds: Option<&'i pairs::PredicateConjunction<'i>>,
+    ) {
+        if let Some(preds) = preds {
+            let (first, following) = preds.get_matched();
+            std::iter::once(first)
+                .chain(following.iter_matched().map(|and_pred| and_pred.get_matched().1))
+                .for_each(|pred| self.check_pred_clause(mctx, pred));
+        }
+    }
+
+    fn check_pred_clause(&mut self, mctx: &MetaContext<'i>, pred: &'i pairs::PredicateClause<'i>) {
+        match pred.deref() {
+            Choice2::_0(pred) => self.check_pred_literal(mctx, pred),
+            Choice2::_1(preds) => {
+                let (_, first, following, _) = preds.get_matched();
+                std::iter::once(first)
+                    .chain(following.iter_matched().map(|or_pred| or_pred.get_matched().1))
+                    .for_each(|pred| self.check_pred_literal(mctx, pred));
+            },
+        }
+    }
+
+    fn check_pred_literal(&mut self, mctx: &MetaContext<'i>, pred: &'i pairs::PredicateTerm<'i>) {
+        let pred = match pred.deref() {
+            Choice2::_0(pred) => pred,
+            Choice2::_1(pred) => pred.get_matched().1,
+        };
+        let pred_name = pred.get_matched().0.span.as_str();
+        if !rpl_predicates::ALL_PREDICATES.contains(&pred_name) {
+            self.errors.push(RPLMetaError::UnknownPredicate {
+                pred_name: pred_name.to_string(),
+                span: SpanWrapper::new(pred.span, mctx.get_active_path()),
+            });
         }
     }
 

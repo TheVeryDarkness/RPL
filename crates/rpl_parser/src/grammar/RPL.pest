@@ -78,6 +78,7 @@ kw_RET          = @{ "RET" ~ !WordFollowing }
 kw_bool         = @{ "bool" ~ !WordFollowing }
 kw_str          = @{ "str" ~ !WordFollowing }
 kw_place        = @{ "place" ~ !WordFollowing }
+kw_where        = @{ "where" ~ !WordFollowing }
 
 Keywords = @{
     kw_pattern
@@ -152,6 +153,7 @@ Keywords = @{
   | kw_isize
   | kw_bool
   | kw_str
+  | kw_where
 }
 
 // Space and Comment
@@ -177,9 +179,9 @@ Colon2       = @{ "::" }
 SemiColon    = @{ ";" }
 Hash         = @{ "#" }
 
-Tilde      = @{ "~" }
 And        = @{ "&" }
-HashTilde  = @{ Hash ~ Tilde }
+AndAnd     = @{ "&&" }
+OrOr       = @{ "||" }
 Bang       = @{ "!" }
 Star       = @{ "*" }
 Arrow      = @{ "->" }
@@ -264,8 +266,32 @@ MetaVariableType = {
   | kw_place ~ LeftParen ~ Type ~ RightParen
 }
 
+Predicate            = {
+    Identifier ~ LeftParen ~ PredicateArgs? ~ RightParen
+}
+PredicateTerm        = {
+    Predicate
+  | Bang ~ Predicate
+}
+PredicateArgs        = {
+    PredicateArg ~ (Comma ~ PredicateArg)* ~ Comma?
+}
+PredicateArg         = {
+    Label
+  | MetaVariable
+  | Type
+  | kw_self
+}
+PredicateClause      = {
+    PredicateTerm
+  | LeftParen ~ PredicateTerm ~ (OrOr ~ PredicateTerm)* ~ RightParen
+}
+PredicateConjunction = {
+    PredicateClause ~ (AndAnd ~ PredicateClause)*
+}
+
 // MetaVariable Declaration
-MetaVariableDecl                    = { MetaVariable ~ Colon ~ MetaVariableType }
+MetaVariableDecl                    = { MetaVariable ~ Colon ~ MetaVariableType ~ (kw_where ~ PredicateConjunction)? }
 MetaVariableDeclsSeparatedByComma   = {
     MetaVariableDecl ~ (Comma ~ MetaVariableDecl)* ~ Comma?
 }
@@ -283,19 +309,16 @@ MetaVariableAssignList              = {
 // Attributes
 Attribute                  = {
     (Word ~ Assign ~ Word)
-  | Word
+  | PredicateConjunction
 }
 AttributesSeparatedByComma = {
     Attribute ~ (Comma ~ Attribute)* ~ Comma?
 }
-AttributeList              = {
-    LeftBracket ~ AttributesSeparatedByComma? ~ RightBracket
+WhereBlock                 = {
+    kw_where ~ LeftBrace ~ AttributesSeparatedByComma? ~ RightBrace
 }
-PreItemAttribute           = { Hash ~ AttributeList }
-PostItemAttribute          = { HashTilde ~ AttributeList }
 
 // Rust Items
-
 Mutability = { kw_mut? }
 
 PtrMutability = {
@@ -840,7 +863,7 @@ RustItemsOrPatternOperation = {
 
 // patt block Item
 RPLPatternItem = {
-    Identifier ~ MetaVariableDeclList? ~ Assign ~ PreItemAttribute? ~ RustItemsOrPatternOperation ~ PostItemAttribute?
+    Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation ~ WhereBlock?
 }
 
 MetaVariableWithDiagMessage = {

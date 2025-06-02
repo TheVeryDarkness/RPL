@@ -26,6 +26,18 @@ fn mir_rvalue_or_call() {
     full_test!(MirRvalue, "copy (((((*$from_vec_mut_borrow).buf).inner).ptr).pointer)");
     full_test!(MirRvalue, "copy ((((*$x).0).0).0)");
 }
+
+#[test]
+fn predicates() {
+    full_test!(Predicate, "p1(self)");
+    full_test!(Predicate, "p1('a, 'b, std::mem::transmute)");
+    full_test!(PredicateTerm, "!p($T)");
+    full_test!(PredicateClause, "!p($T)");
+    full_test!(PredicateClause, "(!p($T) || p($T))");
+    full_test!(PredicateConjunction, "!p($T) && p($T)");
+    full_test!(PredicateConjunction, "(a() || b()) && c()");
+}
+
 #[test]
 fn cve_2018_21000() {
     full_test!(
@@ -42,11 +54,10 @@ util {
     use alloc::alloc::Global;
     use core::marker::PhantomData;
     p_misordered_para[
-        $T1: ty,
-        $T2: ty,
-        $T3: ty,
-        $Op: binop
-    ] = #[mir] unsafe fn _ (..) -> _ {
+        $T1: type,
+        $T2: type,
+        $T3: type,
+    ] = fn _ (..) -> _ {
         let $from_vec: Vec::<$T1> = _;
         let mut $from_vec_mut_borrow: &mut Vec::<$T1> = &mut $from_vec;
         let mut $from_vec_non_null: NonNull::<u8> = copy (*$from_vec_mut_borrow).buf.inner.ptr.pointer;
@@ -84,13 +95,13 @@ util {
     }
 }
 patt {
-    p1[$T: ty] = p_reversed_para[
+    p1[$T: type] = p_reversed_para[
         $T1 = u8,
         $T2 = $T,
         $T3 = $T,
         // $Op = Div
     ]
-    p2[$T: ty] = p_reversed_para[
+    p2[$T: type] = p_reversed_para[
         $T1 = $T,
         $T2 = $T,
         $T3 = u8,
@@ -112,8 +123,8 @@ patt {
     use std::string::String;
     // Only work for crate::ll::instr or ncures::instr
     p1[
-        $T: ty,
-    ] = #[mir] fn _ (..) -> _ {
+        $T: type,
+    ] = fn _ (..) -> _ {
         let $src: &String = _;
         let $bytes: &[u8] = String::as_bytes(move $src);
         let $ptr: *const u8 = slice::as_ptr(copy $bytes);
@@ -121,7 +132,7 @@ patt {
         let $ret: $T = $crate::ll::instr(move $dst);
     }
     // Pass a string ptr to $c_func
-    p2 = #[mir] fn _ (..) -> _ {
+    p2 = fn _ (..) -> _ {
         let $ptr: *const c_char = _;
         _ = $c_func(move $ptr);
     }
@@ -138,8 +149,8 @@ pattern CVE-2019-16138
 patt {
     use std::vec::Vec;
     p[
-        $T: ty
-    ] = #[mir] pub fn _ (..) -> _ {
+        $T: type
+    ] = pub fn _ (..) -> _ {
         let $vec: Vec<$T> = std::vec::Vec::with_capacity(_);
         let $vec_ref: &mut Vec<$T> = &mut $vec;
         _ = std::vec::Vec::set_len(move $vec_ref, _);
@@ -156,8 +167,8 @@ fn cve_2020_25016() {
 pattern CVE-2020-25016
 patt {
     p_unsound_cast_const[
-        $T: ty
-    ] = #[mir] fn _ (..) -> _ {
+        $T: type
+    ] = fn _ (..) -> _ {
         let $from_slice: &[$T] = _;
         let $from_raw: *const [$T] = &raw const *$from_slice;
         let $from_len: usize = PtrMetadata(copy $from_slice);
@@ -166,10 +177,12 @@ patt {
         let $to_len: usize = Mul(move $from_len, move $ty_size);
         let $to_raw: *const [u8] = *const [u8] from (copy $to_ptr, copy $to_len);
         let $to_slice: &[u8] = &*$to_raw;
-    } #~[safety = safe]
+    } where {
+        safety = safe
+    }
     p_unsound_cast_mut[
-        $T: ty
-    ] = #[mir] fn _ (..) -> _ {
+        $T: type
+    ] = fn _ (..) -> _ {
         let $from_slice_mut: &mut [$T] = _;
         let $from_raw_mut: *mut [$T] = &raw mut *$from_slice_mut;
         let $from_len_mut: usize = PtrMetadata(copy $from_slice_mut);
@@ -178,10 +191,10 @@ patt {
         let $to_len_mut: usize = Mul(move $from_len_mut, move $ty_size_mut);
         let $to_raw_mut: *mut [u8] = *mut [u8] from (copy $to_ptr_mut, copy $to_len_mut);
         let $to_slice_mut: &mut [u8] = &mut *$to_raw_mut;
-    } #~[safety = safe]
+    } where {
+        safety = safe
+    }
 }
-// Here, the metavariable $T is placed in square brackets, which is also for later constraints on T. The specific content of the constraint is: the type $T does not have unsafe trait constraints (except Send, Sync)
-// (Since the expression of this constraint requires rustc code/encapsulation in the rpl standard library, it is not reflected in this example)
 "
     );
 }
@@ -192,14 +205,14 @@ fn cve_2020_35881() {
         "\
 pattern CVE-2020-35881
 patt {
-    p_wrong_assumption_of_fat_pointer_layout_const_const = #[mir] fn _ (..) -> _ {
+    p_wrong_assumption_of_fat_pointer_layout_const_const = fn _ (..) -> _ {
         let $ptr: *const $T = _;
         let $ref_to_ptr: &*const $T = &$ptr;
         let $ptr_to_ptr_t: *const *const $T = &raw const (*$ref_to_ptr);
         let $ptr_to_ptr: *const *const () = move $ptr_to_ptr_t as *const *const () (Transmute);
         let $data_ptr: *const () = _;
     }
-    p_wrong_assumption_of_fat_pointer_layout_const_mut = #[mir] fn _ (..) -> _ {
+    p_wrong_assumption_of_fat_pointer_layout_const_mut = fn _ (..) -> _ {
         let $ptr: *const $T = _;
         let $ref_to_ptr: &mut *const $T = &mut $ptr;
         let $ptr_to_ptr_t: *mut *const $T = &raw mut (*$ref_to_ptr);
@@ -207,7 +220,7 @@ patt {
         let $data_ptr: *mut () = _;
     }
     
-    p_wrong_assumption_of_fat_pointer_layout_mut_const = #[mir] fn _ (..) -> _ {
+    p_wrong_assumption_of_fat_pointer_layout_mut_const = fn _ (..) -> _ {
         let $ptr: *mut $T = _;
         let $ref_to_ptr: &*mut $T = &$ptr;
         let $ptr_to_ptr_t: *const *mut $T = &raw const (*$ref_to_ptr);
@@ -215,7 +228,7 @@ patt {
         let $data_ptr: *const () = _;
     }
     
-    p_wrong_assumption_of_fat_pointer_layout_mut_mut = #[mir] fn _ (..) -> _ {
+    p_wrong_assumption_of_fat_pointer_layout_mut_mut = fn _ (..) -> _ {
         let $ptr: *mut $T = _;
         let $ref_to_ptr: &mut *mut $T = &mut $ptr;
         let $ptr_to_ptr_t: *mut *mut $T = &raw mut (*$ref_to_ptr);
@@ -234,8 +247,8 @@ fn cve_2020_35888() {
 pattern CVE-2020-35888
 patt {
     p_move[
-        $T: ty,
-    ] = #[mir, warning] pub fn _ (..) -> _ {
+        $T: type,
+    ] = pub fn _ (..) -> _ {
         let $raw_ptr: *mut $T = _;
         let $value: $T = _;
         drop((*$raw_ptr));
@@ -257,10 +270,10 @@ patt {
     // 1. use a where clause (how to define a where clause?)
     // 2. use a predicate (how to define a predicate?)
     p[
-        $T: ty,
-        $SlabT: ty
+        $T: type,
+        $SlabT: type
     ]
-    = #[mir] fn _ (..) -> _ {
+    = fn _ (..) -> _ {
         let $self: &mut $SlabT;
         let $len: usize = copy (*$self).len;
         let $range: Range<usize> = Range { start: const 0_usize, end: move $len };
@@ -317,8 +330,8 @@ patt {
     use std::rc::Rc;
     use std::rc::RcInner;
     p_rc_unsafe_cell[
-        $T: ty
-    ] = {                       
+        $T: type
+    ] = {           
         pub struct $Cell {
             $inner: Rc<UnsafeCell<$T>>,
         }
@@ -349,21 +362,21 @@ pattern CVE-2021-27376
 patt {
     use std::net::SocketAddrV6;
     use libc::socketaddr;
-    p_const_const_ver = #[mir] fn _ (..) -> _ {
+    p_const_const_ver = fn _ (..) -> _ {
         let $src: *const SocketAddrV6 = _;
         let $dst: *const socketaddr = move $src as *const socketaddr (PtrToPtr);
     }
-    p_mut_const_ver = #[mir] fn _ (..) -> _ {
+    p_mut_const_ver = fn _ (..) -> _ {
         let $src: *mut SocketAddrV6 = _;
         let $dst: *const socketaddr = move $src as *const socketaddr (PtrToPtr);
     }
     
-    p_const_mut_ver = #[mir] fn _ (..) -> _ {
+    p_const_mut_ver = fn _ (..) -> _ {
         let $src: *const SocketAddrV6 = _;
         let $dst: *mut socketaddr = move $src as *mut socketaddr (PtrToPtr);
     }
     
-    p_mut_mut_ver = #[mir] fn _ (..) -> _ {
+    p_mut_mut_ver = fn _ (..) -> _ {
         let $src: *mut SocketAddrV6 = _;
         let $dst: *mut socketaddr = move $src as *mut socketaddr (PtrToPtr);
     }
@@ -381,7 +394,7 @@ patt {
     use alloc::ffi::c_str::CString;
     use core::ffi::c_str::CStr;
     use core::ptr::non_null::NonNull;
-    p = #[mir] pub fn _ (..) -> _ {
+    p = pub fn _ (..) -> _ {
         let $cstring: CString = _;
         let $cstring_ref: &CString = &$cstring;
         let $non_null: NonNull<[u8]> = copy ((((*$cstring_ref).inner).0).pointer);
@@ -414,10 +427,10 @@ patt {
     use cassandra_cpp_sys::cassandra::cass_iterator_get_row;
     use cassandra_cpp_sys::cassandra::case_bool_t;
     p_incorrect_iterator_impl[
-        $T: ty,
-        $Item: ty
-    ] = #[mir] impl Iterator for $T {
-        fn next(_) -> _ {
+        $T: type,
+        $Item: type
+    ] = impl Iterator for $T {
+        fn next(..) -> _ {
             let $mut_iter: *mut CassIterator = _;
             let $next_res: cass_bool_t = case_iterator_next(copy $mut_iter);
             let $discr: u32 = discriminant($next_res);
@@ -433,30 +446,6 @@ patt {
                 }
             }
         }
-    }
-}
-"#
-    );
-}
-
-#[test]
-fn cve_2020_35860() {
-    full_test!(
-        main,
-        r#"
-pattern CVE-2020-35860
-
-diag {
-    p_deref = {
-        " 
-            The public struct $CBox contains a raw pointer ($ptr) to a type $T. 
-            Its `Deref` implementation dereferences the pointer without null checks.
-          
-            Specifically, the `Deref` implementation calls `CStr::from_ptr(self.$ptr)`,
-            whose safety requirements include that the pointer must be non-null.
-        ",
-        $CBox: "$CBox is defined here",
-        $ptr: "$ptr is defined here",
     }
 }
 "#

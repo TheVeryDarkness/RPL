@@ -8,6 +8,7 @@ use parser::generics::{Choice3, Choice4};
 use parser::pairs::TypeMetaVariable;
 use parser::{SpanWrapper, pairs};
 use pest_typed::Span;
+use rpl_predicates::PredicateConjunction;
 use rustc_hash::FxHashMap;
 use rustc_span::Symbol;
 use std::ops::Deref;
@@ -38,9 +39,9 @@ pub enum MetaVariableType {
 // the usize in the hashmap is the *-index of a non-local meta variable
 #[derive(Default, Clone)]
 pub struct NonLocalMetaSymTab {
-    ty_vars: FxHashMap<Symbol, usize>,
-    const_vars: FxHashMap<Symbol, usize>,
-    place_vars: FxHashMap<Symbol, usize>,
+    type_vars: FxHashMap<Symbol, (usize, PredicateConjunction)>,
+    const_vars: FxHashMap<Symbol, (usize, PredicateConjunction)>,
+    place_vars: FxHashMap<Symbol, (usize, PredicateConjunction)>,
 }
 
 impl NonLocalMetaSymTab {
@@ -49,11 +50,12 @@ impl NonLocalMetaSymTab {
         mctx: &MetaContext<'i>,
         meta_var: Ident<'i>,
         meta_var_ty: &pairs::MetaVariableType<'i>,
+        preds: PredicateConjunction,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) {
         match meta_var_ty.deref() {
             Choice3::_0(_) => {
-                let existed = self.ty_vars.insert(meta_var.name, self.ty_vars.len());
+                let existed = self.type_vars.insert(meta_var.name, (self.type_vars.len(), preds));
                 if existed.is_some() {
                     let err = RPLMetaError::NonLocalMetaVariableAlreadyDeclared {
                         meta_var: meta_var.name,
@@ -63,7 +65,7 @@ impl NonLocalMetaSymTab {
                 }
             },
             Choice3::_1(_) => {
-                let existed = self.const_vars.insert(meta_var.name, self.const_vars.len());
+                let existed = self.const_vars.insert(meta_var.name, (self.const_vars.len(), preds));
                 if existed.is_some() {
                     let err = RPLMetaError::NonLocalMetaVariableAlreadyDeclared {
                         meta_var: meta_var.name,
@@ -73,7 +75,7 @@ impl NonLocalMetaSymTab {
                 }
             },
             Choice3::_2(_) => {
-                let existed = self.place_vars.insert(meta_var.name, self.place_vars.len());
+                let existed = self.place_vars.insert(meta_var.name, (self.place_vars.len(), preds));
                 if existed.is_some() {
                     let err = RPLMetaError::NonLocalMetaVariableAlreadyDeclared {
                         meta_var: meta_var.name,
@@ -91,7 +93,7 @@ impl NonLocalMetaSymTab {
         meta_var: Ident<'i>,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) -> Option<MetaVariableType> {
-        if self.ty_vars.contains_key(&meta_var.name) {
+        if self.type_vars.contains_key(&meta_var.name) {
             Some(MetaVariableType::Type)
         } else if self.const_vars.contains_key(&meta_var.name) {
             Some(MetaVariableType::Const)
@@ -109,13 +111,13 @@ impl NonLocalMetaSymTab {
 
     #[allow(clippy::manual_map)]
     #[instrument(skip(self))]
-    pub fn get_type_and_idx_from_symbol(&self, symbol: Symbol) -> Option<(MetaVariableType, usize)> {
-        if let Some(idx) = self.ty_vars.get(&symbol) {
-            Some((MetaVariableType::Type, *idx))
-        } else if let Some(idx) = self.const_vars.get(&symbol) {
-            Some((MetaVariableType::Const, *idx))
-        } else if let Some(idx) = self.place_vars.get(&symbol) {
-            Some((MetaVariableType::Place, *idx))
+    pub fn get_from_symbol(&self, symbol: Symbol) -> Option<(MetaVariableType, (usize, PredicateConjunction))> {
+        if let Some(idx_and_preds) = self.type_vars.get(&symbol) {
+            Some((MetaVariableType::Type, idx_and_preds.clone()))
+        } else if let Some(idx_and_preds) = self.const_vars.get(&symbol) {
+            Some((MetaVariableType::Const, idx_and_preds.clone()))
+        } else if let Some(idx_and_preds) = self.place_vars.get(&symbol) {
+            Some((MetaVariableType::Place, idx_and_preds.clone()))
         } else {
             None
         }
@@ -762,16 +764,19 @@ pub(crate) fn str_is_primitive(ident: &str) -> bool {
 
 pub trait GetType<'i> {
     fn get_type<'s>(&'s self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'s>, RPLMetaError<'i>>;
-    fn get_type_var<'s>(&'s self, ty_meta_var: &TypeMetaVariable<'i>) -> (MetaVariableType, usize);
+    fn get_type_var<'s>(
+        &'s self,
+        ty_meta_var: &TypeMetaVariable<'i>,
+    ) -> (MetaVariableType, (usize, PredicateConjunction));
 }
 
 impl<'i> GetType<'i> for Fn<'i> {
     fn get_type(&self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
         FnInner::get_type(&self.inner, ident.path, &ident.inner)
     }
-    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, usize) {
+    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, (usize, PredicateConjunction)) {
         self.meta_vars
-            .get_type_and_idx_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
+            .get_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
             .unwrap() // unwrap should be safe here because of the meta pass.
     }
 }
@@ -780,9 +785,9 @@ impl<'i> GetType<'i> for WithMetaTable<&'_ FnInner<'i>> {
     fn get_type(&self, ident: &WithPath<'i, Ident<'i>>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
         FnInner::get_type(self.inner, ident.path, &ident.inner)
     }
-    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, usize) {
+    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, (usize, PredicateConjunction)) {
         self.meta_vars
-            .get_type_and_idx_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
+            .get_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
             .unwrap() // unwrap should be safe here because of the meta pass.
     }
 }
@@ -798,9 +803,9 @@ impl<'i> GetType<'i> for SymbolTable<'i> {
                 type_or_path: ident.name,
             })
     }
-    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, usize) {
+    fn get_type_var(&self, ty_meta_var: &TypeMetaVariable) -> (MetaVariableType, (usize, PredicateConjunction)) {
         self.meta_vars
-            .get_type_and_idx_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
+            .get_from_symbol(Symbol::intern(ty_meta_var.span.as_str()))
             .unwrap()
     }
 }

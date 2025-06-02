@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::iter::zip;
 
-use either::Either;
 use rpl_context::{PatCtxt, pat};
+use rpl_resolve::{PatItemKind, def_path_res};
 use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
 use rustc_hir::def::Res;
 use rustc_hir::def_id::{DefId, LOCAL_CRATE};
@@ -13,7 +13,7 @@ use rustc_middle::ty::{self, TyCtxt, ValTreeKind};
 use rustc_span::Symbol;
 use rustc_span::symbol::kw;
 
-use crate::resolve::{self, PatItemKind, lang_item_res, ty_res};
+use crate::resolve::{lang_item_res, ty_res};
 use crate::{AdtMatch, MatchAdtCtxt};
 
 pub struct MatchTyCtxt<'pcx, 'tcx> {
@@ -47,21 +47,15 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
 
     #[instrument(level = "trace", skip(self), ret)]
     pub fn match_ty(&self, ty_pat: pat::Ty<'pcx>, ty: ty::Ty<'tcx>) -> bool {
-        let ty_pat_kind = *ty_pat.kind();
+        let ty_pat_kind = ty_pat.kind().clone();
         let ty_kind = *ty.kind();
         let matched = match (ty_pat_kind, ty_kind) {
             (pat::TyKind::TyVar(ty_var), _)
-                // This code implements predicate evaluation in conjunctive normal form (CNF):
-                // - All clauses in the conjunction must be satisfied
-                // - Within each clause, at least one predicate must be satisfied
-                //    - Either::Left represents a positive predicate
-                //    - Either::Right represents a negative predicate
-                if ty_var.pred.iter().all(|clause| {
-                    clause.iter().any(|pred| match pred {
-                        Either::Left(pred) => pred(self.tcx, self.typing_env, ty),
-                        Either::Right(pred) => !pred(self.tcx, self.typing_env, ty),
-                    })
-                }) =>
+                // FIXME: 
+                // The following code relies on some assumptions:
+                // - The predicate after the declaration of the meta variable is always like
+                //   `is_all_safe_trait(self) && !is_primitive(self)`
+                if ty_var.pred.evaluate(Some(self.tcx), Some(self.typing_env), Some(ty), None, None, None) =>
             {
                 self.ty_vars[ty_var.idx].borrow_mut().insert(ty);
                 true
@@ -281,7 +275,7 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
         } else {
             return false;
         };
-        let res = resolve::def_path_res(self.tcx, path.0, kind);
+        let res = def_path_res(self.tcx, path.0, kind);
         trace!(?res);
         let mut res = res.into_iter().filter_map(|res| match res {
             Res::Def(_, id) => Some(id),

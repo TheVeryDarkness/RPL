@@ -60,13 +60,13 @@ impl fmt::Debug for Ty<'_> {
 
 impl fmt::Debug for TyKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
+        match self {
             Self::TyVar(ty_var) => ty_var.fmt(f),
             Self::Array(ty, len) => write!(f, "[{ty:?}; {len:?}]"),
             Self::Slice(ty) => write!(f, "[{ty:?}]"),
             Self::Tuple(tys) => {
                 f.write_str("(")?;
-                for ty in tys {
+                for ty in tys.iter() {
                     write!(f, "{ty:?}, ")?;
                 }
                 f.write_str(")")
@@ -147,13 +147,13 @@ impl fmt::Debug for IntValue {
     }
 }
 
-impl fmt::Debug for TyVar<'_> {
+impl fmt::Debug for TyVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.idx.fmt(f)
     }
 }
 
-impl fmt::Display for TyVar<'_> {
+impl fmt::Display for TyVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self, f)
     }

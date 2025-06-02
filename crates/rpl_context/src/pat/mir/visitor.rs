@@ -5,7 +5,7 @@ pub use rustc_middle::mir::visit::{MutatingUseContext, NonMutatingUseContext, Pl
 pub trait PatternVisitor<'pcx>: Sized {
     fn visit_local(&mut self, _local: Local, _pcx: PlaceContext, _location: Location) {}
     fn visit_scalar_int(&mut self, _scalar_int: IntValue) {}
-    fn visit_ty_var(&mut self, _ty_var: TyVar) {}
+    fn visit_ty_var(&mut self, _ty_var: &TyVar) {}
     fn visit_adt_pat(&mut self, _adt_pat: Symbol) {}
     fn visit_fn_pat(&mut self, _fn_pat: Symbol) {}
 
@@ -259,7 +259,7 @@ impl<'pcx, P: PatternSuperVisitable<'pcx>> PatternVisitable<'pcx> for P {}
 impl<'pcx> PatternSuperVisitable<'pcx> for Ty<'pcx> {
     fn super_visit_with<V: PatternVisitor<'pcx>>(&self, vis: &mut V) {
         match self.kind() {
-            &TyKind::TyVar(ty_var) => vis.visit_ty_var(ty_var),
+            TyKind::TyVar(ty_var) => vis.visit_ty_var(ty_var),
             &TyKind::Array(ty, konst) => {
                 vis.visit_ty(ty);
                 vis.visit_const(konst);

@@ -1,5 +1,7 @@
 use rustc_middle::ty::{self, Ty, TyCtxt};
 
+pub type IsTyPredicateTy = for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, Ty<'tcx>) -> bool;
+
 #[instrument(level = "debug", skip(tcx), ret)]
 #[allow(unused_variables)]
 pub fn is_integral<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {

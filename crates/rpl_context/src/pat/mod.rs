@@ -24,7 +24,7 @@ mod utils;
 pub use item::*;
 pub use matched::Matched;
 pub use mir::*;
-pub use non_local_meta_vars::NonLocalMetaVars;
+pub use non_local_meta_vars::*;
 pub use ty::*;
 
 pub type Label = Symbol;
@@ -140,6 +140,7 @@ impl<'pcx> Pattern<'pcx> {
         body: &Body<'tcx>,
         matched: &impl Matched<'tcx>,
     ) -> DynamicError {
+        // FIXME: raise an error if the diag related to the pattern is not found
         self.diag_block.get(&pat_name).unwrap().build(label_map, body, matched)
     }
 }
@@ -152,7 +153,7 @@ impl<'pcx> Pattern<'pcx> {
         block_type: PattOrUtil,
     ) {
         let p = pat_item.path;
-        let (name, meta_decls, _, _, item_or_patt_op, _) = pat_item.get_matched();
+        let (name, meta_decls, _, item_or_patt_op, _) = pat_item.get_matched();
         let name = Symbol::intern(name.span.as_str());
         let symbol_table = symbol_tables.get(&name).unwrap();
         let meta = Arc::new(NonLocalMetaVars::from_meta_decls(
