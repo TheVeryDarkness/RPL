@@ -1,4 +1,4 @@
-pub type TrivialPredicate = fn() -> bool;
+pub type TrivialPredsFnPtr = fn() -> bool;
 
 pub fn is_false() -> bool {
     false

@@ -30,54 +30,51 @@ use rustc_middle::ty::{self, Ty, TyCtxt};
 // Attention:
 // When you add a new module here,
 // Try to keep all predicate signatures consistent in it.
-mod is_ty;
-mod trait_bound;
-mod translate;
-mod trivial;
+mod single_ty_preds;
+mod translate_preds;
+mod tribool;
+mod trivial_preds;
 
-pub use is_ty::*;
-pub use trait_bound::*;
-pub use translate::*;
-pub use trivial::*;
+pub use single_ty_preds::*;
+pub use translate_preds::*;
+pub use trivial_preds::*;
 
 // FIXME: performance
 // Attention:
 // When you add a new predicate,
 // Add it to the list below.
 pub const ALL_PREDICATES: &[&str] = &[
-    // trait_bound
+    // ty_preds
     "is_all_safe_trait",
     "is_not_unpin",
     "is_sync",
-    // translate
-    "translate_from_hir_function",
-    // ty
     "is_integral",
     "is_ptr",
     "is_primitive",
-    // trivial
+    // translate_preds
+    "translate_from_hir_function",
+    // trivial_preds
     "false",
     "true",
 ];
 
 #[derive(Clone, Copy, Debug)]
 pub enum PredicateKind {
-    TraitBound(TraitBoundPredicateTy),
-    Translate(TranslatePredicateTy),
-    Ty(IsTyPredicateTy),
-    Trivial(TrivialPredicate),
+    Ty(SingleTyPredsFnPtr),
+    Translate(TranslatePredsFnPtr),
+    Trivial(TrivialPredsFnPtr),
 }
 
 impl From<&str> for PredicateKind {
     fn from(s: &str) -> Self {
         match s {
-            "is_all_safe_trait" => Self::TraitBound(is_all_safe_trait),
-            "is_not_unpin" => Self::TraitBound(is_not_unpin),
-            "is_sync" => Self::TraitBound(is_sync),
-            "translate_from_hir_function" => Self::Translate(translate_from_hir_function),
+            "is_all_safe_trait" => Self::Ty(is_all_safe_trait),
+            "is_not_unpin" => Self::Ty(is_not_unpin),
+            "is_sync" => Self::Ty(is_sync),
             "is_integral" => Self::Ty(is_integral),
             "is_ptr" => Self::Ty(is_ptr),
             "is_primitive" => Self::Ty(is_primitive),
+            "translate_from_hir_function" => Self::Translate(translate_from_hir_function),
             "is_false" => Self::Trivial(is_false),
             "is_true" => Self::Trivial(is_true),
             _ => unreachable!("Unknown predicate: {}", s),
@@ -96,7 +93,7 @@ impl PredicateKind {
         body: Option<&mir::Body<'tcx>>,
     ) -> bool {
         match self {
-            Self::TraitBound(p) => {
+            Self::Ty(p) => {
                 debug_assert!(tcx.is_some(), "tcx is required when evaluating trait_bound predicates");
                 debug_assert!(
                     typing_env.is_some(),
@@ -117,15 +114,6 @@ impl PredicateKind {
                 debug_assert!(tcx.is_some(), "tcx is required when evaluating translate predicates");
                 debug_assert!(body.is_some(), "body is required when evaluating translate predicates");
                 p(mir_location.unwrap(), hir_fn_path.unwrap(), tcx.unwrap(), body.unwrap())
-            },
-            Self::Ty(p) => {
-                debug_assert!(tcx.is_some(), "tcx is required when evaluating ty predicates");
-                debug_assert!(
-                    typing_env.is_some(),
-                    "typing_env is required when evaluating ty predicates"
-                );
-                debug_assert!(ty.is_some(), "ty is required when evaluating ty predicates");
-                p(tcx.unwrap(), typing_env.unwrap(), ty.unwrap())
             },
             Self::Trivial(p) => p(),
         }

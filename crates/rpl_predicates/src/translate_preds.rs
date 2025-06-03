@@ -8,7 +8,7 @@ use rustc_hir::{
 use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, Symbol};
 
-pub type TranslatePredicateTy = fn(
+pub type TranslatePredsFnPtr = fn(
     mir_location: rustc_middle::mir::Location,
     hir_fn_path: &str,
     tcx: TyCtxt<'_>,
