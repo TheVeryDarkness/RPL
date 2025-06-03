@@ -9,7 +9,6 @@ keywords.workspace = true
 repository.workspace = true
 
 [dependencies]
-tracing.workspace = true
 rpl_parser.workspace = true
 rpl_resolve.workspace = true
 

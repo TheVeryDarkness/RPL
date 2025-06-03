@@ -10,10 +10,15 @@ extern crate rpl_parser as parser;
 extern crate rustc_arena;
 extern crate rustc_data_structures;
 extern crate rustc_driver;
+extern crate rustc_errors;
 extern crate rustc_hash;
 extern crate rustc_hir;
 extern crate rustc_index;
+extern crate rustc_macros;
+extern crate rustc_middle;
 extern crate rustc_span;
+#[macro_use]
+extern crate tracing;
 
 pub mod arena;
 pub mod check;
@@ -34,6 +39,7 @@ use std::path::PathBuf;
 pub fn parse_and_collect<'mcx>(
     arena: &'mcx Arena<'mcx>,
     path_and_content: &'mcx Vec<(PathBuf, String)>,
+    mut handler: impl FnMut(&RPLMetaError<'mcx>),
 ) -> MetaContext<'mcx> {
     let mut mctx = MetaContext::new(arena);
     for (path, content) in path_and_content {
@@ -53,11 +59,11 @@ pub fn parse_and_collect<'mcx>(
                 mctx.syntax_trees.insert(*idx, main);
                 // Perform meta collection
                 let meta = SymbolTables::collect(path, main, *idx, &mctx);
-                meta.show_error();
+                meta.show_error(&mut handler);
                 mctx.symbol_tables.insert(*idx, meta);
             },
             Err(err) => {
-                eprintln!("{}", RPLMetaError::from(err));
+                handler(&RPLMetaError::from(err));
                 continue;
             },
         }

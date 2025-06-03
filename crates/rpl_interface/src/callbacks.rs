@@ -1,6 +1,7 @@
 use std::sync::OnceLock;
 
 use rpl_context::PatternCtxt;
+use rpl_driver::ErrorFound;
 use rpl_meta::cli::collect_file_from_string_args;
 // use rpl_middle::ty::RplConfig;
 use rustc_interface::interface;
@@ -129,12 +130,24 @@ impl rustc_driver::Callbacks for RplCallbacks {
         // Disable flattening and inlining of format_args!(), so the HIR matches with the AST.
         config.opts.unstable_opts.flatten_format_args = false;
     }
-    fn after_analysis(&mut self, _compiler: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
+    fn after_analysis(&mut self, _: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
         static MCTX_ARENA: OnceLock<rpl_meta::arena::Arena<'_>> = OnceLock::new();
         static MCTX: OnceLock<rpl_meta::context::MetaContext<'_>> = OnceLock::new();
         let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
         let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
-        let mctx = MCTX.get_or_init(|| rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths));
+        // let dcx = compiler.sess.dcx();
+        let mut error_counter = 0;
+        let mctx = MCTX.get_or_init(|| {
+            rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
+                error_counter += 1;
+                eprintln!("{error_counter}. {error}");
+                // let _ = dcx.emit_err(error.clone());
+            })
+        });
+        // dcx.abort_if_errors();
+        if error_counter > 0 {
+            tcx.dcx().emit_fatal(ErrorFound);
+        }
         PatternCtxt::entered(|pcx| rpl_driver::check_crate(tcx, pcx, mctx));
         rustc_driver::Compilation::Continue
     }

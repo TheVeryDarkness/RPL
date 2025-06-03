@@ -131,9 +131,9 @@ impl<'pcx> PatCtxt<'pcx> {
     pub fn mk_adt_ty(self, path_with_args: pat::PathWithArgs<'pcx>) -> Ty<'pcx> {
         self.mk_path_ty(path_with_args)
     }
-    // pub fn mk_adt_pat_ty(self, pat: Symbol) -> Ty<'pcx> {
-    //     self.mk_ty(TyKind::AdtPat(pat))
-    // }
+    pub fn mk_adt_pat_ty(self, pat: Symbol) -> Ty<'pcx> {
+        self.mk_ty(TyKind::AdtPat(pat))
+    }
     pub fn mk_array_ty(self, ty: Ty<'pcx>, len: pat::Const<'pcx>) -> Ty<'pcx> {
         self.mk_ty(TyKind::Array(ty, len))
     }
@@ -176,6 +176,9 @@ impl<'pcx> PatCtxt<'pcx> {
     pub fn alloc_fn(self, pat: pat::FnPattern<'pcx>) -> &'pcx mut pat::FnPattern<'pcx> {
         self.arena.alloc(pat)
     }
+    pub fn alloc_struct(self, pat: pat::Adt<'pcx>) -> &'pcx mut pat::Adt<'pcx> {
+        self.arena.alloc(pat)
+    }
     pub fn add_parsed_patterns<'mcx: 'pcx>(self, mctx: &'mcx rpl_meta::context::MetaContext<'mcx>) {
         for (id, syntax_tree) in mctx.syntax_trees.iter() {
             self.add_parsed_pattern(*id, syntax_tree, mctx);
@@ -205,7 +208,7 @@ impl<'pcx> PatCtxt<'pcx> {
             );
         });
         for diag in diags {
-            pattern.add_diag(diag)
+            pattern.add_diag(diag, patt_symbol_tables)
         }
         self.rpl_patterns.lock().insert(id, pattern);
     }
