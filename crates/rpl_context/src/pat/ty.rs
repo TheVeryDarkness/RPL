@@ -145,6 +145,7 @@ impl<'pcx> Ty<'pcx> {
         if qself.is_some() {
             todo!("qself is not supported yet");
         }
+        // FIXME: imports logic incomplete
         if let Some(ident) = utils::Path::from(path).as_ident() {
             if let Ok(path) = fn_sym_tab.get_type(&WithPath::new(p, ident)) {
                 return match path {
