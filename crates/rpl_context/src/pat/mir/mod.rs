@@ -395,7 +395,6 @@ pub enum StatementKind<'pcx> {
 
 pub enum RawDecleration<'pcx> {
     TypeAlias(Symbol, Ty<'pcx>),
-    UsePath(Path<'pcx>),
     LocalInit(Option<Label>, Local, Option<RvalueOrCall<'pcx>>), /* In meta pass, we have already collect the local
                                                                   * and its ty */
 }
@@ -408,15 +407,14 @@ impl<'pcx> RawDecleration<'pcx> {
     ) -> Self {
         let p = decl.path;
         match decl.inner.deref() {
-            Choice3::_0(type_alias) => {
+            Choice2::_0(type_alias) => {
                 let (_, name, _, ty, _) = type_alias.get_matched();
                 Self::TypeAlias(
                     Symbol::intern(name.span.as_str()),
                     Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab),
                 )
             },
-            Choice3::_1(use_path) => Self::UsePath(Path::from_pairs(use_path.get_matched().1, pcx)),
-            Choice3::_2(local_init) => {
+            Choice2::_1(local_init) => {
                 let (label, _, _, local, _, _, init, _) = local_init.get_matched();
                 let local = Local::from(fn_sym_tab.inner.get_local_idx(Symbol::intern(local.span.as_str())));
                 let rvalue_or_call = if let Some(init) = init {

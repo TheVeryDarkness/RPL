@@ -552,7 +552,7 @@ impl<'i> FnInner<'i> {
             },
         }
     }
-    fn add_type_impl(
+    pub(crate) fn add_type(
         &mut self,
         mctx: &MetaContext<'i>,
         ident: Ident<'i>,
@@ -567,15 +567,7 @@ impl<'i> FnInner<'i> {
             errors.push(err);
         });
     }
-    pub fn add_type(
-        &mut self,
-        mctx: &MetaContext<'i>,
-        ident: Ident<'i>,
-        ty: &'i pairs::Type<'i>,
-        errors: &mut Vec<RPLMetaError<'i>>,
-    ) {
-        self.add_type_impl(mctx, ident, TypeOrPath::Type(ty), errors);
-    }
+
     fn get_type(&self, path: &'i std::path::Path, ident: &Ident<'i>) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
         self.types
             .get(&ident.name)
@@ -586,12 +578,6 @@ impl<'i> FnInner<'i> {
             })
     }
 
-    pub fn add_path(&mut self, mctx: &MetaContext<'i>, path: &'i pairs::Path<'i>, errors: &mut Vec<RPLMetaError<'i>>) {
-        let ty_or_path = path.into();
-        let path: Path<'i> = path.into();
-        let ident = path.ident();
-        self.add_type_impl(mctx, ident, ty_or_path, errors);
-    }
     pub fn add_import(
         &mut self,
         mctx: &MetaContext<'i>,
@@ -601,7 +587,7 @@ impl<'i> FnInner<'i> {
         let ty_or_path = path.into();
         let path: Path<'i> = path.into();
         let ident = path.ident();
-        self.add_type_impl(mctx, ident, ty_or_path, errors);
+        self.add_type(mctx, ident, ty_or_path, errors);
     }
 
     pub fn get_sorted_locals(&self) -> WithPath<'i, Vec<(Symbol, &'i pairs::Type<'i>)>> {

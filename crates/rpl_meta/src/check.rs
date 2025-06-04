@@ -397,20 +397,14 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_mir_decl(&mut self, mctx: &MetaContext<'i>, mir_decl: &'i pairs::MirDecl<'i>) {
         match mir_decl.deref() {
-            Choice3::_0(type_decl) => self.check_mir_type_decl(mctx, type_decl),
-            Choice3::_1(use_path) => self.check_use_path(mctx, use_path),
-            Choice3::_2(local_decl) => self.check_mir_local_decl(mctx, local_decl),
+            Choice2::_0(type_decl) => self.check_mir_type_decl(mctx, type_decl),
+            Choice2::_1(local_decl) => self.check_mir_local_decl(mctx, local_decl),
         }
-    }
-
-    fn check_use_path(&mut self, mctx: &MetaContext<'i>, use_path: &'i pairs::UsePath<'i>) {
-        let path = use_path.Path();
-        self.fn_def.add_path(mctx, path, self.errors);
     }
 
     fn check_mir_type_decl(&mut self, mctx: &MetaContext<'i>, type_decl: &'i pairs::MirTypeDecl<'i>) {
         let (_, ident, _, ty, _) = type_decl.get_matched();
-        self.fn_def.add_type(mctx, ident.into(), ty, self.errors);
+        self.fn_def.add_type(mctx, ident.into(), ty.into(), self.errors);
     }
 
     fn check_mir_local_decl(&mut self, mctx: &MetaContext<'i>, local_decl: &'i pairs::MirLocalDecl<'i>) {

@@ -6692,7 +6692,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirDecl , "Corresponds to expression: `(MirTypeDecl | UsePath | MirLocalDecl)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirDecl , super :: super :: generics :: Choice3 :: < super :: super :: rules :: r#MirTypeDecl :: < 'i , INHERITED > , super :: super :: rules :: r#UsePath :: < 'i , INHERITED > , super :: super :: rules :: r#MirLocalDecl :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#MirDecl , "Corresponds to expression: `(MirTypeDecl | MirLocalDecl)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirDecl , super :: super :: generics :: Choice2 :: < super :: super :: rules :: r#MirTypeDecl :: < 'i , INHERITED > , super :: super :: rules :: r#MirLocalDecl :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirDecl<'i, INHERITED> {
             #[doc = "A helper function to access [`MirLocalDecl`]."]
             #[allow(non_snake_case)]
@@ -6701,7 +6701,7 @@ pub mod rules_impl {
             ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MirLocalDecl<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = res._2().map(|res| res);
+                    let res = res._1().map(|res| res);
                     res
                 }
             }
@@ -6713,17 +6713,6 @@ pub mod rules_impl {
                 let res = &*self.content;
                 {
                     let res = res._0().map(|res| res);
-                    res
-                }
-            }
-            #[doc = "A helper function to access [`UsePath`]."]
-            #[allow(non_snake_case)]
-            pub fn r#UsePath<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#UsePath<'i, INHERITED>> {
-                let res = &*self.content;
-                {
-                    let res = res._1().map(|res| res);
                     res
                 }
             }

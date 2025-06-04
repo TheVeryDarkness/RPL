@@ -712,7 +712,6 @@ UsePath = {
 
 MirDecl = {
     MirTypeDecl
-  | UsePath
   | MirLocalDecl
 }
 
