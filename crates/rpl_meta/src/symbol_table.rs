@@ -114,7 +114,6 @@ impl NonLocalMetaSymTab {
     }
 
     #[allow(clippy::manual_map)]
-    #[instrument(skip(self))]
     pub fn get_from_symbol(&self, symbol: Symbol) -> Option<(MetaVariableType, (usize, PredicateConjunction))> {
         if let Some(idx_and_preds) = self.type_vars.get(&symbol) {
             Some((MetaVariableType::Type, idx_and_preds.clone()))
@@ -486,6 +485,7 @@ pub struct FnInner<'i> {
     #[expect(unused)]
     span: Span<'i>,
     path: &'i std::path::Path,
+    /// Type aliases and paths imported into the function scope.
     types: FxHashMap<Symbol, TypeOrPath<'i>>,
     // FIXME: remove it when `self` parameter is implemented
     self_value: Option<&'i pairs::Type<'i>>,
