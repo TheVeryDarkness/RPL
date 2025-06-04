@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use rpl_meta::symbol_table::{GetType, TypeOrPath, TypeVariable, WithPath};
+use rpl_meta::symbol_table::{GetType, MetaVariable, TypeOrPath, WithPath};
 use rpl_meta::{collect_elems_separated_by_comma, utils};
 use rpl_parser::generics::{Choice2, Choice3, Choice4, Choice10, Choice12, Choice14};
 use rpl_parser::pairs;
@@ -113,9 +113,8 @@ impl<'pcx> Ty<'pcx> {
                 pcx.mk_tuple_ty(&tys)
             },
             Choice14::_8(ty_meta_var) => {
-                // FIXME: judge whether it is a type variable or a adt pattern;
                 match fn_sym_tab.get_type_var(ty_meta_var) {
-                    TypeVariable::MetaVariable(ty, idx, pred) => {
+                    MetaVariable::MetaVariable(ty, idx, pred) => {
                         // FIXME: Information loss, the pred is not stored.
                         // Solution:
                         // Store the pred in the meta_pass.
@@ -129,7 +128,7 @@ impl<'pcx> Ty<'pcx> {
                         };
                         pcx.mk_var_ty(ty_meta_var)
                     },
-                    TypeVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
+                    MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
                 }
             },
             Choice14::_9(_ty_self) => todo!(),
@@ -424,26 +423,21 @@ impl<'pcx> GenericArgsRef<'pcx> {
         let path: &rpl_meta::utils::Path<'_> = args.inner;
         let mut items: Vec<GenericArgKind<'_>> = Vec::new();
         path.segments.iter().for_each(|seg| {
-            let args = seg.1;
-            if let Some(args) = args {
-                Self::from_angle_bracketed_generic_arguments(WithPath::new(p, args.deref()), pcx, fn_sym_tab)
-                    .iter()
-                    .for_each(|arg| {
-                        items.push(*arg);
-                    });
-            }
+            Self::from_generic_arguments(p, seg.1.iter().copied(), pcx, fn_sym_tab)
+                .iter()
+                .for_each(|arg| {
+                    items.push(*arg);
+                });
         });
         GenericArgsRef(pcx.mk_slice(&items))
     }
 
-    pub fn from_angle_bracketed_generic_arguments(
-        args: WithPath<'pcx, &'pcx pairs::AngleBracketedGenericArguments<'pcx>>,
+    pub fn from_generic_arguments(
+        p: &'pcx std::path::Path,
+        args: impl Iterator<Item = &'pcx pairs::GenericArgument<'pcx>>,
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &'pcx impl GetType<'pcx>,
     ) -> Self {
-        let p = args.path;
-        let (_, _, args, _) = args.get_matched();
-        let args = collect_elems_separated_by_comma!(args).collect::<Vec<_>>();
         let args = args
             .into_iter()
             .map(|arg| GenericArgKind::from(WithPath::new(p, arg), pcx, fn_sym_tab))
@@ -533,7 +527,12 @@ impl<'pcx> PathWithArgs<'pcx> {
         let lang_item =
             LangItem::from_name(rustc_span::Symbol::intern(lang_item.span.as_str())).expect("Unknown lang item");
         let args = if let Some(args) = args {
-            GenericArgsRef::from_angle_bracketed_generic_arguments(WithPath::new(p, args), pcx, fn_sym_tab)
+            GenericArgsRef::from_generic_arguments(
+                p,
+                collect_elems_separated_by_comma!(args.GenericArgumentsSepretatedByComma()),
+                pcx,
+                fn_sym_tab,
+            )
         } else {
             GenericArgsRef(&[])
         };
