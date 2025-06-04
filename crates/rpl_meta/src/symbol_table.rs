@@ -14,7 +14,7 @@ use rustc_span::Symbol;
 use std::ops::Deref;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, From)]
+#[derive(Clone, Copy, From, Debug)]
 pub enum TypeOrPath<'i> {
     Type(&'i pairs::Type<'i>),
     Path(&'i pairs::Path<'i>),
@@ -25,6 +25,17 @@ impl<'i> TypeOrPath<'i> {
         match self {
             Self::Type(ty) => ty.span,
             Self::Path(path) => path.span,
+        }
+    }
+
+    pub fn try_as_path(&self) -> Option<&'i pairs::Path<'i>> {
+        match &self {
+            Self::Type(ty) if let Some(type_path) = ty.TypePath() => {
+                // FIXME: Qself is dropped
+                Some(type_path.Path())
+            },
+            Self::Path(path) => Some(path),
+            _ => None,
         }
     }
 }

@@ -414,7 +414,7 @@ impl<'pcx> GenericArgsRef<'pcx> {
         let args = WithPath::new(path, &args);
         Self::from_path(args, pcx, fn_sym_tab)
     }
-    //FIX: this function accumulates generic arguments from all path segments
+    // FIXME: this function accumulates generic arguments from all path segments
     pub fn from_path(
         args: WithPath<'pcx, &rpl_meta::utils::Path<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -473,13 +473,34 @@ pub struct PathWithArgs<'pcx> {
 }
 
 impl<'pcx> PathWithArgs<'pcx> {
+    /// Creates a `PathWithArgs` from a `Path`, resolving any type variables or paths.
+    ///
+    /// # Note
+    ///
+    /// Also checks [`Ty::from_type_path`] for resolving type paths.
+    #[instrument(level = "debug", skip_all, ret)]
     pub fn from_path(
         path: WithPath<'pcx, &'pcx pairs::Path<'pcx>>,
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
-        let args = GenericArgsRef::from_path_pairs(path, pcx, fn_sym_tab);
-        let path = Path::from_pairs(path.inner, pcx);
+        let p = path.path;
+        let mut path = utils::Path::from(path.inner);
+        let mut used = FxHashSet::default();
+        while let Some(ident) = path.leading_ident()
+            && let Ok(type_or_path) = fn_sym_tab.get_type(&WithPath::new(p, ident))
+            && let Some(mapped) = type_or_path.try_as_path()
+        {
+            if !used.insert(mapped) {
+                // Avoid infinite loop
+                // FIXME: can Vec<Vec<T>> be resolved?
+                break;
+            }
+            let mapped = utils::Path::from(mapped);
+            path = path.replace_leading_ident(mapped);
+        }
+        let args = GenericArgsRef::from_path(WithPath::new(p, &path), pcx, fn_sym_tab);
+        let path = Path::from(path, pcx);
         Self { path, args }
     }
 
@@ -499,21 +520,7 @@ impl<'pcx> PathWithArgs<'pcx> {
         if qself.is_some() {
             todo!("qself is not supported yet");
         }
-
-        let mut path = utils::Path::from(path);
-        let mut used = FxHashSet::default();
-        while let Some(ident) = path.leading_ident()
-            && let Ok(TypeOrPath::Path(mapped)) = fn_sym_tab.get_type(&WithPath::new(p, ident))
-        {
-            if !used.insert(mapped) {
-                break; // Avoid infinite loop
-            }
-            let mapped = utils::Path::from(mapped);
-            path = path.replace_leading_ident(mapped);
-        }
-        let args = GenericArgsRef::from_path(WithPath::new(p, &path), pcx, fn_sym_tab);
-        let path = Path::from(path, pcx);
-        Self { path, args }
+        Self::from_path(WithPath::new(p, path), pcx, fn_sym_tab)
     }
 
     pub fn from_lang_item(

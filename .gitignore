@@ -24,3 +24,6 @@ mir_dump
 /docs/book/book
 /docs/reference/book
 tmp/
+
+# rustc ICEs
+rustc-ice-*

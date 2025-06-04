@@ -140,8 +140,13 @@ impl<'i> Path<'i> {
         assert!(self.leading.is_none());
         prefix.segments.reserve(self.segments.len().saturating_sub(1));
         assert!(!prefix.segments.is_empty());
-        assert!(prefix.segments.last().unwrap().1.is_none());
-        prefix.segments.last_mut().unwrap().1 = self.segments[0].1;
+        // FIXME: bound check
+        // type A = B<C>;
+        // let _ : A<D> = _;
+        if self.segments[0].1.is_some() {
+            assert!(prefix.segments.last().unwrap().1.is_none());
+            prefix.segments.last_mut().unwrap().1 = self.segments[0].1;
+        }
         prefix.segments.extend(self.segments.into_iter().skip(1));
         prefix._span = self._span;
         prefix
