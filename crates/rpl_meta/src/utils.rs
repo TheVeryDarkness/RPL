@@ -1,10 +1,11 @@
-use crate::collect_elems_separated_by_comma;
 use derive_more::Debug;
-use parser::generics::Choice2;
 use parser::pairs;
 use pest_typed::Span;
 use rustc_span::Symbol;
 
+use crate::collect_elems_separated_by_comma;
+
+/// Identifier in RPL meta language.
 #[derive(Copy, Clone, Debug)]
 #[debug("{name}")]
 pub struct Ident<'i> {
@@ -29,29 +30,6 @@ impl Hash for Ident<'_> {
     }
 }
 
-impl<'i> From<&pairs::PathLeading<'i>> for Ident<'i> {
-    fn from(leading: &pairs::PathLeading<'i>) -> Self {
-        let (name, _) = leading.get_matched();
-        let name = if name.is_some() {
-            Symbol::intern("crate")
-        } else {
-            Symbol::intern("")
-        };
-        let span = leading.span;
-        Self { name, span }
-    }
-}
-
-impl<'i> From<&pairs::PathSegment<'i>> for Ident<'i> {
-    fn from(segment: &pairs::PathSegment<'i>) -> Self {
-        let (name, _) = segment.get_matched();
-        match name {
-            Choice2::_0(ident) => Ident::from(ident),
-            Choice2::_1(meta) => Ident::from(meta),
-        }
-    }
-}
-
 impl<'i> From<&pairs::Identifier<'i>> for Ident<'i> {
     fn from(ident: &pairs::Identifier<'i>) -> Self {
         let span = ident.span;
@@ -60,16 +38,24 @@ impl<'i> From<&pairs::Identifier<'i>> for Ident<'i> {
     }
 }
 
-impl<'i> From<&pairs::Dollarself<'i>> for Ident<'i> {
-    fn from(ident: &pairs::Dollarself<'i>) -> Self {
-        let span = ident.span;
+impl<'i> From<&pairs::MetaVariable<'i>> for Ident<'i> {
+    fn from(meta: &pairs::MetaVariable<'i>) -> Self {
+        let span = meta.span;
         let name = Symbol::intern(span.as_str());
         Self { name, span }
     }
 }
 
-impl<'i> From<&pairs::MetaVariable<'i>> for Ident<'i> {
-    fn from(meta: &pairs::MetaVariable<'i>) -> Self {
+impl<'i> From<&pairs::Dollarself<'i>> for Ident<'i> {
+    fn from(meta: &pairs::Dollarself<'i>) -> Self {
+        let span = meta.span;
+        let name = Symbol::intern(span.as_str());
+        Self { name, span }
+    }
+}
+
+impl<'i> From<&pairs::DollarRET<'i>> for Ident<'i> {
+    fn from(meta: &pairs::DollarRET<'i>) -> Self {
         let span = meta.span;
         let name = Symbol::intern(span.as_str());
         Self { name, span }
@@ -105,11 +91,11 @@ impl<'i> From<&'i pairs::Path<'i>> for Path<'i> {
             .unwrap_or_default()
         }
         let (leading, seg, segs) = path.get_matched();
-        let mut segments = vec![(Ident::from(seg), collect_args(seg.PathArguments()))];
+        let mut segments = vec![(Ident::from(seg.Identifier()), collect_args(seg.PathArguments()))];
         segs.iter_matched().for_each(|seg| {
             let (_, seg) = seg.get_matched();
             let args = collect_args(seg.PathArguments());
-            segments.push((Ident::from(seg), args));
+            segments.push((Ident::from(seg.Identifier()), args));
         });
         let span = path.span;
         Self {
@@ -123,7 +109,9 @@ impl<'i> From<&'i pairs::Path<'i>> for Path<'i> {
 impl<'i> Path<'i> {
     /// Returns `Some(ident)` if `self` is a single identifier.
     pub fn as_ident(&self) -> Option<Ident<'i>> {
-        if self.leading.is_none() && self.segments.len() == 1 {
+        if self.leading.is_none() && self.segments.len() == 1 && self.segments[0].1.is_empty() {
+            // If the path has no leading identifier and only one segment with no generic arguments,
+            // it can be treated as a single identifier.
             Some(self.segments[0].0)
         } else {
             None
@@ -145,7 +133,6 @@ impl<'i> Path<'i> {
         }
     }
     /// Replaces the leading identifier with a new one.
-    #[instrument(level = "debug", ret)]
     pub fn replace_leading_ident(mut self, mut prefix: Self) -> Self {
         assert!(self.leading.is_none());
         prefix.segments.reserve(self.segments.len().saturating_sub(1));

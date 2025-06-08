@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
-use rpl_context::pat::LabelMap;
+use rpl_context::pat::{LabelMap, Spanned};
 use rpl_match::CountedMatch;
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
@@ -16,6 +16,9 @@ use rustc_span::{Span, Symbol};
 
 use crate::{CheckMirCtxt, pat};
 
+pub(crate) mod artifact;
+
+#[derive(Debug)]
 pub struct Matched<'tcx> {
     pub basic_blocks: IndexVec<pat::BasicBlock, MatchedBlock>,
     pub locals: IndexVec<pat::Local, mir::Local>,
@@ -53,26 +56,30 @@ impl Matched<'_> {
     }
 }
 
-impl<'tcx> pat::Matched<'tcx> for Matched<'tcx> {
-    fn location(&self, labels: &LabelMap, name: &str) -> pat::Location {
-        *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
+pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>);
+
+impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
+    fn span(&self, body: &rustc_middle::mir::Body<'_>, name: &str) -> Span {
+        let MatchedWithLabelMap(labels, matched) = self;
+        match *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
             panic!("label `{name}` not found in pattern labels: {labels:?}");
-        })
-    }
-    fn span(&self, labels: &LabelMap, body: &rustc_middle::mir::Body<'_>, name: &str) -> Span {
-        self[self.location(labels, name)].span_no_inline(body)
+        }) {
+            Spanned::Location(location) => matched[location].span_no_inline(body),
+            Spanned::Local(local) => body.local_decls[matched[local]].source_info.span,
+        }
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
-        self.ty_vars[idx]
+        self.1.ty_vars[idx]
     }
     fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
-        self.const_vars[idx]
+        self.1.const_vars[idx]
     }
     fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
-        self.place_vars[idx]
+        self.1.place_vars[idx]
     }
 }
 
+#[derive(Debug)]
 pub struct MatchedBlock {
     pub statements: Vec<StatementMatch>,
     pub start: Option<mir::BasicBlock>,

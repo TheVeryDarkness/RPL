@@ -11,24 +11,29 @@ kw_meta   = @{ "meta" ~ !WordFollowing }
 kw_import = @{ "import" ~ !WordFollowing }
 
 // Rust Keywords
-kw_self         = @{ "self" ~ !WordFollowing }
-kw_Self         = @{ "Self" ~ !WordFollowing }
-kw_fn           = @{ "fn" ~ !WordFollowing }
-kw_mut          = @{ "mut" ~ !WordFollowing }
-kw_const        = @{ "const" ~ !WordFollowing }
-kw_static       = @{ "static" ~ !WordFollowing }
-kw_lang         = @{ "lang" ~ !WordFollowing }
-kw_as           = @{ "as" ~ !WordFollowing }
-kw_crate        = @{ "crate" ~ !WordFollowing }
-kw_use          = @{ "use" ~ !WordFollowing }
-kw_type         = @{ "type" ~ !WordFollowing }
-kw_let          = @{ "let" ~ !WordFollowing }
-kw_move         = @{ "move" ~ !WordFollowing }
-kw_copy         = @{ "copy" ~ !WordFollowing }
-kw_Len          = @{ "Len" ~ !WordFollowing }
-kw_PtrToPtr     = @{ "PtrToPtr" ~ !WordFollowing }
-kw_IntToInt     = @{ "IntToInt" ~ !WordFollowing }
-kw_Transmute    = @{ "Transmute" ~ !WordFollowing }
+kw_self            = @{ "self" ~ !WordFollowing }
+kw_Self            = @{ "Self" ~ !WordFollowing }
+kw_fn              = @{ "fn" ~ !WordFollowing }
+kw_mut             = @{ "mut" ~ !WordFollowing }
+kw_const           = @{ "const" ~ !WordFollowing }
+kw_static          = @{ "static" ~ !WordFollowing }
+kw_lang            = @{ "lang" ~ !WordFollowing }
+kw_as              = @{ "as" ~ !WordFollowing }
+kw_crate           = @{ "crate" ~ !WordFollowing }
+kw_use             = @{ "use" ~ !WordFollowing }
+kw_type            = @{ "type" ~ !WordFollowing }
+kw_let             = @{ "let" ~ !WordFollowing }
+kw_move            = @{ "move" ~ !WordFollowing }
+kw_copy            = @{ "copy" ~ !WordFollowing }
+kw_Len             = @{ "Len" ~ !WordFollowing }
+kw_PtrToPtr        = @{ "PtrToPtr" ~ !WordFollowing }
+kw_IntToInt        = @{ "IntToInt" ~ !WordFollowing }
+kw_Transmute       = @{ "Transmute" ~ !WordFollowing }
+kw_PointerCoercion = @{ "PointerCoercion" ~ !WordFollowing }
+// Soft Keyword
+kw_Unsize = @{ "Unsize" ~ !WordFollowing }
+// Soft Keyword
+kw_Implicit     = @{ "Implicit" ~ !WordFollowing }
 kw_Add          = @{ "Add" ~ !WordFollowing }
 kw_Sub          = @{ "Sub" ~ !WordFollowing }
 kw_Mul          = @{ "Mul" ~ !WordFollowing }
@@ -106,6 +111,7 @@ Keywords = @{
   | kw_PtrToPtr
   | kw_IntToInt
   | kw_Transmute
+  | kw_PointerCoercion
   | kw_Add
   | kw_Sub
   | kw_Mul
@@ -258,6 +264,7 @@ Word          = @{ WordLeading ~ (WordFollowing)* }
 
 // RPL identifier and meta variables
 Identifier   = @{ !(Keywords) ~ Word }
+LabelName    = @{ Word }
 MetaVariable = @{ Dollar ~ Word }
 
 MetaVariableType = {
@@ -298,7 +305,10 @@ MetaVariableDeclsSeparatedByComma   = {
 MetaVariableDeclList                = {
     LeftBracket ~ MetaVariableDeclsSeparatedByComma? ~ RightBracket
 }
-MetaVariableAssign                  = { MetaVariable ~ Assign ~ (Identifier | MetaVariable | Type) }
+MetaVariableAssign                  = {
+    MetaVariable ~ Assign ~ (Identifier | MetaVariable | Type)
+  | Label ~ Assign ~ Label
+}
 MetaVariableAssignsSeparatedByComma = {
     MetaVariableAssign ~ (Comma ~ MetaVariableAssign)* ~ Comma?
 }
@@ -351,7 +361,7 @@ PathLeading = {
 }
 
 PathSegment = {
-    (Identifier | MetaVariable) ~ PathArguments?
+    Identifier ~ PathArguments?
 }
 
 TypePath = {
@@ -391,7 +401,7 @@ TypesSeparatedByComma = {
 }
 
 TypeArray = {
-    LeftBracket ~ Type ~ SemiColon ~ Integer ~ RightBracket
+    LeftBracket ~ Type ~ SemiColon ~ (Integer | MetaVariable) ~ RightBracket
 }
 
 TypeGroup = {
@@ -528,7 +538,7 @@ MirOperandCopy = {
 }
 
 MirOperandConst = {
-    kw_const ~ (Literal | LangItemWithArgs | TypePath)
+    kw_const ~ (Literal | LangItemWithArgs | TypePath | MetaVariable)
 }
 
 MirOperand = {
@@ -562,10 +572,15 @@ MirRvalueLen = {
     kw_Len ~ LeftParen ~ MirPlace ~ RightParen
 }
 
+PointerCoercion = { kw_Unsize }
+
+CoercionSource = { kw_Implicit }
+
 MirCastKind = {
     kw_PtrToPtr
   | kw_IntToInt
   | kw_Transmute
+  | kw_PointerCoercion ~ LeftParen ~ PointerCoercion ~ Comma ~ CoercionSource ~ RightParen
 }
 
 MirRvalueCast = {
@@ -724,7 +739,7 @@ MirDrop = {
 }
 
 Label = {
-    Quote ~ Identifier
+    Quote ~ LabelName
 }
 
 LabelWithColon = {
@@ -849,9 +864,13 @@ PatternConfiguration = {
     Identifier ~ MetaVariableAssignList
 }
 
+PatternExpression = {
+    PatternConfiguration ~ (Minus ~ PatternConfiguration)*
+}
+
 // FIXME
 PatternOperation = {
-    PatternConfiguration
+    PatternExpression
 }
 
 RustItemsOrPatternOperation = {
@@ -889,9 +908,25 @@ diagMessage = ${
     "\"" ~ diagMessageInner ~ "\""
 }
 
+diagAttr = {
+    Identifier ~ (LeftParen ~ diagAttrs? ~ RightParen | Assign ~ diagMessage)?
+}
+
+diagAttrs = {
+    diagAttr ~ (Comma ~ diagAttr)* ~ Comma?
+}
+
+diagItem = {
+    Identifier ~ (LeftParen ~ diagAttrs ~ RightParen)? ~ Assign ~ diagMessage
+}
+
+diagItems = {
+    diagItem ~ (Comma ~ diagItem)* ~ Comma?
+}
+
 // diag block Item
 diagBlockItem = {
-    Identifier ~ Assign ~ LeftBrace ~ (Identifier ~ (LeftParen ~ Identifier ~ RightParen)? ~ Assign ~ diagMessage ~ Comma)* ~ MetaVariableWithDiagMessageSeparatedByComma? ~ RightBrace
+    Identifier ~ Assign ~ LeftBrace ~ diagItems ~ MetaVariableWithDiagMessageSeparatedByComma? ~ RightBrace
 }
 
 // RPL Blocks

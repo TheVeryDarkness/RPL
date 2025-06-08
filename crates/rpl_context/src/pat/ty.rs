@@ -12,11 +12,10 @@ use rustc_middle::mir;
 use rustc_middle::ty::{self};
 use rustc_span::Symbol;
 
+use super::FnSymbolTable;
 use crate::PatCtxt;
 use crate::cvt_prim_ty::CvtPrimTy;
 use crate::pat::non_local_meta_vars::{ConstVar, TyVar};
-
-use super::FnSymbolTable;
 
 // FIXME: Use interning for the types
 #[derive(Clone, Copy)]
@@ -49,7 +48,17 @@ impl<'pcx> Ty<'pcx> {
                 let (_, ty, _, len, _) = ty_array.get_matched();
                 let ty = WithPath::new(p, ty);
                 let ty = Self::from(ty, pcx, fn_sym_tab);
-                pcx.mk_array_ty(ty, IntValue::from_integer(len).into())
+                match len {
+                    Choice2::_0(len) => pcx.mk_array_ty(ty, IntValue::from_integer(len).into()),
+                    Choice2::_1(len) => {
+                        let (const_idx, const_ty, const_pred) = fn_sym_tab
+                            .as_ref()
+                            .force_non_local_meta_var(WithPath::new(p, len))
+                            .expect_const();
+                        let len = ConstVar::from(pcx, fn_sym_tab, const_idx, WithPath::new(p, const_ty), const_pred);
+                        pcx.mk_array_ty(ty, len.into())
+                    },
+                }
             },
             Choice14::_1(ty_group) => {
                 let (_, ty) = ty_group.get_matched();
@@ -112,24 +121,22 @@ impl<'pcx> Ty<'pcx> {
                 };
                 pcx.mk_tuple_ty(&tys)
             },
-            Choice14::_8(ty_meta_var) => {
-                match fn_sym_tab.get_type_var(ty_meta_var) {
-                    MetaVariable::MetaVariable(ty, idx, pred) => {
-                        // FIXME: Information loss, the pred is not stored.
-                        // Solution:
-                        // Store the pred in the meta_pass.
-                        let ty_meta_var = match ty {
-                            rpl_meta::symbol_table::MetaVariableType::Type => TyVar {
-                                idx: idx.into(),
-                                name: Symbol::intern(ty_meta_var.span.as_str()),
-                                pred,
-                            },
-                            _ => panic!("A non-type meta variable used as a type variable"),
-                        };
-                        pcx.mk_var_ty(ty_meta_var)
-                    },
-                    MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
-                }
+            Choice14::_8(ty_meta_var) => match fn_sym_tab
+                .as_ref()
+                .force_non_local_meta_var(WithPath::new(p, ty_meta_var))
+            {
+                MetaVariable::Type(idx, pred) => {
+                    let ty_meta_var = TyVar {
+                        idx: idx.into(),
+                        name: Symbol::intern(ty_meta_var.span.as_str()),
+                        pred,
+                    };
+                    pcx.mk_var_ty(ty_meta_var)
+                },
+                MetaVariable::Const(..) | MetaVariable::Place(..) => {
+                    panic!("A non-type meta variable used as a type variable")
+                },
+                MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
             },
             Choice14::_9(_ty_self) => todo!(),
             Choice14::_10(primitive_types) => pcx.mk_ty(TyKind::from_primitive_type(primitive_types)),
@@ -148,7 +155,7 @@ impl<'pcx> Ty<'pcx> {
     ///
     /// Also checks [`PathWithArgs::from_type_path`] for resolving type paths.
     /// Maybe reuse `PathWithArgs::from_type_path`?
-    #[instrument(level = "debug", skip_all, ret)]
+    #[instrument(level = "trace", skip_all, ret)]
     fn from_type_path(
         ty_path: WithPath<'pcx, &'pcx pairs::TypePath<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -162,7 +169,7 @@ impl<'pcx> Ty<'pcx> {
         // FIXME: imports logic incomplete?
         if let Some(ident) = utils::Path::from(path).as_ident() {
             // only check for the first time
-            if let Ok(TypeOrPath::Type(ty)) = fn_sym_tab.get_type(&WithPath::new(p, ident)) {
+            if let Ok(TypeOrPath::Type(ty)) = fn_sym_tab.get_type_or_path(&WithPath::new(p, ident)) {
                 let ty = WithPath::new(p, ty);
                 return Ty::from(ty, pcx, fn_sym_tab);
             }
@@ -170,7 +177,7 @@ impl<'pcx> Ty<'pcx> {
         let mut path = utils::Path::from(path);
         let mut used = FxHashSet::default();
         while let Some(ident) = path.leading_ident()
-            && let Ok(TypeOrPath::Path(mapped)) = fn_sym_tab.get_type(&WithPath::new(p, ident))
+            && let Ok(TypeOrPath::Path(mapped)) = fn_sym_tab.get_type_or_path(&WithPath::new(p, ident))
         {
             if !used.insert(mapped) {
                 break; // Avoid infinite loop
@@ -472,7 +479,7 @@ impl<'pcx> PathWithArgs<'pcx> {
     /// # Note
     ///
     /// Also checks [`Ty::from_type_path`] for resolving type paths.
-    #[instrument(level = "debug", skip_all, ret)]
+    #[instrument(level = "trace", skip_all, ret)]
     pub fn from_path(
         path: WithPath<'pcx, &'pcx pairs::Path<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -482,7 +489,7 @@ impl<'pcx> PathWithArgs<'pcx> {
         let mut path = utils::Path::from(path.inner);
         let mut used = FxHashSet::default();
         while let Some(ident) = path.leading_ident()
-            && let Ok(type_or_path) = fn_sym_tab.get_type(&WithPath::new(p, ident))
+            && let Ok(type_or_path) = fn_sym_tab.get_type_or_path(&WithPath::new(p, ident))
             && let Some(mapped) = type_or_path.try_as_path()
         {
             if !used.insert(mapped) {
@@ -503,7 +510,7 @@ impl<'pcx> PathWithArgs<'pcx> {
     /// # Note
     ///
     /// Also checks [`Ty::from_type_path`] for resolving type paths.
-    #[instrument(level = "debug", skip_all, ret)]
+    #[instrument(level = "trace", skip_all, ret)]
     pub fn from_type_path(
         path: WithPath<'pcx, &'pcx pairs::TypePath<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -524,8 +531,8 @@ impl<'pcx> PathWithArgs<'pcx> {
     ) -> Self {
         let p = lang_item.path;
         let (_, _, _, _, lang_item, _, args) = lang_item.get_matched();
-        let lang_item =
-            LangItem::from_name(rustc_span::Symbol::intern(lang_item.span.as_str())).expect("Unknown lang item");
+        let lang_item = LangItem::from_name(rustc_span::Symbol::intern(lang_item.span.as_str().trim_matches('"')))
+            .unwrap_or_else(|| panic!("Unknown lang item {:?}", lang_item.span.as_str()));
         let args = if let Some(args) = args {
             GenericArgsRef::from_generic_arguments(
                 p,
@@ -589,18 +596,34 @@ impl IntValue {
     pub fn from_integer(int: &pairs::Integer<'_>) -> Self {
         let (lit, ty) = int.get_matched();
         let value = match lit {
-            Choice4::_0(dec) => u128::from_str_radix(dec.span.as_str(), 10)
-                .expect("invalid decimal integer")
-                .into(),
-            Choice4::_1(bin) => u128::from_str_radix(bin.span.as_str(), 2)
-                .expect("invalid binary integer")
-                .into(),
-            Choice4::_2(oct) => u128::from_str_radix(oct.span.as_str(), 8)
-                .expect("invalid octal integer")
-                .into(),
-            Choice4::_3(hex) => u128::from_str_radix(hex.span.as_str(), 16)
-                .expect("invalid hexadecimal integer")
-                .into(),
+            Choice4::_0(dec) => {
+                let dec_str = dec.span.as_str();
+                let dec_str = &dec_str.replace('_', "");
+                u128::from_str_radix(dec_str, 10)
+                    .unwrap_or_else(|err| panic!("invalid decimal integer {:?}: {}", dec_str, err))
+                    .into()
+            },
+            Choice4::_1(bin) => {
+                let bin_str = bin.span.as_str();
+                let bin_str = &bin_str.replace('_', "");
+                u128::from_str_radix(bin_str, 2)
+                    .unwrap_or_else(|err| panic!("invalid binary integer {:?}: {}", bin_str, err))
+                    .into()
+            },
+            Choice4::_2(oct) => {
+                let oct_str = oct.span.as_str();
+                let oct_str = &oct_str.replace('_', "");
+                u128::from_str_radix(oct_str, 8)
+                    .unwrap_or_else(|err| panic!("invalid octal integer {:?}: {}", oct_str, err))
+                    .into()
+            },
+            Choice4::_3(hex) => {
+                let hex_str = hex.span.as_str();
+                let hex_str = &hex_str.replace('_', "");
+                u128::from_str_radix(hex_str, 16)
+                    .unwrap_or_else(|err| panic!("invalid hexadecimal integer {:?}: {}", hex_str, err))
+                    .into()
+            },
         };
         let ty = if let Some(ty) = ty {
             IntTy::from(ty)
@@ -720,5 +743,11 @@ impl Const<'_> {
 impl From<IntValue> for Const<'_> {
     fn from(value: IntValue) -> Self {
         Self::Value(value)
+    }
+}
+
+impl<'pcx> From<ConstVar<'pcx>> for Const<'pcx> {
+    fn from(value: ConstVar<'pcx>) -> Self {
+        Self::ConstVar(value)
     }
 }

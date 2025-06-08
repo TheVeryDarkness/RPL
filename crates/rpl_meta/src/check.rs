@@ -1,3 +1,13 @@
+use std::ops::Deref;
+use std::sync::Arc;
+
+use impls::CheckImplCtxt;
+use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
+use parser::{SpanWrapper, pairs};
+use rpl_predicates::PredicateConjunction;
+use rustc_data_structures::fx::FxHashMap;
+use rustc_span::Symbol;
+
 use crate::context::MetaContext;
 use crate::symbol_table::{
     AdtPatType, EnumInner, FnInner, GetType as _, ImplInner, NonLocalMetaSymTab, SymbolTable, Variant, WithMetaTable,
@@ -5,24 +15,13 @@ use crate::symbol_table::{
 };
 use crate::utils::{Ident, Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
-use impls::CheckImplCtxt;
-use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
-use parser::{SpanWrapper, pairs};
-use rpl_predicates::PredicateConjunction;
-use rustc_data_structures::fx::FxHashMap;
-use rustc_span::Symbol;
-use std::ops::Deref;
-use std::sync::Arc;
 
 mod impls;
 
+/// Used for checking any errors in RPL patterns.
 pub struct CheckCtxt<'i> {
     pub(crate) name: Symbol,
     pub(crate) symbol_table: SymbolTable<'i>,
-    /// Should be inserted into [`FnInner::types`].
-    ///
-    /// See [`SymbolTable::imports`] and [`CheckFnCtxt::imports`].
-    pub(crate) imports: FxHashMap<Symbol, &'i pairs::Path<'i>>,
     pub(crate) errors: Vec<RPLMetaError<'i>>,
 }
 
@@ -32,14 +31,13 @@ impl<'i> CheckCtxt<'i> {
             name,
             symbol_table: SymbolTable::default(),
             errors: Vec::new(),
-            imports: Default::default(),
         }
     }
 
     pub fn check_import(&mut self, mctx: &MetaContext<'i>, import: &'i pairs::UsePath<'i>) {
         let path = Path::from(import.Path());
         let ident = path.ident();
-        if self.imports.try_insert(ident.name, import.Path()).is_err() {
+        if self.symbol_table.imports.try_insert(ident.name, import.Path()).is_err() {
             self.errors.push(RPLMetaError::SymbolAlreadyDeclared {
                 span: SpanWrapper::new(import.span, mctx.get_active_path()),
                 ident: ident.name,
@@ -155,12 +153,12 @@ impl<'i> CheckCtxt<'i> {
     fn check_fn(&mut self, mctx: &MetaContext<'i>, rust_fn: &'i pairs::Fn<'i>) {
         let fn_name = rust_fn.FnSig().FnName();
         let fn_def = self.symbol_table.add_fn(mctx, fn_name, None, &mut self.errors);
-        if let Some(fn_def) = fn_def {
+        if let Some((fn_def, imports)) = fn_def {
             CheckFnCtxt {
                 meta_vars: fn_def.meta_vars.clone(),
                 impl_def: None,
                 fn_def: &mut fn_def.inner,
-                imports: &self.imports,
+                imports,
                 errors: &mut self.errors,
             }
             .check_fn(mctx, rust_fn);
@@ -210,11 +208,11 @@ impl<'i> CheckCtxt<'i> {
     fn check_impl(&mut self, mctx: &MetaContext<'i>, rust_impl: &'i pairs::Impl<'i>) {
         let meta_vars = self.symbol_table.meta_vars.clone();
         let impl_def = self.symbol_table.add_impl(mctx, rust_impl, &mut self.errors);
-        if let Some(impl_def) = impl_def {
+        if let Some((impl_def, imports)) = impl_def {
             CheckImplCtxt {
                 meta_vars,
                 impl_def: &mut impl_def.inner,
-                imports: &self.imports,
+                imports,
                 errors: &mut self.errors,
             }
             .check_impl(mctx, rust_impl);
@@ -223,7 +221,7 @@ impl<'i> CheckCtxt<'i> {
 }
 
 struct CheckFnCtxt<'i, 'r> {
-    meta_vars: Arc<NonLocalMetaSymTab>,
+    meta_vars: Arc<NonLocalMetaSymTab<'i>>,
     #[allow(dead_code)]
     impl_def: Option<&'r ImplInner<'i>>,
     fn_def: &'r mut FnInner<'i>,
@@ -354,13 +352,9 @@ impl<'i> CheckFnCtxt<'i, '_> {
         match value.deref() {
             Choice3::_0(_bool) => {},
             Choice3::_1(int) => {
-                let int_str = int.span.as_str();
-                // find the last '_' in the string, and check if the suffix after the '_' is a primitive type
-                let last_underscore = int_str.rfind('_');
                 let mut missing_suffix = false;
-                if let Some(last_underscore) = last_underscore {
-                    let suffix = &int_str[last_underscore + 1..];
-                    if !crate::symbol_table::str_is_primitive(suffix) {
+                if let Some(suffix) = int.IntegerSuffix() {
+                    if !crate::symbol_table::str_is_primitive(suffix.span.as_str()) {
                         missing_suffix = true;
                     }
                 } else {
@@ -425,8 +419,11 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_mir_local_decl(&mut self, mctx: &MetaContext<'i>, local_decl: &'i pairs::MirLocalDecl<'i>) {
         //FIXME: check whether label names conflict
-        let (_, _, _, local, _, ty, rvalue_or_call, _) = local_decl.get_matched();
-        self.fn_def.add_place_local(mctx, local, ty, self.errors);
+        let (label, _, _, local, _, ty, rvalue_or_call, _) = local_decl.get_matched();
+        let label = label
+            .as_ref()
+            .map(|label| Symbol::intern(label.get_matched().0.get_matched().1.span.as_str()));
+        self.fn_def.add_place_local(mctx, label, local, ty, self.errors);
         self.check_type(mctx, ty);
         if let Some(rvalue_or_call) = rvalue_or_call {
             self.check_mir_rvalue_or_call(mctx, rvalue_or_call.get_matched().1);
@@ -513,9 +510,12 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_mir_const_operand(&mut self, mctx: &MetaContext<'i>, konst: &'i pairs::MirOperandConst<'i>) {
         let (_, konst) = konst.get_matched();
         match konst {
-            Choice3::_0(_lit) => {},
-            Choice3::_1(lang_item) => self.check_lang_item_with_args(mctx, lang_item),
-            Choice3::_2(ty_path) => self.check_type_path(mctx, ty_path),
+            Choice4::_0(_lit) => {},
+            Choice4::_1(lang_item) => self.check_lang_item_with_args(mctx, lang_item),
+            Choice4::_2(path) => self.check_type_path(mctx, path),
+            Choice4::_3(ident) => {
+                let _: Option<_> = self.meta_vars.get_non_local_meta_var(mctx, ident.into(), self.errors);
+            },
         }
     }
 
@@ -666,7 +666,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
         if let Some(ident) = path.as_ident() {
             if !ident_is_primitive(&ident) {
                 WithMetaTable::from((&*self.fn_def, self.meta_vars.clone()))
-                    .get_type(&WithPath::with_ctx(mctx, ident))
+                    .get_type_or_path(&WithPath::with_ctx(mctx, ident))
                     .or_record(self.errors);
             }
         } else {
@@ -733,7 +733,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
 }
 
 struct CheckVariantCtxt<'i, 'r> {
-    _meta_vars: Arc<NonLocalMetaSymTab>,
+    _meta_vars: Arc<NonLocalMetaSymTab<'i>>,
     variant_def: &'r mut Variant<'i>,
     errors: &'r mut Vec<RPLMetaError<'i>>,
 }
@@ -767,7 +767,7 @@ impl<'i> CheckVariantCtxt<'i, '_> {
 }
 
 struct CheckEnumCtxt<'i, 'r> {
-    meta_vars: Arc<NonLocalMetaSymTab>,
+    meta_vars: Arc<NonLocalMetaSymTab<'i>>,
     enum_def: &'r mut EnumInner<'i>,
     errors: &'r mut Vec<RPLMetaError<'i>>,
 }

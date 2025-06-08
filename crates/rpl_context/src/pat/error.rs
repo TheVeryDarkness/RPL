@@ -1,17 +1,20 @@
 use std::sync::LazyLock;
 
-use rpl_meta::symbol_table::{MetaVariableType, NonLocalMetaSymTab};
+use derive_more::{Debug, Display};
+use rpl_meta::collect_elems_separated_by_comma;
+use rpl_meta::symbol_table::{MetaVariableType, NonLocalMetaSymTab, WithPath};
 use rpl_parser::generics::Choice2;
-use rpl_parser::pairs;
-use rustc_errors::LintDiagnostic;
+use rpl_parser::pairs::diagMessageInner;
+use rpl_parser::{SpanWrapper, pairs};
+use rustc_errors::{Applicability, LintDiagnostic};
 use rustc_lint::{Level, Lint};
 use rustc_middle::mir::Body;
 use rustc_span::{Span, Symbol};
 use sync_arena::declare_arena;
+use thiserror::Error;
 
+use super::Matched;
 use crate::pat::{ConstVarIdx, TyVarIdx};
-
-use super::{LabelMap, Matched};
 
 /// A dynamic error that can be used to report user-defined errors
 ///
@@ -32,6 +35,8 @@ pub struct DynamicError {
     labels: Vec<(String, Span)>,
     notes: Vec<(String, Option<Span>)>,
     helps: Vec<(String, Option<Span>)>,
+    /// Suggestion description, alternative code, the span of the label, and its [`Applicability`].
+    suggestions: Vec<(String, String, Span, Applicability)>,
     lint: &'static Lint,
 }
 
@@ -56,6 +61,9 @@ impl LintDiagnostic<'_, ()> for DynamicError {
                 diag.note(note);
             }
         }
+        for (suggestion, code, span, applicability) in self.suggestions {
+            diag.span_suggestion(span, suggestion, code, applicability);
+        }
     }
 }
 
@@ -66,6 +74,34 @@ impl DynamicError {
     /// Also see [`rustc_session::declare_tool_lint!`].
     pub const fn lint(&self) -> &'static Lint {
         self.lint
+    }
+    pub fn default_diagnostic(span: Span) -> Self {
+        const LINT: Lint = Lint {
+            name: "rpl::missing_diagnostic",
+            default_level: Level::Deny,
+            ..Lint::default_fields_for_macro()
+        };
+        let primary = (String::from("A pattern instance found in this span"), span);
+        let labels = Vec::new();
+        let notes = vec![
+            (String::from("This is a fallback diagnostic message."), None),
+            (
+                String::from(
+                    "You are seeing this because there is no corresponding diagnostic item in the RPL pattern file.",
+                ),
+                None,
+            ),
+        ];
+        let helps = Vec::new();
+        let suggestions = Vec::new();
+        DynamicError {
+            primary,
+            labels,
+            notes,
+            helps,
+            suggestions,
+            lint: &LINT,
+        }
     }
 }
 
@@ -105,14 +141,27 @@ impl<'i> SubMsg<'i> {
 
 pub(crate) struct DynamicErrorBuilder<'i> {
     /// Primary message and its span.
+    ///
+    /// See [`DynamicError::primary`].
     primary: (Vec<SubMsg<'i>>, &'i str),
     /// Label description, and the span of the label.
+    ///
+    /// See [`DynamicError::labels`].
     labels: Vec<(Vec<SubMsg<'i>>, &'i str)>,
     /// Notes and their spans.
+    ///
+    /// See [`DynamicError::notes`].
     notes: Vec<(Vec<SubMsg<'i>>, Option<&'i str>)>,
     /// Helps and their spans.
     /// Helps are additional information that can help the user understand the error.
+    ///
+    /// See [`DynamicError::helps`].
     helps: Vec<(Vec<SubMsg<'i>>, Option<&'i str>)>,
+    /// Suggestions, alternative code, their spans, and its [`Applicability`].
+    ///
+    /// See [`DynamicError::suggestions`].
+    #[expect(clippy::type_complexity)]
+    suggestions: Vec<(Vec<SubMsg<'i>>, Vec<SubMsg<'i>>, Option<&'i str>, Applicability)>,
     lint: &'static Lint,
 }
 
@@ -124,80 +173,167 @@ declare_arena!(
 
 static ARENA: LazyLock<Arena<'static>> = LazyLock::new(Arena::default);
 
+#[derive(Debug, Display, Error)]
+pub enum ParseError<'i> {
+    #[display("Primary message not found:\n{_0}")]
+    PrimaryNotFound(SpanWrapper<'i>),
+    #[display("Expected an identifier, but found:\n{_0}")]
+    NotAnIdentifier(SpanWrapper<'i>),
+    #[display("Expected a argument list, but found:\n{_0}")]
+    #[expect(dead_code)]
+    NotAnArgumentList(SpanWrapper<'i>),
+    #[display("Expected a key-value pair, but found:\n{_0}")]
+    #[expect(dead_code)]
+    NotAKeyValuePair(SpanWrapper<'i>),
+    #[display("No argument found:\n{_0}")]
+    Empty(SpanWrapper<'i>),
+    #[display("Too many arguments:\n{_0}")]
+    TooManyArguments(SpanWrapper<'i>),
+    #[display("Unexpected arguments:\n{_0}")]
+    UnexpectedArguments(SpanWrapper<'i>),
+    #[display("Invalid key {_0}:\n{_1}")]
+    InvalidKey(&'i str, SpanWrapper<'i>),
+    #[display("Missing {_0} in {_1}:\n{_2}")]
+    MissingValue(&'static str, &'static str, SpanWrapper<'i>),
+}
+
+fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> Result<&'i str, ParseError<'i>> {
+    let (first, following, _trailing_comma) = attrs.get_matched();
+    if !following.content.is_empty() {
+        return Err(ParseError::TooManyArguments(SpanWrapper::new(attrs.span, path)));
+    }
+    let (ident, arguments_or_value) = first.get_matched();
+    if arguments_or_value.is_some() {
+        return Err(ParseError::NotAnIdentifier(SpanWrapper::new(first.span, path)));
+    }
+    Ok(ident.span.as_str())
+}
+
+fn parse_suggestion<'i>(
+    path: &'i std::path::Path,
+    attrs: &'i pairs::diagAttrs<'i>,
+) -> Result<(&'i diagMessageInner<'i, 0>, Option<&'i str>, Applicability), ParseError<'i>> {
+    let mut code = None;
+    let mut span = None;
+    let mut applicability = None;
+    for attr in collect_elems_separated_by_comma!(attrs) {
+        let key = attr.get_matched().0.span.as_str();
+        if let Some(Choice2::_1(pair)) = attr.get_matched().1 {
+            let (_, message) = pair.get_matched();
+            match key {
+                "code" => code = Some(message.diagMessageInner()),
+                "span" => span = Some(message.diagMessageInner().span.as_str()),
+                "applicability" => {
+                    applicability = Some(match message.span.as_str() {
+                        "machine_applicable" => Applicability::MachineApplicable,
+                        "maybe_incorrect" => Applicability::MaybeIncorrect,
+                        "has_placeholders" => Applicability::HasPlaceholders,
+                        "unspecified" => Applicability::Unspecified,
+                        _ => unimplemented!("Unrecognized applicability: {}", message.span.as_str()),
+                    })
+                },
+                _ => return Err(ParseError::InvalidKey(key, SpanWrapper::new(attr.span, path))),
+            }
+        }
+    }
+    let code =
+        code.ok_or_else(|| ParseError::MissingValue("code", "suggestion", SpanWrapper::new(attrs.span, path)))?;
+    let applicability = applicability.unwrap_or(Applicability::Unspecified);
+    Ok((code, span, applicability))
+}
+
 impl<'i> DynamicErrorBuilder<'i> {
     //FIXME: this function has a lot of `unwrap` calls, which can panic if the input is malformed.
     /// Create a [`DynamicErrorBuilder`] from a [`pairs::diagBlockItem`].
-    pub(super) fn from_item(item: &'i pairs::diagBlockItem<'i>, meta_vars: &NonLocalMetaSymTab) -> Self {
-        let (_, _, _, pairs, _, _) = item.get_matched();
-        let mut primary = (None, None);
+    pub(super) fn from_item(
+        item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
+        meta_vars: &NonLocalMetaSymTab,
+    ) -> Result<Self, ParseError<'i>> {
+        let path = item.path;
+        let (_, _, _, diags, _, _) = item.get_matched();
+        let mut primary = None;
         let mut labels = Vec::new();
         let mut notes = Vec::new();
         let mut helps = Vec::new();
+        let mut suggestions = Vec::new();
         let mut level = Level::Deny;
         let mut name = None;
 
-        for pair in pairs.iter_matched() {
-            let (key, span, _, message, _) = pair.get_matched();
+        for diag in collect_elems_separated_by_comma!(diags) {
+            let (key, args, _, message) = diag.get_matched();
 
             let message = message.get_matched().1;
 
-            let key = key.span.as_str();
+            let args = args.as_ref().map(|args| args.get_matched().1);
 
-            let span_name = span.as_ref().map(|span| span.get_matched().1.span.as_str());
+            let key = key.span.as_str();
 
             match key {
                 "primary" => {
-                    primary.0 = Some(SubMsg::parse(message, meta_vars));
-                    if let Some(span_name) = span_name {
-                        primary.1 = Some(span_name);
-                    }
+                    let ident = parse_ident(
+                        path,
+                        args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
+                    )?;
+                    primary = Some((SubMsg::parse(message, meta_vars), ident));
                 },
                 "label" => {
-                    labels.push((SubMsg::parse(message, meta_vars), span_name.unwrap()));
+                    let ident = parse_ident(
+                        path,
+                        args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
+                    )?;
+                    labels.push((SubMsg::parse(message, meta_vars), ident));
                 },
                 "note" => {
-                    notes.push((SubMsg::parse(message, meta_vars), span_name));
+                    let ident = args.map(|args| parse_ident(path, args)).transpose()?;
+                    notes.push((SubMsg::parse(message, meta_vars), ident));
                 },
                 "help" => {
-                    helps.push((SubMsg::parse(message, meta_vars), span_name));
+                    let ident = args.map(|args| parse_ident(path, args)).transpose()?;
+                    helps.push((SubMsg::parse(message, meta_vars), ident));
                 },
                 "name" => {
+                    if args.is_some() {
+                        return Err(ParseError::UnexpectedArguments(SpanWrapper::new(diag.span, path)));
+                    }
                     name = Some(message);
                 },
                 "level" => {
                     let message = message.span.as_str();
                     level = match message {
                         "allow" => Level::Allow,
-                        "warning" => Level::Warn,
+                        "warn" => Level::Warn,
                         "deny" => Level::Deny,
                         "forbid" => Level::Forbid,
                         _ => unimplemented!("Unrecognized level: {message}",),
                     };
                 },
+                "suggestion" => {
+                    let args = args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?;
+                    let (code, span, applicability) = parse_suggestion(path, args)?;
+                    let code = SubMsg::parse(code, meta_vars);
+                    let message = SubMsg::parse(message, meta_vars);
+                    suggestions.push((message, code, span, applicability));
+                },
                 _ => unimplemented!("Unrecognized key: {key:?}"),
             }
         }
-        let primary = (primary.0.unwrap(), primary.1.unwrap());
+        let primary = primary.ok_or_else(|| ParseError::PrimaryNotFound(SpanWrapper::new(item.span, path)))?;
         let name = name.unwrap().span.as_str();
         let builder = DynamicErrorBuilder {
             primary,
             labels,
             notes,
             helps,
+            suggestions,
             lint: ARENA.alloc(Lint {
                 name: ARENA.alloc_str(&format!("rpl::{name}")),
                 default_level: level,
                 ..Lint::default_fields_for_macro()
             }),
         };
-        builder
+        Ok(builder)
     }
-    pub(crate) fn build<'tcx>(
-        &self,
-        label_map: &LabelMap,
-        body: &Body<'tcx>,
-        matched: &impl Matched<'tcx>,
-    ) -> DynamicError {
+    pub(crate) fn build<'tcx>(&self, body: &Body<'tcx>, matched: &impl Matched<'tcx>) -> DynamicError {
         fn format<'tcx>(message: &Vec<SubMsg>, matched: &impl Matched<'tcx>) -> String {
             let mut s = String::new();
             for msg in message {
@@ -215,32 +351,31 @@ impl<'i> DynamicErrorBuilder<'i> {
             }
             s
         }
-        let primary = (
-            format(&self.primary.0, matched),
-            matched.span(label_map, body, self.primary.1),
-        );
+        let primary = (format(&self.primary.0, matched), matched.span(body, self.primary.1));
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (format(label, matched), matched.span(label_map, body, span)))
+            .map(|(label, span)| (format(label, matched), matched.span(body, span)))
             .collect();
         let notes = self
             .notes
             .iter()
-            .map(|(note, span)| {
-                (
-                    format(note, matched),
-                    span.map(|span| matched.span(label_map, body, span)),
-                )
-            })
+            .map(|(note, span)| (format(note, matched), span.map(|span| matched.span(body, span))))
             .collect();
         let helps = self
             .helps
             .iter()
-            .map(|(help, span)| {
+            .map(|(help, span)| (format(help, matched), span.map(|span| matched.span(body, span))))
+            .collect();
+        let suggestions = self
+            .suggestions
+            .iter()
+            .map(|(suggestion, code, span, applicability)| {
                 (
-                    format(help, matched),
-                    span.map(|span| matched.span(label_map, body, span)),
+                    format(suggestion, matched),
+                    format(code, matched),
+                    matched.span(body, span.unwrap()),
+                    *applicability,
                 )
             })
             .collect();
@@ -250,6 +385,7 @@ impl<'i> DynamicErrorBuilder<'i> {
             labels,
             notes,
             helps,
+            suggestions,
             lint,
         }
     }

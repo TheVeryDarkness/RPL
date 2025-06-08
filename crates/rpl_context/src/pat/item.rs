@@ -1,9 +1,6 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use super::utils::mutability_from_pair_mutability;
-use super::{FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
-use crate::PatCtxt;
 use derive_more::derive::Debug;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{Visibility, WithMetaTable, WithPath};
@@ -14,28 +11,32 @@ use rustc_hir::Safety;
 use rustc_middle::mir;
 use rustc_span::Symbol;
 
+use super::utils::mutability_from_pair_mutability;
+use super::{FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
+use crate::PatCtxt;
+
 pub type StructInner<'pcx> = Variant<'pcx>;
-pub type Struct<'pcx> = WithMetaTable<StructInner<'pcx>>;
+pub type Struct<'pcx> = WithMetaTable<'pcx, StructInner<'pcx>>;
 
 pub type EnumInner<'pcx> = FxIndexMap<Symbol, Variant<'pcx>>;
-pub type Enum<'pcx> = WithMetaTable<EnumInner<'pcx>>;
+pub type Enum<'pcx> = WithMetaTable<'pcx, EnumInner<'pcx>>;
 
 #[derive(Debug)]
 pub struct Adt<'pcx> {
-    pub meta: NonLocalMetaVars<'pcx>,
+    pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub kind: AdtKind<'pcx>,
 }
 
 impl<'pcx> Adt<'pcx> {
-    pub(crate) fn new_struct(inner: StructInner<'pcx>) -> Self {
+    pub(crate) fn new_struct(inner: StructInner<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>) -> Self {
         Self {
-            meta: Default::default(),
+            meta,
             kind: AdtKind::Struct(inner),
         }
     }
-    pub(crate) fn new_enum(inner: EnumInner<'pcx>) -> Self {
+    pub(crate) fn new_enum(inner: EnumInner<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>) -> Self {
         Self {
-            meta: Default::default(),
+            meta,
             kind: AdtKind::Enum(inner),
         }
     }
@@ -119,12 +120,9 @@ pub struct Field<'pcx> {
 
 pub struct Impl<'pcx> {
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
-    #[expect(dead_code)]
     pub(crate) ty: Ty<'pcx>,
-    #[expect(dead_code)]
     pub(crate) trait_id: Option<Path<'pcx>>,
-    #[expect(dead_code)]
-    pub(crate) fns: FxHashMap<Symbol, FnPattern<'pcx>>,
+    pub fns: FxHashMap<Symbol, FnPattern<'pcx>>,
 }
 
 #[derive(Default)]
@@ -277,6 +275,9 @@ impl<'pcx> Param<'pcx> {
 impl<'pcx> FnPatterns<'pcx> {
     pub fn get_fn_pat(&self, name: Symbol) -> Option<&'pcx FnPattern<'pcx>> {
         self.named_fns.get(&name).copied()
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &'pcx FnPattern<'pcx>> {
+        self.into_iter()
     }
 }
 

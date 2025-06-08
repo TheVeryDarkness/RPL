@@ -1,12 +1,13 @@
 //! Error type from RPL meta pass.
 
+use std::fmt::Debug;
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use error_enum::error_type;
 use parser::{ParseError, SpanWrapper};
 use pest_typed::Span;
 use rustc_span::Symbol;
-use std::fmt::Debug;
-use std::path::PathBuf;
-use std::sync::Arc;
 
 // TODO: 排版
 error_type!(
@@ -68,8 +69,9 @@ error_type!(
             307 TypeOrPathNotDeclared {
                 type_or_path: Symbol,
                 span: SpanWrapper<'i>,
+                declared: Vec<Symbol>,
             }
-                "Type or path `{type_or_path}` is not declared. \n{span}",
+                "Type or path `{type_or_path}` is not declared. Declared ones are {declared:?}. \n{span}",
             308 MethodAlreadyDeclared {
                 span: SpanWrapper<'i>,
             }
@@ -114,6 +116,10 @@ error_type!(
                 span: SpanWrapper<'i>,
             }
                 "The return value `RET` in MIR pattern is not declared. \n{span}",
+            321 RetAlreadyDeclared {
+                span: SpanWrapper<'i>,
+            }
+                "The return value `RET` in MIR pattern is already declared. \n{span}",
             319 UnknownPredicate {
                 pred_name: String,
                 span: SpanWrapper<'i>,

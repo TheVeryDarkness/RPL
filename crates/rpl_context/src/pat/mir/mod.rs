@@ -3,13 +3,14 @@ use std::fmt::{self, Debug};
 use std::ops::Index;
 
 use either::Either;
-use rpl_meta::symbol_table::WithPath;
+use rpl_meta::symbol_table::{LocalSpecial, WithPath};
 use rpl_parser::generics::{Choice5, Choice6, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::Target;
 use rustc_index::IndexVec;
-use rustc_middle::mir;
+use rustc_middle::mir::{self, CoercionSource};
+use rustc_middle::ty::adjustment::PointerCoercion;
 
 mod pretty;
 pub mod visitor;
@@ -426,7 +427,7 @@ impl<'pcx> RawDecleration<'pcx> {
                 };
                 let label = label
                     .as_ref()
-                    .map(|label| Symbol::intern(label.Label().Identifier().span.as_str()));
+                    .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
                 Self::LocalInit(label, local, rvalue_or_call)
             },
         }
@@ -435,8 +436,9 @@ impl<'pcx> RawDecleration<'pcx> {
 
 pub enum RawStatement<'pcx> {
     Assign(Option<Label>, Place<'pcx>, Rvalue<'pcx>),
-    CallIgnoreRet(Call<'pcx>),
-    Drop(Place<'pcx>),
+    Call(Option<Label>, Place<'pcx>, Call<'pcx>),
+    CallIgnoreRet(Option<Label>, Call<'pcx>),
+    Drop(Option<Label>, Place<'pcx>),
     Break,
     Continue,
     Loop(Vec<RawStatement<'pcx>>),
@@ -469,19 +471,34 @@ impl<'pcx> RawStatement<'pcx> {
     pub fn from_assign(
         stmt: WithPath<'pcx, &'pcx pairs::MirAssign<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: &'pcx FnSymbolTable<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
         let p = stmt.path;
         let (label, place, _, rvalue_or_call) = stmt.get_matched();
-        let place = Place::from(place, pcx, sym_tab);
-        let rvalue = match rvalue_or_call.deref() {
-            Choice2::_0(_call) => todo!("call in mir assign"),
-            Choice2::_1(rvalue) => Rvalue::from_rvalue(WithPath::new(p, rvalue), pcx, sym_tab),
-        };
         let label = label
             .as_ref()
-            .map(|label| Symbol::intern(label.Label().Identifier().span.as_str()));
-        Self::Assign(label, place, rvalue)
+            .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
+        let place = Place::from(place, pcx, fn_sym_tab);
+        match rvalue_or_call.deref() {
+            Choice2::_0(call) => Self::from_call_assign(label, p, place, call, pcx, fn_sym_tab),
+            Choice2::_1(rvalue) => {
+                let rvalue = Rvalue::from_rvalue(WithPath::new(p, rvalue), pcx, fn_sym_tab);
+                Self::Assign(label, place, rvalue)
+            },
+        }
+    }
+
+    /// See [`mir::TerminatorKind::Call`]
+    fn from_call_assign(
+        label: Option<Symbol>,
+        p: &'pcx std::path::Path,
+        place: Place<'pcx>,
+        call: &'pcx pairs::MirCall<'pcx>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let call = Call::from(with_path(p, call), pcx, fn_sym_tab);
+        Self::Call(label, place, call)
     }
 
     pub fn from_call_ignore_ret(
@@ -490,15 +507,25 @@ impl<'pcx> RawStatement<'pcx> {
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
         let p = call_ignore_ret.path;
-        let (_label, _, _, call) = call_ignore_ret.get_matched();
+        let (label, _, _, call) = call_ignore_ret.get_matched();
         let call = Call::from(with_path(p, call), pcx, fn_sym_tab);
-        Self::CallIgnoreRet(call)
+        Self::CallIgnoreRet(
+            label
+                .as_ref()
+                .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
+            call,
+        )
     }
 
     pub fn from_drop(drop_: &pairs::MirDrop<'pcx>, pcx: PatCtxt<'pcx>, sym_tab: &FnSymbolTable<'pcx>) -> Self {
-        let (_label, _, _, place, _) = drop_.get_matched();
+        let (label, _, _, place, _) = drop_.get_matched();
         let place = Place::from(place, pcx, sym_tab);
-        Self::Drop(place)
+        Self::Drop(
+            label
+                .as_ref()
+                .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
+            place,
+        )
     }
 
     pub fn from_loop(
@@ -626,6 +653,25 @@ pub enum TerminatorKind<'pcx> {
     PatEnd,
 }
 
+trait Cast<T> {
+    fn cast(self) -> T;
+}
+
+impl<'i> Cast<PointerCoercion> for &'i pairs::PointerCoercion<'i> {
+    fn cast(self) -> PointerCoercion {
+        PointerCoercion::Unsize
+    }
+}
+
+impl<'i> Cast<CoercionSource> for &'i pairs::CoercionSource<'i> {
+    fn cast(self) -> CoercionSource {
+        CoercionSource::Implicit
+    }
+}
+
+/// A value that can be used in an rvalue.
+///
+/// See [`mir::Rvalue`].
 pub enum Rvalue<'pcx> {
     Any,
     Use(Operand<'pcx>),
@@ -657,9 +703,13 @@ impl<'pcx> Rvalue<'pcx> {
                 let operand = Operand::from(with_path(p, operand), pcx, fn_sym_tab);
                 let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);
                 let cast_kind = match cast_kind.deref() {
-                    Choice3::_0(_ptr_to_ptr) => mir::CastKind::PtrToPtr,
-                    Choice3::_1(_int_to_int) => mir::CastKind::IntToInt,
-                    Choice3::_2(_transmute) => mir::CastKind::Transmute,
+                    Choice4::_0(_ptr_to_ptr) => mir::CastKind::PtrToPtr,
+                    Choice4::_1(_int_to_int) => mir::CastKind::IntToInt,
+                    Choice4::_2(_transmute) => mir::CastKind::Transmute,
+                    Choice4::_3(pointer_coercion) => {
+                        let (_, _, pointer_coercion, _, coercion_source, _) = pointer_coercion.get_matched();
+                        mir::CastKind::PointerCoercion(pointer_coercion.cast(), coercion_source.cast())
+                    },
                 };
                 Rvalue::Cast(cast_kind, operand, ty)
             },
@@ -861,12 +911,32 @@ impl<'pcx> ConstOperand<'pcx> {
         let p = op.path;
         let (_, op) = op.get_matched();
         match op {
-            Choice3::_0(lit) => Self::from_literal(lit),
-            Choice3::_1(lang_item_with_args) => {
+            Choice4::_0(lit) => Self::from_literal(lit),
+            Choice4::_1(lang_item_with_args) => {
                 Self::from_lang_item(WithPath::new(p, lang_item_with_args), pcx, fn_sym_tab)
             },
-            Choice3::_2(type_path) => Self::from_type_path(WithPath::new(p, type_path), pcx, fn_sym_tab),
+            Choice4::_2(type_path) => Self::from_type_path(WithPath::new(p, type_path), pcx, fn_sym_tab),
+            Choice4::_3(meta_var) => Self::from_meta_var(WithPath::new(p, meta_var), pcx, fn_sym_tab),
         }
+    }
+
+    fn from_meta_var(
+        meta_var: WithPath<'pcx, &'pcx pairs::MetaVariable<'_>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let (idx, ty, pred) = fn_sym_tab
+            .meta_vars
+            .get_from_symbol(Symbol::intern(meta_var.span.as_str()))
+            .unwrap()
+            .expect_const();
+        Self::ConstVar(ConstVar::from(
+            pcx,
+            fn_sym_tab,
+            idx,
+            WithPath::new(meta_var.path, ty),
+            pred,
+        ))
     }
 
     fn from_type_path(
@@ -1070,9 +1140,21 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
     pub fn mk_locals(&mut self, fn_sym_tab: &'pcx FnSymbolTable<'pcx>, pcx: PatCtxt<'pcx>) {
         let WithPath { path, inner: locals } = fn_sym_tab.inner.get_sorted_locals();
-        for (_, ty) in locals {
+        for (label, _, ty, special) in locals {
             let ty = Ty::from(with_path(path, ty), pcx, fn_sym_tab);
-            self.mk_local(ty);
+            let local = self.mk_local(ty);
+            match special {
+                LocalSpecial::Return => {
+                    self.pattern.return_idx = Some(local);
+                },
+                LocalSpecial::Self_ => {
+                    self.pattern.self_idx = Some(local);
+                },
+                LocalSpecial::None => {},
+            }
+            if let Some(label) = label {
+                self.pattern.labels.insert(label, Spanned::Local(local));
+            }
         }
     }
 
@@ -1109,8 +1191,13 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     fn mk_raw_stmt(&mut self, kind: RawStatement<'pcx>) -> Location {
         match kind {
             RawStatement::Assign(label, place, rvalue) => self.mk_assign(label, StatementKind::Assign(place, rvalue)),
-            RawStatement::CallIgnoreRet(Call(func, args)) => self.mk_fn_call(func, args.into_boxed_slice(), None),
-            RawStatement::Drop(place) => self.mk_drop(place),
+            RawStatement::Call(label, place, Call(func, args)) => {
+                self.mk_fn_call(label, func, args.into_boxed_slice(), Some(place))
+            },
+            RawStatement::CallIgnoreRet(label, Call(func, args)) => {
+                self.mk_fn_call(label, func, args.into_boxed_slice(), None)
+            },
+            RawStatement::Drop(label, place) => self.mk_drop(label, place),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),
             RawStatement::Loop(stmts) => self.mk_loop(stmts),
@@ -1132,7 +1219,9 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         if let RawDecleration::LocalInit(label, local, Some(rvalue_or_call)) = kind {
             match rvalue_or_call {
                 RvalueOrCall::Rvalue(rvalue) => _ = self.mk_assign(label, StatementKind::Assign(local.into(), rvalue)),
-                RvalueOrCall::Call(call) => _ = self.mk_fn_call(call.0, call.1.into_boxed_slice(), Some(local.into())),
+                RvalueOrCall::Call(call) => {
+                    _ = self.mk_fn_call(label, call.0, call.1.into_boxed_slice(), Some(local.into()))
+                },
             }
         }
     }
@@ -1146,7 +1235,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         self.pattern.basic_blocks[block].statements.push(assign);
         let loc = Location { block, statement_index };
         if let Some(label) = label {
-            self.pattern.labels.insert(label, loc);
+            self.pattern.labels.insert(label, Spanned::Location(loc));
         }
         loc
     }
@@ -1158,6 +1247,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
     pub fn mk_fn_call(
         &mut self,
+        label: Option<Label>,
         func: Operand<'pcx>,
         args: List<Operand<'pcx>>,
         destination: Option<Place<'pcx>>,
@@ -1172,25 +1262,38 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             && let Target::Variant | Target::Struct | Target::Union = lang_item.target()
         {
             return self.mk_assign(
-                None,
+                label,
                 StatementKind::Assign(
                     place,
                     Rvalue::Aggregate(AggKind::Adt(path_with_args, AggAdtKind::Tuple), args),
                 ),
             );
         }
+
         let target = self.next_block();
-        self.set_terminator(TerminatorKind::Call {
+        let loc = self.set_terminator(TerminatorKind::Call {
             func,
             args,
             destination,
             target,
-        })
+        });
+
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, Spanned::Location(loc));
+        }
+
+        loc
     }
-    pub fn mk_drop(&mut self, place: impl Into<Place<'pcx>>) -> Location {
+    pub fn mk_drop(&mut self, label: Option<Label>, place: impl Into<Place<'pcx>>) -> Location {
         let target = self.next_block();
         let place = place.into();
-        self.set_terminator(TerminatorKind::Drop { place, target })
+        let loc = self.set_terminator(TerminatorKind::Drop { place, target });
+
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, Spanned::Location(loc));
+        }
+
+        loc
     }
     pub fn mk_switch_int(
         &mut self,

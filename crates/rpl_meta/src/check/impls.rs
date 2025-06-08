@@ -1,16 +1,17 @@
+use std::sync::Arc;
+
+use parser::pairs;
+use rustc_data_structures::fx::FxHashMap;
+use rustc_span::Symbol;
+
+use super::CheckFnCtxt;
 use crate::RPLMetaError;
 use crate::context::MetaContext;
 use crate::symbol_table::{FnInner, ImplInner, NonLocalMetaSymTab};
 use crate::utils::Record;
-use parser::pairs;
-use rustc_data_structures::fx::FxHashMap;
-use rustc_span::Symbol;
-use std::sync::Arc;
-
-use super::CheckFnCtxt;
 
 pub(super) struct CheckImplCtxt<'i, 'r> {
-    pub(super) meta_vars: Arc<NonLocalMetaSymTab>,
+    pub(super) meta_vars: Arc<NonLocalMetaSymTab<'i>>,
     pub(super) impl_def: &'r mut ImplInner<'i>,
     pub(super) imports: &'r FxHashMap<Symbol, &'i pairs::Path<'i>>,
     pub(super) errors: &'r mut Vec<RPLMetaError<'i>>,
