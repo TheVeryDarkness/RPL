@@ -274,7 +274,7 @@ MetaVariableType = {
 }
 
 Predicate            = {
-    Identifier ~ LeftParen ~ PredicateArgs? ~ RightParen
+    Word ~ LeftParen ~ PredicateArgs? ~ RightParen
 }
 PredicateTerm        = {
     Predicate
@@ -286,7 +286,7 @@ PredicateArgs        = {
 PredicateArg         = {
     Label
   | MetaVariable
-  | Type
+  | Path
   | kw_self
 }
 PredicateClause      = {
@@ -316,16 +316,19 @@ MetaVariableAssignList              = {
     LeftBracket ~ MetaVariableAssignsSeparatedByComma? ~ RightBracket
 }
 
-// Attributes
-Attribute                  = {
-    (Word ~ Assign ~ Word)
+// Constraints
+Attribute                   = {
+    Word ~ Assign ~ Word
+}
+Constraint                  = {
+    Attribute
   | PredicateConjunction
 }
-AttributesSeparatedByComma = {
-    Attribute ~ (Comma ~ Attribute)* ~ Comma?
+ConstraintsSeparatedByComma = {
+    Constraint ~ (Comma ~ Constraint)* ~ Comma?
 }
-WhereBlock                 = {
-    kw_where ~ LeftBrace ~ AttributesSeparatedByComma? ~ RightBrace
+WhereBlock                  = {
+    kw_where ~ LeftBrace ~ ConstraintsSeparatedByComma? ~ RightBrace
 }
 
 // Rust Items
@@ -853,12 +856,19 @@ ImplKind = {
 }
 
 Impl = {
-    kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn)* ~ RightBrace
+    kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace
 }
 
-RustItem = { Fn | Struct | Enum | Impl }
-
-RustItems = { LeftBrace ~ (RustItem)+ ~ RightBrace }
+RustItem                = {
+    Fn
+  | Struct
+  | Enum
+  | Impl
+}
+RustItemWithConstraint  = {
+    RustItem ~ WhereBlock?
+}
+RustItemsWithConstraint = { LeftBrace ~ (RustItemWithConstraint)+ ~ RightBrace }
 
 PatternConfiguration = {
     Identifier ~ MetaVariableAssignList
@@ -874,14 +884,14 @@ PatternOperation = {
 }
 
 RustItemsOrPatternOperation = {
-    RustItem
-  | RustItems
+    RustItemWithConstraint
+  | RustItemsWithConstraint
   | PatternOperation
 }
 
 // patt block Item
 RPLPatternItem = {
-    Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation ~ WhereBlock?
+    Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
 }
 
 MetaVariableWithDiagMessage = {

@@ -12,7 +12,9 @@ repository.workspace = true
 derive_more.workspace = true
 rpl_context.workspace = true
 rpl_resolve.workspace = true
+rpl_constraints.workspace = true
 rpl_mir_graph.workspace = true
+rpl_meta.workspace = true
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

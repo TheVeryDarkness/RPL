@@ -19,12 +19,14 @@ rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 use std::convert::identity;
 
 use either::Either;
+use rpl_constraints::Constraint;
 use rpl_context::PatCtxt;
 use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::matches::{Matched, MatchedWithLabelMap};
 use rpl_match::mir::pat::{LabelMap, PatternItem};
 use rpl_match::mir::{CheckMirCtxt, pat};
+use rpl_match::predicate_evaluator::PredicateEvaluator;
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashSet;
 use rustc_hir as hir;
@@ -34,7 +36,7 @@ use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
 use rustc_middle::hir::nested_filter::All;
 use rustc_middle::mir;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
 use rustc_session::declare_tool_lint;
 use rustc_span::symbol::Ident;
@@ -134,17 +136,31 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = (Matched<'tcx>, &'pcx LabelMap)> {
         rpl_rust_items.impls.values().flat_map(move |impl_pat| {
-            //FIXME: check impl_pat.ty and impl_pat.trait_id
+            // FIXME: check impl_pat.ty and impl_pat.trait_id
             impl_pat.fns.values().flat_map(move |fn_pat| {
-                //FIXME: sometimes we need to check function name
+                // FIXME: sometimes we need to check function name
                 // if *fn_name != impl_item.ident.name {
                 //     continue;
                 // }
                 CheckMirCtxt::new(self.tcx, self.pcx, body, rpl_rust_items, name, fn_pat, mir_cfg, mir_ddg)
                     .check()
                     .into_iter()
+                    .filter(|matched| {
+                        let evaluator = PredicateEvaluator::new(
+                            self.tcx,
+                            ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
+                            body,
+                            &fn_pat.expect_body().labels,
+                            matched,
+                            &fn_pat.symbol_table.meta_vars,
+                        );
+                        fn_pat.constraints.iter().all(|constraint| match constraint {
+                            Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
+                            _ => true,
+                        })
+                    })
                     .map(move |matched| {
-                        let labels = &fn_pat.expect_mir_body().labels;
+                        let labels = &fn_pat.expect_body().labels;
                         (matched, labels)
                     })
             })
@@ -204,7 +220,8 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = (Matched<'tcx>, &'pcx LabelMap)> {
         rpl_rust_items.fns.iter().flat_map(move |fn_pat| {
-            // // FIXME: a more general way to handle this
+            // FIXME: a more general way to handle this
+            // FIXME: check constraints::attributes, i.e. pre-match filtering
             // if matches!(fn_pat.visibility, Visibility::Public)
             //     && !self.tcx.visibility(def_id).is_public()
             // {
@@ -213,8 +230,22 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
             CheckMirCtxt::new(self.tcx, self.pcx, body, rpl_rust_items, name, fn_pat, mir_cfg, mir_ddg)
                 .check()
                 .into_iter()
+                .filter(|matched| {
+                    let evaluator = PredicateEvaluator::new(
+                        self.tcx,
+                        ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
+                        body,
+                        &fn_pat.expect_body().labels,
+                        matched,
+                        &fn_pat.symbol_table.meta_vars,
+                    );
+                    fn_pat.constraints.iter().all(|constraint| match constraint {
+                        Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
+                        _ => true,
+                    })
+                })
                 .map(move |matched| {
-                    let labels = &fn_pat.expect_mir_body().labels;
+                    let labels = &fn_pat.expect_body().labels;
                     (matched, labels)
                 })
         })

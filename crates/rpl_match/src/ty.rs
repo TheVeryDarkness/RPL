@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::iter::zip;
 
+use rpl_constraints::predicates::{PredicateArg, PredicateKind};
 use rpl_context::{PatCtxt, pat};
 use rpl_resolve::{PatItemKind, def_path_res};
 use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
@@ -56,7 +57,29 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
                 // The following code relies on some assumptions:
                 // - The predicate after the declaration of the meta variable is always like
                 //   `is_all_safe_trait(self) && !is_primitive(self)`
-                if ty_var.pred.evaluate(Some(self.tcx), Some(self.typing_env), Some(ty), None, None, None) =>
+                if ty_var.pred.clauses.iter().all(|clause|
+                    clause.terms.iter().any(|term| {
+                        if let PredicateKind::Ty(ty_pred) = term.kind
+                            && term.args.iter().all(|arg| { matches!(arg, PredicateArg::SelfValue) }) {
+                                let res = ty_pred(self.tcx, self.typing_env, ty);
+                                if term.is_neg {
+                                    !res
+                                } else {
+                                    res
+                                }
+                            } // for debugging 
+                            else if let PredicateKind::Trivial(trivial) = term.kind {
+                                if term.is_neg {
+                                    !trivial()
+                                } else {
+                                    trivial()
+                                }
+                            }
+                            else {
+                                false
+                            }
+                    })
+                ) =>
             {
                 self.ty_vars[ty_var.idx].borrow_mut().insert(ty);
                 true

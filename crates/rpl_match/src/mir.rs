@@ -58,7 +58,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         let ty = MatchTyCtxt::new(tcx, pcx, typing_env, pat, &fn_pat.meta);
         let place = MatchPlaceCtxt::new(tcx, pcx, &fn_pat.meta);
         // let places = pat.locals.iter().map(|&local| ty.mk_ty(pat.locals[local].ty)).collect();
-        let mir_pat = fn_pat.expect_mir_body();
+        let mir_pat = fn_pat.expect_body();
         // let pat_pdg = crate::graph::pat_program_dep_graph(&patterns, tcx.pointer_size().bytes_usize());
         // let mir_pdg = crate::graph::mir_program_dep_graph(body);
         let pat_cfg = crate::graph::pat_control_flow_graph(mir_pat, tcx.pointer_size().bytes());

@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use error::{DynamicError, DynamicErrorBuilder};
+use rpl_constraints::Constraint;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;
 use rpl_meta::utils::Ident;
@@ -80,21 +81,28 @@ impl<'pcx> RustItems<'pcx> {
     fn add_item(
         &mut self,
         pat_name: Option<Symbol>,
-        item: WithPath<'pcx, &'pcx pairs::RustItem<'pcx>>,
+        item: WithPath<'pcx, &'pcx pairs::RustItemWithConstraint<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
     ) {
-        match &***item {
+        let path = item.path;
+        let (item, where_block) = item.get_matched();
+        let constraints = Constraint::from_where_block_opt(where_block);
+        match item.deref() {
             Choice4::_0(rust_fn) => {
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_symbol_table = symbol_table.get_fn(fn_name).unwrap();
-                self.add_fn(WithPath::new(item.path, rust_fn), meta, fn_symbol_table);
+                self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, constraints);
             },
             Choice4::_1(rust_struct) => {
-                self.add_struct(pat_name, with_path(item.path, rust_struct), meta, symbol_table)
+                self.add_struct(pat_name, with_path(path, rust_struct), meta, symbol_table, constraints)
             },
-            Choice4::_2(rust_enum) => self.add_enum(pat_name, with_path(item.path, rust_enum), meta, symbol_table),
-            Choice4::_3(rust_impl) => self.add_impl(pat_name, with_path(item.path, rust_impl), meta, symbol_table),
+            Choice4::_2(rust_enum) => {
+                self.add_enum(pat_name, with_path(path, rust_enum), meta, symbol_table, constraints)
+            },
+            Choice4::_3(rust_impl) => {
+                self.add_impl(pat_name, with_path(path, rust_impl), meta, symbol_table, constraints)
+            },
         }
     }
 
@@ -104,8 +112,9 @@ impl<'pcx> RustItems<'pcx> {
         rust_fn: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         fn_symbol_table: &'pcx FnSymbolTable<'pcx>,
+        constraints: Vec<Constraint>,
     ) {
-        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta);
+        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, constraints);
         let fn_pat = self.pcx.alloc_fn(fn_pat);
         let fn_name = fn_pat.name;
         match fn_name.as_str() {
@@ -127,6 +136,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_struct: WithPath<'pcx, &'pcx pairs::Struct<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        constraints: Vec<Constraint>,
     ) {
         let mut struct_inner = StructInner::default();
         let name = rust_struct.MetaVariable();
@@ -141,7 +151,7 @@ impl<'pcx> RustItems<'pcx> {
             }
         }
 
-        let struct_pat = Adt::new_struct(struct_inner, meta);
+        let struct_pat = Adt::new_struct(struct_inner, meta, constraints);
         // let struct_pat = self.pcx.alloc_struct(struct_pat);
         self.adts.insert(Symbol::intern(name.span.as_str()), struct_pat);
     }
@@ -153,6 +163,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_enum: WithPath<'pcx, &'pcx pairs::Enum<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        constraints: Vec<Constraint>,
     ) {
         let mut enum_inner = EnumInner::default();
         let name = rust_enum.MetaVariable();
@@ -190,9 +201,9 @@ impl<'pcx> RustItems<'pcx> {
             }
         }
 
-        let struct_pat = Adt::new_enum(enum_inner, meta);
+        let enum_pat = Adt::new_enum(enum_inner, meta, constraints);
         // let struct_pat = self.pcx.alloc_struct(struct_pat);
-        self.adts.insert(Symbol::intern(name.span.as_str()), struct_pat);
+        self.adts.insert(Symbol::intern(name.span.as_str()), enum_pat);
     }
 
     #[instrument(level = "debug", skip(self, rust_impl, meta, symbol_table))]
@@ -202,6 +213,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_impl: WithPath<'pcx, &'pcx pairs::Impl<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        constraints: Vec<Constraint>,
     ) {
         let p = rust_impl.path;
         let (_, impl_kind, ty, _, fns, _) = rust_impl.get_matched();
@@ -213,9 +225,17 @@ impl<'pcx> RustItems<'pcx> {
         let fns = fns
             .iter_matched()
             .map(|rust_fn| {
+                let (rust_fn, where_block) = rust_fn.get_matched();
+                let constraints = Constraint::from_where_block_opt(where_block);
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_sym_tab = impl_sym_tab.inner.get_fn(fn_name).unwrap();
-                let fn_def = FnPattern::from(WithPath::new(p, rust_fn), self.pcx, fn_sym_tab, Arc::clone(&meta));
+                let fn_def = FnPattern::from(
+                    WithPath::new(p, rust_fn),
+                    self.pcx,
+                    fn_sym_tab,
+                    Arc::clone(&meta),
+                    constraints,
+                );
                 (fn_name, fn_def)
             })
             .collect();
@@ -224,6 +244,7 @@ impl<'pcx> RustItems<'pcx> {
             ty,
             trait_id,
             fns,
+            constraints,
         };
         debug!(ty = ?impl_pat.ty, trait_id = ?impl_pat.trait_id, fns = ?impl_pat.fns.keys());
         if let Some(pat_name) = pat_name {
@@ -289,7 +310,7 @@ impl<'pcx> Pattern<'pcx> {
         block_type: PattOrUtil,
     ) {
         let p = pat_item.path;
-        let (name, meta_decls, _, item_or_patt_op, _) = pat_item.get_matched();
+        let (name, meta_decls, _, item_or_patt_op) = pat_item.get_matched();
         let name = Symbol::intern(name.span.as_str());
         let symbol_table = symbol_tables.get(&name).unwrap();
         let meta = Arc::new(NonLocalMetaVars::from_meta_decls(
@@ -380,7 +401,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_items(
         &mut self,
         pat_name: Symbol,
-        items: WithPath<'pcx, impl Iterator<Item = &'pcx pairs::RustItem<'pcx>>>,
+        items: WithPath<'pcx, impl Iterator<Item = &'pcx pairs::RustItemWithConstraint<'pcx>>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         block_type: PattOrUtil,

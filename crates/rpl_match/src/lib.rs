@@ -37,6 +37,7 @@ pub mod graph; // FIXME: visibility
 pub mod matches; // FIXME: visibility
 pub mod mir; // FIXME: visibility
 mod place;
+pub mod predicate_evaluator;
 pub mod resolve;
 mod ty;
 

@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use derive_more::derive::Debug;
+use rpl_constraints::Constraint;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{Visibility, WithMetaTable, WithPath};
 use rpl_parser::generics::Choice4;
@@ -25,19 +26,30 @@ pub type Enum<'pcx> = WithMetaTable<'pcx, EnumInner<'pcx>>;
 pub struct Adt<'pcx> {
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub kind: AdtKind<'pcx>,
+    pub constraints: Vec<Constraint>,
 }
 
 impl<'pcx> Adt<'pcx> {
-    pub(crate) fn new_struct(inner: StructInner<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>) -> Self {
+    pub(crate) fn new_struct(
+        inner: StructInner<'pcx>,
+        meta: Arc<NonLocalMetaVars<'pcx>>,
+        constraints: Vec<Constraint>,
+    ) -> Self {
         Self {
             meta,
             kind: AdtKind::Struct(inner),
+            constraints,
         }
     }
-    pub(crate) fn new_enum(inner: EnumInner<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>) -> Self {
+    pub(crate) fn new_enum(
+        inner: EnumInner<'pcx>,
+        meta: Arc<NonLocalMetaVars<'pcx>>,
+        constraints: Vec<Constraint>,
+    ) -> Self {
         Self {
             meta,
             kind: AdtKind::Enum(inner),
+            constraints,
         }
     }
     pub fn non_enum_variant_mut(&mut self) -> &mut Variant<'pcx> {
@@ -123,6 +135,7 @@ pub struct Impl<'pcx> {
     pub(crate) ty: Ty<'pcx>,
     pub(crate) trait_id: Option<Path<'pcx>>,
     pub fns: FxHashMap<Symbol, FnPattern<'pcx>>,
+    pub constraints: Vec<Constraint>,
 }
 
 #[derive(Default)]
@@ -138,9 +151,11 @@ pub struct FnPattern<'pcx> {
     pub visibility: Visibility,
     pub name: Symbol,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
+    pub symbol_table: &'pcx FnSymbolTable<'pcx>,
     pub params: Params<'pcx>,
     pub ret: Option<Ty<'pcx>>,
     pub body: Option<&'pcx FnPatternBody<'pcx>>,
+    pub constraints: Vec<Constraint>,
 }
 
 impl<'pcx> FnPattern<'pcx> {
@@ -149,6 +164,7 @@ impl<'pcx> FnPattern<'pcx> {
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
+        constraints: Vec<Constraint>,
     ) -> Self {
         let p = pair.path;
         let (sig, body) = pair.get_matched();
@@ -183,6 +199,8 @@ impl<'pcx> FnPattern<'pcx> {
             params,
             ret,
             body,
+            constraints,
+            symbol_table: fn_sym_tab,
         }
     }
 
@@ -282,7 +300,7 @@ impl<'pcx> FnPatterns<'pcx> {
 }
 
 impl<'pcx> FnPattern<'pcx> {
-    pub fn expect_mir_body(&self) -> &'pcx FnPatternBody<'pcx> {
+    pub fn expect_body(&self) -> &'pcx FnPatternBody<'pcx> {
         match self.body {
             Some(mir_body) => mir_body,
             _ => panic!("expected MIR body"),

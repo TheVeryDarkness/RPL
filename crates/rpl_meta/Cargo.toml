@@ -9,7 +9,7 @@ edition.workspace = true
 
 [dependencies]
 rpl_parser.workspace = true
-rpl_predicates.workspace = true
+rpl_constraints.workspace = true
 
 pest.workspace = true
 pest_generator.workspace = true

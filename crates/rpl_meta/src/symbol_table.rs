@@ -6,7 +6,7 @@ use either::Either;
 use parser::generics::{Choice3, Choice4};
 use parser::{SpanWrapper, pairs};
 use pest_typed::Span;
-use rpl_predicates::PredicateConjunction;
+use rpl_constraints::predicates::PredicateConjunction;
 use rustc_hash::FxHashMap;
 use rustc_span::Symbol;
 
@@ -58,6 +58,9 @@ pub enum AdtPatType {
 pub type Type<'i> = &'i pairs::Type<'i>;
 
 // the usize in the hashmap is the *-index of a non-local meta variable
+// PredicateConjunction is the predicates after the meta variable declaration
+// (These predicates should have only one parameter, which is the meta variable itself)
+// like `$T: type where is_all_safe_trait(self) && !is_primitive(self)`
 #[derive(Default, Clone, Debug)]
 pub struct NonLocalMetaSymTab<'i> {
     type_vars: FxHashMap<Symbol, (usize, PredicateConjunction)>,

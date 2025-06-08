@@ -1192,13 +1192,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpl_constraints"
+version = "0.1.0"
+dependencies = [
+ "rpl_parser",
+ "rpl_resolve",
+]
+
+[[package]]
 name = "rpl_context"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "rpl_constraints",
  "rpl_meta",
  "rpl_parser",
- "rpl_predicates",
  "sync-arena",
 ]
 
@@ -1206,6 +1214,7 @@ dependencies = [
 name = "rpl_driver"
 version = "0.1.0"
 dependencies = [
+ "rpl_constraints",
  "rpl_context",
  "rpl_match",
  "rpl_meta",
@@ -1239,7 +1248,9 @@ name = "rpl_match"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "rpl_constraints",
  "rpl_context",
+ "rpl_meta",
  "rpl_mir_graph",
  "rpl_resolve",
 ]
@@ -1258,8 +1269,8 @@ dependencies = [
  "pest_typed_derive",
  "pest_typed_generator",
  "pretty_assertions",
+ "rpl_constraints",
  "rpl_parser",
- "rpl_predicates",
  "schemars",
  "serde",
  "serde_json",
@@ -1297,14 +1308,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "rpl_predicates"
-version = "0.1.0"
-dependencies = [
- "rpl_parser",
- "rpl_resolve",
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ use rustc_span::{Span, Symbol};
 
 pub type TranslatePredsFnPtr = fn(
     mir_location: rustc_middle::mir::Location,
-    hir_fn_path: &str,
+    hir_fn_path: Vec<Symbol>,
     tcx: TyCtxt<'_>,
     body: &rustc_middle::mir::Body<'_>,
 ) -> bool;
@@ -30,8 +30,7 @@ struct FindExprBySpanAndFnPath<'tcx> {
 }
 
 impl<'tcx> FindExprBySpanAndFnPath<'tcx> {
-    pub fn new(span: Span, path: &str, tcx: TyCtxt<'tcx>) -> Self {
-        let path = path.split("::").map(Symbol::intern).collect::<Vec<_>>();
+    pub fn new(span: Span, path: Vec<Symbol>, tcx: TyCtxt<'tcx>) -> Self {
         let resolved_res = def_path_res(tcx, &path, PatItemKind::Fn);
         Self {
             span,
@@ -91,9 +90,9 @@ fn get_body_id_from_hir_node(node: Node<'_>) -> Option<BodyId> {
     }
 }
 
-pub fn translate_from_hir_function(
+pub fn translate_from_function(
     mir_location: rustc_middle::mir::Location,
-    hir_fn_path: &str,
+    hir_fn_path: Vec<Symbol>,
     tcx: TyCtxt<'_>,
     body: &rustc_middle::mir::Body<'_>,
 ) -> bool {

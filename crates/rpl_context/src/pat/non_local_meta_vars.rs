@@ -1,10 +1,10 @@
 use std::ops::Deref;
 
+use rpl_constraints::predicates::PredicateConjunction;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{GetType, WithPath};
 use rpl_parser::generics::Choice3;
 use rpl_parser::pairs;
-use rpl_predicates::PredicateConjunction;
 use rustc_index::IndexVec;
 use rustc_span::Symbol;
 
@@ -50,7 +50,7 @@ impl<'pcx> ConstVar<'pcx> {
         fn_sym_tab: &'pcx impl GetType<'pcx>,
         idx: usize,
         ty: WithPath<'pcx, &'pcx pairs::Type<'pcx>>,
-        pred: rpl_predicates::PredicateConjunction,
+        pred: PredicateConjunction,
     ) -> Self {
         let name = Symbol::intern(ty.span.as_str());
         let ty = Ty::from(ty, pcx, fn_sym_tab);
@@ -85,7 +85,11 @@ pub struct NonLocalMetaVars<'pcx> {
 impl<'pcx> NonLocalMetaVars<'pcx> {
     pub fn add_ty_var(&mut self, name: Symbol, preds: Option<&pairs::PredicateConjunction<'_>>) {
         let idx = self.ty_vars.next_index();
-        let pred = PredicateConjunction::from_pairs_opt(preds);
+        let pred = if let Some(preds) = preds {
+            PredicateConjunction::from_pairs(preds)
+        } else {
+            PredicateConjunction::default()
+        };
         let ty_var = TyVar { idx, name, pred };
         self.ty_vars.push(ty_var);
     }

@@ -21,7 +21,7 @@ rpl_mir_graph = { path = "./crates/rpl_mir_graph" }
 rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
 rpl_utils = { path = "./crates/rpl_utils" }
 rpl_meta = { path = "./crates/rpl_meta" }
-rpl_predicates = { path = "./crates/rpl_predicates" }
+rpl_constraints = { path = "./crates/rpl_constraints" }
 rpl_resolve = { path = "./crates/rpl_resolve" }
 rustc_tools_util = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }

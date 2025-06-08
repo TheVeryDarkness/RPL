@@ -243,7 +243,7 @@ fn parse_suggestion<'i>(
 }
 
 impl<'i> DynamicErrorBuilder<'i> {
-    //FIXME: this function has a lot of `unwrap` calls, which can panic if the input is malformed.
+    // FIXME: this function has a lot of `unwrap` calls, which can panic if the input is malformed.
     /// Create a [`DynamicErrorBuilder`] from a [`pairs::diagBlockItem`].
     pub(super) fn from_item(
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,

@@ -148,7 +148,8 @@ pub enum Rule {
     r#MetaVariableAssignsSeparatedByComma,
     r#MetaVariableAssignList,
     r#Attribute,
-    r#AttributesSeparatedByComma,
+    r#Constraint,
+    r#ConstraintsSeparatedByComma,
     r#WhereBlock,
     r#Mutability,
     r#PtrMutability,
@@ -262,7 +263,8 @@ pub enum Rule {
     r#ImplKind,
     r#Impl,
     r#RustItem,
-    r#RustItems,
+    r#RustItemWithConstraint,
+    r#RustItemsWithConstraint,
     r#PatternConfiguration,
     r#PatternExpression,
     r#PatternOperation,
@@ -2035,17 +2037,8 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#Predicate , "Corresponds to expression: `(Identifier ~ LeftParen ~ PredicateArgs? ~ RightParen)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Predicate , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#PredicateArgs :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#Predicate , "Corresponds to expression: `(Word ~ LeftParen ~ PredicateArgs? ~ RightParen)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Predicate , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#PredicateArgs :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#Predicate<'i, INHERITED> {
-            #[doc = "A helper function to access [`Identifier`]."]
-            #[allow(non_snake_case)]
-            pub fn r#Identifier<'s>(&'s self) -> &'s super::super::rules::r#Identifier<'i, INHERITED> {
-                let res = &*self.content;
-                {
-                    let res = &res.content.0.matched;
-                    res
-                }
-            }
             #[doc = "A helper function to access [`LeftParen`]."]
             #[allow(non_snake_case)]
             pub fn r#LeftParen<'s>(&'s self) -> &'s super::super::rules::r#LeftParen<'i, INHERITED> {
@@ -2076,6 +2069,15 @@ pub mod rules_impl {
                 let res = &*self.content;
                 {
                     let res = &res.content.3.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`Word`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Word<'s>(&'s self) -> &'s super::super::rules::r#Word<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
                     res
                 }
             }
@@ -2201,7 +2203,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#PredicateArg , "Corresponds to expression: `(Label | MetaVariable | Type | kw_self)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#PredicateArg , super :: super :: generics :: Choice4 :: < super :: super :: rules :: r#Label :: < 'i , INHERITED > , super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: rules :: r#kw_self :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#PredicateArg , "Corresponds to expression: `(Label | MetaVariable | Path | kw_self)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#PredicateArg , super :: super :: generics :: Choice4 :: < super :: super :: rules :: r#Label :: < 'i , INHERITED > , super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: rules :: r#kw_self :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#PredicateArg<'i, INHERITED> {
             #[doc = "A helper function to access [`Label`]."]
             #[allow(non_snake_case)]
@@ -2225,11 +2227,11 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`Type`]."]
+            #[doc = "A helper function to access [`Path`]."]
             #[allow(non_snake_case)]
-            pub fn r#Type<'s>(
+            pub fn r#Path<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Type<'i, INHERITED>> {
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Path<'i, INHERITED>> {
                 let res = &*self.content;
                 {
                     let res = res._2().map(|res| res);
@@ -2844,19 +2846,51 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#Attribute , "Corresponds to expression: `((Word ~ Assign ~ Word) | PredicateConjunction)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Attribute , super :: super :: generics :: Choice2 :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: rules :: r#PredicateConjunction :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#Attribute , "Corresponds to expression: `(Word ~ Assign ~ Word)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Attribute , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#Attribute<'i, INHERITED> {
             #[doc = "A helper function to access [`Assign`]."]
             #[allow(non_snake_case)]
-            pub fn r#Assign<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Assign<'i, INHERITED>> {
+            pub fn r#Assign<'s>(&'s self) -> &'s super::super::rules::r#Assign<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = res._0().map(|res| {
-                        let res = &res.content.1.matched;
-                        res
-                    });
+                    let res = &res.content.1.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`Word`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Word<'s>(
+                &'s self,
+            ) -> (
+                &'s super::super::rules::r#Word<'i, INHERITED>,
+                &'s super::super::rules::r#Word<'i, INHERITED>,
+            ) {
+                let res = &*self.content;
+                {
+                    let res = (
+                        {
+                            let res = &res.content.0.matched;
+                            res
+                        },
+                        {
+                            let res = &res.content.2.matched;
+                            res
+                        },
+                    );
+                    res
+                }
+            }
+        }
+        :: pest_typed :: rule ! (r#Constraint , "Corresponds to expression: `(Attribute | PredicateConjunction)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Constraint , super :: super :: generics :: Choice2 :: < super :: super :: rules :: r#Attribute :: < 'i , INHERITED > , super :: super :: rules :: r#PredicateConjunction :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#Constraint<'i, INHERITED> {
+            #[doc = "A helper function to access [`Attribute`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Attribute<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Attribute<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = res._0().map(|res| res);
                     res
                 }
             }
@@ -2872,71 +2906,9 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`Word`]."]
-            #[allow(non_snake_case)]
-            pub fn r#Word<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<(
-                &'s super::super::rules::r#Word<'i, INHERITED>,
-                &'s super::super::rules::r#Word<'i, INHERITED>,
-            )> {
-                let res = &*self.content;
-                {
-                    let res = res._0().map(|res| {
-                        let res = (
-                            {
-                                let res = &res.content.0.matched;
-                                res
-                            },
-                            {
-                                let res = &res.content.2.matched;
-                                res
-                            },
-                        );
-                        res
-                    });
-                    res
-                }
-            }
         }
-        :: pest_typed :: rule ! (r#AttributesSeparatedByComma , "Corresponds to expression: `(Attribute ~ (Comma ~ Attribute)* ~ Comma?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#AttributesSeparatedByComma , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Attribute :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Comma :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Attribute :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#Comma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
-        impl<'i, const INHERITED: ::core::primitive::usize> r#AttributesSeparatedByComma<'i, INHERITED> {
-            #[doc = "A helper function to access [`Attribute`]."]
-            #[allow(non_snake_case)]
-            pub fn r#Attribute<'s>(
-                &'s self,
-            ) -> (
-                &'s super::super::rules::r#Attribute<'i, INHERITED>,
-                ::pest_typed::re_exported::Vec<&'s super::super::rules::r#Attribute<'i, INHERITED>>,
-            ) {
-                let res = &*self.content;
-                {
-                    let res = (
-                        {
-                            let res = &res.content.0.matched;
-                            res
-                        },
-                        {
-                            let res = &res.content.1.matched;
-                            {
-                                let res = res
-                                    .content
-                                    .iter()
-                                    .map(|res| {
-                                        let res = &res.matched;
-                                        {
-                                            let res = &res.content.1.matched;
-                                            res
-                                        }
-                                    })
-                                    .collect::<::pest_typed::re_exported::Vec<_>>();
-                                res
-                            }
-                        },
-                    );
-                    res
-                }
-            }
+        :: pest_typed :: rule ! (r#ConstraintsSeparatedByComma , "Corresponds to expression: `(Constraint ~ (Comma ~ Constraint)* ~ Comma?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#ConstraintsSeparatedByComma , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Constraint :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Comma :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Constraint :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#Comma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#ConstraintsSeparatedByComma<'i, INHERITED> {
             #[doc = "A helper function to access [`Comma`]."]
             #[allow(non_snake_case)]
             pub fn r#Comma<'s>(
@@ -2976,14 +2948,50 @@ pub mod rules_impl {
                     res
                 }
             }
-        }
-        :: pest_typed :: rule ! (r#WhereBlock , "Corresponds to expression: `(kw_where ~ LeftBrace ~ AttributesSeparatedByComma? ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#WhereBlock , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_where :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#AttributesSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
-        impl<'i, const INHERITED: ::core::primitive::usize> r#WhereBlock<'i, INHERITED> {
-            #[doc = "A helper function to access [`AttributesSeparatedByComma`]."]
+            #[doc = "A helper function to access [`Constraint`]."]
             #[allow(non_snake_case)]
-            pub fn r#AttributesSeparatedByComma<'s>(
+            pub fn r#Constraint<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#AttributesSeparatedByComma<'i, INHERITED>>
+            ) -> (
+                &'s super::super::rules::r#Constraint<'i, INHERITED>,
+                ::pest_typed::re_exported::Vec<&'s super::super::rules::r#Constraint<'i, INHERITED>>,
+            ) {
+                let res = &*self.content;
+                {
+                    let res = (
+                        {
+                            let res = &res.content.0.matched;
+                            res
+                        },
+                        {
+                            let res = &res.content.1.matched;
+                            {
+                                let res = res
+                                    .content
+                                    .iter()
+                                    .map(|res| {
+                                        let res = &res.matched;
+                                        {
+                                            let res = &res.content.1.matched;
+                                            res
+                                        }
+                                    })
+                                    .collect::<::pest_typed::re_exported::Vec<_>>();
+                                res
+                            }
+                        },
+                    );
+                    res
+                }
+            }
+        }
+        :: pest_typed :: rule ! (r#WhereBlock , "Corresponds to expression: `(kw_where ~ LeftBrace ~ ConstraintsSeparatedByComma? ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#WhereBlock , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_where :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#ConstraintsSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#WhereBlock<'i, INHERITED> {
+            #[doc = "A helper function to access [`ConstraintsSeparatedByComma`]."]
+            #[allow(non_snake_case)]
+            pub fn r#ConstraintsSeparatedByComma<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#ConstraintsSeparatedByComma<'i, INHERITED>>
             {
                 let res = &*self.content;
                 {
@@ -8492,7 +8500,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#Impl , "Corresponds to expression: `(kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ Fn* ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Impl , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_impl :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#ImplKind :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: rules :: r#Fn :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#Impl , "Corresponds to expression: `(kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Impl , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_impl :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#ImplKind :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Fn :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#WhereBlock :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#Impl<'i, INHERITED> {
             #[doc = "A helper function to access [`Fn`]."]
             #[allow(non_snake_case)]
@@ -8506,7 +8514,10 @@ pub mod rules_impl {
                             .iter()
                             .map(|res| {
                                 let res = &res.matched;
-                                res
+                                {
+                                    let res = &res.content.0.matched;
+                                    res
+                                }
                             })
                             .collect::<::pest_typed::re_exported::Vec<_>>();
                         res
@@ -8552,6 +8563,35 @@ pub mod rules_impl {
                 {
                     let res = &res.content.2.matched;
                     res
+                }
+            }
+            #[doc = "A helper function to access [`WhereBlock`]."]
+            #[allow(non_snake_case)]
+            pub fn r#WhereBlock<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Vec<
+                ::pest_typed::re_exported::Option<&'s super::super::rules::r#WhereBlock<'i, INHERITED>>,
+            > {
+                let res = &*self.content;
+                {
+                    let res = &res.content.4.matched;
+                    {
+                        let res = res
+                            .content
+                            .iter()
+                            .map(|res| {
+                                let res = &res.matched;
+                                {
+                                    let res = &res.content.1.matched;
+                                    {
+                                        let res = res.as_ref().map(|res| res);
+                                        res
+                                    }
+                                }
+                            })
+                            .collect::<::pest_typed::re_exported::Vec<_>>();
+                        res
+                    }
                 }
             }
             #[doc = "A helper function to access [`kw_impl`]."]
@@ -8611,8 +8651,34 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#RustItems , "Corresponds to expression: `(LeftBrace ~ RustItem+ ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RustItems , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: RepOnce :: < 'i , INHERITED , super :: super :: rules :: r#RustItem :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
-        impl<'i, const INHERITED: ::core::primitive::usize> r#RustItems<'i, INHERITED> {
+        :: pest_typed :: rule ! (r#RustItemWithConstraint , "Corresponds to expression: `(RustItem ~ WhereBlock?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RustItemWithConstraint , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RustItem :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#WhereBlock :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#RustItemWithConstraint<'i, INHERITED> {
+            #[doc = "A helper function to access [`RustItem`]."]
+            #[allow(non_snake_case)]
+            pub fn r#RustItem<'s>(&'s self) -> &'s super::super::rules::r#RustItem<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`WhereBlock`]."]
+            #[allow(non_snake_case)]
+            pub fn r#WhereBlock<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#WhereBlock<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.1.matched;
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
+                }
+            }
+        }
+        :: pest_typed :: rule ! (r#RustItemsWithConstraint , "Corresponds to expression: `(LeftBrace ~ RustItemWithConstraint+ ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RustItemsWithConstraint , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: RepOnce :: < 'i , INHERITED , super :: super :: rules :: r#RustItemWithConstraint :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#RustItemsWithConstraint<'i, INHERITED> {
             #[doc = "A helper function to access [`LeftBrace`]."]
             #[allow(non_snake_case)]
             pub fn r#LeftBrace<'s>(&'s self) -> &'s super::super::rules::r#LeftBrace<'i, INHERITED> {
@@ -8631,11 +8697,12 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`RustItem`]."]
+            #[doc = "A helper function to access [`RustItemWithConstraint`]."]
             #[allow(non_snake_case)]
-            pub fn r#RustItem<'s>(
+            pub fn r#RustItemWithConstraint<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Vec<&'s super::super::rules::r#RustItem<'i, INHERITED>> {
+            ) -> ::pest_typed::re_exported::Vec<&'s super::super::rules::r#RustItemWithConstraint<'i, INHERITED>>
+            {
                 let res = &*self.content;
                 {
                     let res = &res.content.1.matched;
@@ -8748,7 +8815,7 @@ pub mod rules_impl {
                 res
             }
         }
-        :: pest_typed :: rule ! (r#RustItemsOrPatternOperation , "Corresponds to expression: `(RustItem | RustItems | PatternOperation)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RustItemsOrPatternOperation , super :: super :: generics :: Choice3 :: < super :: super :: rules :: r#RustItem :: < 'i , INHERITED > , super :: super :: rules :: r#RustItems :: < 'i , INHERITED > , super :: super :: rules :: r#PatternOperation :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#RustItemsOrPatternOperation , "Corresponds to expression: `(RustItemWithConstraint | RustItemsWithConstraint | PatternOperation)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RustItemsOrPatternOperation , super :: super :: generics :: Choice3 :: < super :: super :: rules :: r#RustItemWithConstraint :: < 'i , INHERITED > , super :: super :: rules :: r#RustItemsWithConstraint :: < 'i , INHERITED > , super :: super :: rules :: r#PatternOperation :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#RustItemsOrPatternOperation<'i, INHERITED> {
             #[doc = "A helper function to access [`PatternOperation`]."]
             #[allow(non_snake_case)]
@@ -8762,22 +8829,24 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`RustItem`]."]
+            #[doc = "A helper function to access [`RustItemWithConstraint`]."]
             #[allow(non_snake_case)]
-            pub fn r#RustItem<'s>(
+            pub fn r#RustItemWithConstraint<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#RustItem<'i, INHERITED>> {
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#RustItemWithConstraint<'i, INHERITED>>
+            {
                 let res = &*self.content;
                 {
                     let res = res._0().map(|res| res);
                     res
                 }
             }
-            #[doc = "A helper function to access [`RustItems`]."]
+            #[doc = "A helper function to access [`RustItemsWithConstraint`]."]
             #[allow(non_snake_case)]
-            pub fn r#RustItems<'s>(
+            pub fn r#RustItemsWithConstraint<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#RustItems<'i, INHERITED>> {
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#RustItemsWithConstraint<'i, INHERITED>>
+            {
                 let res = &*self.content;
                 {
                     let res = res._1().map(|res| res);
@@ -8785,7 +8854,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#RPLPatternItem , "Corresponds to expression: `(Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation ~ WhereBlock?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RPLPatternItem , super :: super :: generics :: Seq5 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MetaVariableDeclList :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RustItemsOrPatternOperation :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#WhereBlock :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#RPLPatternItem , "Corresponds to expression: `(Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RPLPatternItem , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MetaVariableDeclList :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RustItemsOrPatternOperation :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#RPLPatternItem<'i, INHERITED> {
             #[doc = "A helper function to access [`Assign`]."]
             #[allow(non_snake_case)]
@@ -8829,20 +8898,6 @@ pub mod rules_impl {
                 {
                     let res = &res.content.3.matched;
                     res
-                }
-            }
-            #[doc = "A helper function to access [`WhereBlock`]."]
-            #[allow(non_snake_case)]
-            pub fn r#WhereBlock<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#WhereBlock<'i, INHERITED>> {
-                let res = &*self.content;
-                {
-                    let res = &res.content.4.matched;
-                    {
-                        let res = res.as_ref().map(|res| res);
-                        res
-                    }
                 }
             }
         }

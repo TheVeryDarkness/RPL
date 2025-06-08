@@ -126,6 +126,14 @@ impl<'tcx> Index<pat::ConstVarIdx> for Matched<'tcx> {
     }
 }
 
+impl<'tcx> Index<pat::PlaceVarIdx> for Matched<'tcx> {
+    type Output = PlaceRef<'tcx>;
+
+    fn index(&self, place_var: pat::PlaceVarIdx) -> &Self::Output {
+        &self.place_vars[place_var]
+    }
+}
+
 pub fn matches<'tcx>(cx: &CheckMirCtxt<'_, '_, 'tcx>) -> Vec<Matched<'tcx>> {
     let mut matching = MatchCtxt::new(cx);
     matching.do_match();

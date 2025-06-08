@@ -4,7 +4,7 @@ use std::sync::Arc;
 use impls::CheckImplCtxt;
 use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
-use rpl_predicates::PredicateConjunction;
+use rpl_constraints::predicates::PredicateConjunction;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_span::Symbol;
 
@@ -46,7 +46,7 @@ impl<'i> CheckCtxt<'i> {
     }
 
     pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::RPLPatternItem<'i>) {
-        let (_, meta_decl_list, _, rust_item_or_patt_operation, _) = pat_item.get_matched();
+        let (_, meta_decl_list, _, rust_item_or_patt_operation) = pat_item.get_matched();
         if let Some(meta_decl_list) = meta_decl_list {
             self.check_meta_decl_list(mctx, meta_decl_list);
         }
@@ -64,11 +64,11 @@ impl<'i> CheckCtxt<'i> {
                 let (ident, _, ty, preds) = decl.get_matched();
                 let preds = preds.as_ref().map(|preds| preds.get_matched().1);
                 self.check_pred_conjunction_opt(mctx, preds);
-                // FIXME:
-                // The following code relies on some assumptions:
-                // - The predicate after the declaration of the meta variable is always like
-                //   `is_all_safe_trait(self) && !is_primitive(self)`
-                let preds = PredicateConjunction::from_pairs_opt(preds);
+                let preds = if let Some(preds) = preds {
+                    PredicateConjunction::from_pairs(preds)
+                } else {
+                    PredicateConjunction::default()
+                };
                 // unwrap here is safe because we check the meta decl list before checking the rust items
                 // so the Arc is not cloned
                 let meta_vars_ref = Arc::get_mut(&mut self.symbol_table.meta_vars).unwrap();
@@ -108,7 +108,7 @@ impl<'i> CheckCtxt<'i> {
             Choice2::_1(pred) => pred.get_matched().1,
         };
         let pred_name = pred.get_matched().0.span.as_str();
-        if !rpl_predicates::ALL_PREDICATES.contains(&pred_name) {
+        if !rpl_constraints::predicates::ALL_PREDICATES.contains(&pred_name) {
             self.errors.push(RPLMetaError::UnknownPredicate {
                 pred_name: pred_name.to_string(),
                 span: SpanWrapper::new(pred.span, mctx.get_active_path()),
@@ -126,8 +126,8 @@ impl<'i> CheckCtxt<'i> {
                 // FIXME: process the patt operation
             },
             _ => {
-                let item = rust_item_or_patt_operation.RustItem();
-                let items = rust_item_or_patt_operation.RustItems();
+                let item = rust_item_or_patt_operation.RustItemWithConstraint();
+                let items = rust_item_or_patt_operation.RustItemsWithConstraint();
                 let rust_items = if let Some(items) = items {
                     items.get_matched().1.iter_matched().collect::<Vec<_>>()
                 } else {
@@ -139,7 +139,12 @@ impl<'i> CheckCtxt<'i> {
         }
     }
 
-    fn check_rust_items(&mut self, mctx: &MetaContext<'i>, rust_items: Vec<&'i pairs::RustItem<'i>>) {
+    fn check_rust_items(&mut self, mctx: &MetaContext<'i>, rust_items: Vec<&'i pairs::RustItemWithConstraint<'i>>) {
+        // FIXME: check the constraints in meta_pass
+        let rust_items = rust_items
+            .into_iter()
+            .map(|item| item.get_matched().0)
+            .collect::<Vec<_>>();
         for rust_item in rust_items {
             match rust_item.deref() {
                 Choice4::_0(rust_fn) => self.check_fn(mctx, rust_fn),

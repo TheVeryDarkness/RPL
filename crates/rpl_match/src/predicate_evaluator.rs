@@ -1,0 +1,160 @@
+use rpl_constraints::predicates::{PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm};
+use rpl_context::pat::{ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
+use rpl_meta::symbol_table::{MetaVariable, NonLocalMetaSymTab};
+use rustc_middle::mir::{self, Const, PlaceRef};
+use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_span::Symbol;
+
+use crate::matches::{Matched, StatementMatch};
+
+/// PredicateArgInstance is the matched instance of a [PredicateArg]
+#[allow(unused)]
+#[derive(Clone, Debug)]
+enum PredicateArgInstance<'tcx> {
+    Location(mir::Location), // mapped from [PredicateArg::Label]
+    Local(mir::Local),       // mapped from [PredicateArg::Local]
+    Ty(Ty<'tcx>),            // mapped from [PredicateArg::MetaVar]
+    Const(Const<'tcx>),      // mapped from [PredicateArg::MetaVar]
+    Place(PlaceRef<'tcx>),   // mapped from [PredicateArg::MetaVar]
+    Path(Vec<Symbol>),       // mapped from [PredicateArg::Path]
+}
+
+pub struct PredicateEvaluator<'e, 'm, 'tcx> {
+    // 'e means eval, 'm means meta
+    tcx: TyCtxt<'tcx>,
+    typing_env: ty::TypingEnv<'tcx>,
+    body: &'e mir::Body<'tcx>,
+    label_map: &'e LabelMap,
+    matched: &'e Matched<'tcx>,
+    symbol_table: &'e NonLocalMetaSymTab<'m>,
+}
+
+impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        typing_env: ty::TypingEnv<'tcx>,
+        body: &'e mir::Body<'tcx>,
+        label_map: &'e LabelMap,
+        matched: &'e Matched<'tcx>,
+        symbol_table: &'e NonLocalMetaSymTab<'m>,
+    ) -> Self {
+        Self {
+            tcx,
+            typing_env,
+            body,
+            label_map,
+            matched,
+            symbol_table,
+        }
+    }
+
+    pub fn evaluate_conjunction(&self, conjunction: &PredicateConjunction) -> bool {
+        conjunction.clauses.iter().all(|clause| self.evaluate_clause(clause))
+    }
+
+    fn evaluate_clause(&self, clause: &PredicateClause) -> bool {
+        clause.terms.iter().any(|term| self.evaluate_term(term))
+    }
+
+    fn evaluate_term(&self, term: &PredicateTerm) -> bool {
+        let mut arg_instance = Vec::new();
+        for arg in term.args.iter() {
+            let res = self.instantiate_arg(arg);
+            if let Ok(instance) = res {
+                arg_instance.push(instance);
+            } else {
+                info!(
+                    "Encountered error when instantiating predicate arg: {}",
+                    res.unwrap_err()
+                );
+                return false; // FIXME: return undecided
+            }
+        }
+        match term.kind {
+            PredicateKind::Ty(p) => {
+                assert!(
+                    arg_instance.len() == 1,
+                    "PredicateKind::Ty should have exactly one argument"
+                );
+                match &arg_instance[0] {
+                    PredicateArgInstance::Ty(ty) => p(self.tcx, self.typing_env, *ty),
+                    _ => panic!("PredicateArgInstance::Ty expected, got {:?}", arg_instance[0]),
+                }
+            },
+            PredicateKind::MultipleTys(p) => {
+                let mut args = Vec::new();
+                for arg in arg_instance.iter() {
+                    match arg {
+                        PredicateArgInstance::Ty(ty) => args.push(*ty),
+                        _ => panic!("PredicateArgInstance::Ty expected, got {:?}", arg),
+                    }
+                }
+                p(self.tcx, self.typing_env, args)
+            },
+            PredicateKind::Translate(p) => {
+                assert!(
+                    arg_instance.len() == 2,
+                    "PredicateKind::Translate should have exactly two arguments"
+                );
+                match (&arg_instance[0], &arg_instance[1]) {
+                    (PredicateArgInstance::Location(loc), PredicateArgInstance::Path(path)) => {
+                        p(*loc, path.clone(), self.tcx, self.body)
+                    },
+                    _ => panic!(
+                        "PredicateArgInstance::Location and PredicateArgInstance::Path expected, got {:?} and {:?}",
+                        &arg_instance[0], &arg_instance[1]
+                    ),
+                }
+            },
+            PredicateKind::Trivial(p) => p(),
+        }
+    }
+
+    fn instantiate_arg(&self, arg: &PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
+        match arg {
+            PredicateArg::Label(label) => {
+                let pat_loc = self
+                    .label_map
+                    .get(label)
+                    .ok_or_else(|| format!("label `{}` not found", label))?;
+                match pat_loc {
+                    Spanned::Local(local) => Ok(PredicateArgInstance::Local(self.matched[*local])),
+                    Spanned::Location(location) => {
+                        let stmt_match = self.matched[*location];
+                        match stmt_match {
+                            StatementMatch::Location(loc) => Ok(PredicateArgInstance::Location(loc)),
+                            StatementMatch::Arg(local) => Ok(PredicateArgInstance::Local(local)),
+                        }
+                    },
+                }
+            },
+            PredicateArg::MetaVar(name) => {
+                let meta_var = self.symbol_table.get_from_symbol(*name);
+                if let Some(meta_var) = meta_var {
+                    match meta_var {
+                        MetaVariable::Type(idx, _) => {
+                            let ty_var_idx: TyVarIdx = idx.into();
+                            let ty = self.matched[ty_var_idx];
+                            Ok(PredicateArgInstance::Ty(ty))
+                        },
+                        MetaVariable::Const(idx, _, _) => {
+                            let const_var_idx: ConstVarIdx = idx.into();
+                            let const_var = self.matched[const_var_idx];
+                            Ok(PredicateArgInstance::Const(const_var))
+                        },
+                        MetaVariable::Place(idx, _, _) => {
+                            let place_var_idx: PlaceVarIdx = idx.into();
+                            let place_var = self.matched[place_var_idx];
+                            Ok(PredicateArgInstance::Place(place_var))
+                        },
+                        MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
+                    }
+                } else {
+                    Err(format!("meta_var `{}` not found", name))
+                }
+            },
+            PredicateArg::Path(path) => Ok(PredicateArgInstance::Path(path.clone())),
+            PredicateArg::SelfValue => panic!("SelfValue should not be used in predicate evaluation."),
+        }
+    }
+}
