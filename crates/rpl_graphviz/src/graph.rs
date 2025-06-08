@@ -2,8 +2,8 @@ use std::iter::Iterator;
 use std::ops::Not;
 
 use gsgdt::{Edge, Graph, GraphvizSettings, Node, NodeStyle};
-use rpl_mir::graph::{mir_control_flow_graph, mir_data_dep_graph, pat_control_flow_graph, pat_data_dep_graph};
-use rpl_mir::pat;
+use rpl_match::graph::{mir_control_flow_graph, mir_data_dep_graph, pat_control_flow_graph, pat_data_dep_graph};
+use rpl_match::mir::pat;
 use rpl_mir_graph::{ControlFlowGraph, DataDepGraph, TerminatorEdges};
 use rustc_index::{Idx, IndexSlice};
 use rustc_middle::mir;

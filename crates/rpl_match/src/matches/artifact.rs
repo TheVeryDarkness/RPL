@@ -5,7 +5,7 @@ use rustc_middle::mir::{Const, Local, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
-use crate::{Matched, StatementMatch, pat};
+use super::{Matched, StatementMatch, pat};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NormalizedMatched<'tcx> {

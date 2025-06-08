@@ -3,7 +3,6 @@ use std::fmt;
 use std::ops::Index;
 
 use rpl_context::pat::{LabelMap, Spanned};
-use rpl_match::CountedMatch;
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;
@@ -14,9 +13,10 @@ use rustc_middle::mir::{self, Const, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
-use crate::{CheckMirCtxt, pat};
+use crate::CountedMatch;
+use crate::mir::{CheckMirCtxt, pat};
 
-pub(crate) mod artifact;
+pub mod artifact;
 
 #[derive(Debug)]
 pub struct Matched<'tcx> {

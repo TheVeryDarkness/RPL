@@ -1,8 +1,8 @@
+use rpl_context::pat;
+use rpl_context::pat::visitor::{PatternVisitor, PlaceContext};
 use rpl_mir_graph::{ControlFlowGraph, DataDepGraph, ProgramDepGraph, SwitchTargets, TerminatorEdges};
 
 use super::BlockDataDepGraphVisitor;
-use crate::pat;
-use crate::pat::visitor::{PatternVisitor, PlaceContext};
 
 pub type PatProgramDepGraph = ProgramDepGraph<pat::BasicBlock, pat::Local>;
 pub type PatDataDepGraph = DataDepGraph<pat::BasicBlock, pat::Local>;
