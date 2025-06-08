@@ -1,49 +1,9 @@
-#![allow(internal_features)]
-#![feature(rustc_private)]
-#![feature(rustc_attrs)]
-#![feature(let_chains)]
-#![feature(if_let_guard)]
-#![feature(box_patterns)]
-#![feature(try_trait_v2)]
-#![feature(debug_closure_helpers)]
-#![feature(iter_chain)]
-#![feature(iterator_try_collect)]
-#![feature(cell_update)]
-
-extern crate rustc_abi;
-extern crate rustc_arena;
-extern crate rustc_ast;
-extern crate rustc_data_structures;
-extern crate rustc_driver;
-extern crate rustc_errors;
-extern crate rustc_fluent_macro;
-extern crate rustc_hash;
-extern crate rustc_hir;
-extern crate rustc_index;
-extern crate rustc_macros;
-extern crate rustc_middle;
-extern crate rustc_span;
-extern crate rustc_target;
-extern crate rustc_type_ir;
-
-extern crate either;
-extern crate smallvec;
-#[macro_use]
-extern crate tracing;
-
-pub mod graph;
-
-mod matches;
-
 use std::cell::RefCell;
 use std::iter::zip;
 
-pub use matches::artifact::*;
-pub use matches::*;
 use rpl_context::PatCtxt;
 pub use rpl_context::pat;
 pub use rpl_context::pat::MatchedMap;
-use rpl_match::{Candidates, MatchFnCtxt, MatchPlaceCtxt, MatchTyCtxt};
 use rpl_mir_graph::TerminatorEdges;
 use rustc_abi::{FieldIdx, VariantIdx};
 use rustc_data_structures::fx::FxIndexSet;
@@ -58,22 +18,24 @@ use rustc_middle::{mir, ty};
 use rustc_span::Symbol;
 
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
+use crate::matches::{Matched, matches};
+use crate::{Candidates, MatchFnCtxt, MatchPlaceCtxt, MatchTyCtxt};
 
 pub struct CheckMirCtxt<'a, 'pcx, 'tcx> {
-    ty: MatchTyCtxt<'pcx, 'tcx>,
-    place: MatchPlaceCtxt<'pcx, 'tcx>,
-    body: &'a mir::Body<'tcx>,
-    pat_name: Symbol,
-    fn_pat: &'a pat::FnPattern<'pcx>,
-    mir_pat: &'a pat::FnPatternBody<'pcx>,
-    pat_cfg: PatControlFlowGraph,
-    pat_ddg: PatDataDepGraph,
-    mir_cfg: &'a MirControlFlowGraph,
-    mir_ddg: &'a MirDataDepGraph,
+    pub(crate) ty: MatchTyCtxt<'pcx, 'tcx>,
+    pub(crate) place: MatchPlaceCtxt<'pcx, 'tcx>,
+    pub(crate) body: &'a mir::Body<'tcx>,
+    pub(crate) pat_name: Symbol,
+    pub(crate) fn_pat: &'a pat::FnPattern<'pcx>,
+    pub(crate) mir_pat: &'a pat::FnPatternBody<'pcx>,
+    pub(crate) pat_cfg: PatControlFlowGraph,
+    pub(crate) pat_ddg: PatDataDepGraph,
+    pub(crate) mir_cfg: &'a MirControlFlowGraph,
+    pub(crate) mir_ddg: &'a MirDataDepGraph,
     // pat_pdg: PatProgramDepGraph,
     // mir_pdg: MirProgramDepGraph,
-    locals: IndexVec<pat::Local, RefCell<MixedBitSet<mir::Local>>>,
-    places: IndexVec<pat::PlaceVarIdx, RefCell<FxIndexSet<mir::PlaceRef<'tcx>>>>,
+    pub(crate) locals: IndexVec<pat::Local, RefCell<MixedBitSet<mir::Local>>>,
+    pub(crate) places: IndexVec<pat::PlaceVarIdx, RefCell<FxIndexSet<mir::PlaceRef<'tcx>>>>,
 }
 
 impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
@@ -126,7 +88,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         pat_name = ?self.pat_name,
     ))]
     pub fn check(&self) -> Vec<Matched<'tcx>> {
-        matches::matches(self)
+        matches(self)
     }
     /*
     pub fn check(&self) {

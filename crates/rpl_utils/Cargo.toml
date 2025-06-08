@@ -8,7 +8,7 @@ keywords.workspace = true
 edition.workspace = true
 
 [dependencies]
-rpl_mir.workspace = true
+rpl_match.workspace = true
 rpl_graphviz.workspace = true
 filepath = "0.1.2"
 

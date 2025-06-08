@@ -11,9 +11,7 @@ edition.workspace = true
 rpl_context.workspace = true
 rpl_match.workspace = true
 rpl_meta.workspace = true
-# rpl_patterns.workspace = true
 rpl_utils.workspace = true
-rpl_mir.workspace = true
 
 [features]
 

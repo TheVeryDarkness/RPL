@@ -20,10 +20,12 @@ use std::convert::identity;
 
 use either::Either;
 use rpl_context::PatCtxt;
+use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
+use rpl_match::matches::artifact::NormalizedMatched;
+use rpl_match::matches::{Matched, MatchedWithLabelMap};
+use rpl_match::mir::pat::{LabelMap, PatternItem};
+use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_meta::context::MetaContext;
-use rpl_mir::graph::{MirControlFlowGraph, MirDataDepGraph};
-use rpl_mir::pat::{LabelMap, PatternItem};
-use rpl_mir::{CheckMirCtxt, Matched, MatchedWithLabelMap, NormalizedMatched, pat};
 use rustc_data_structures::fx::FxHashSet;
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
@@ -275,8 +277,8 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                     hir::ImplItemKind::Fn(..) => {
                         if self.tcx.is_mir_available(def_id) {
                             let body = self.tcx.optimized_mir(def_id);
-                            let mir_cfg = rpl_mir::graph::mir_control_flow_graph(body);
-                            let mir_ddg = rpl_mir::graph::mir_data_dep_graph(body, &mir_cfg);
+                            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
+                            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
                             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                                 for (&name, pat_item) in &pattern.patt_block {
                                     match pat_item {
@@ -323,8 +325,8 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     fn check_fn(&mut self, def_id: LocalDefId) {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
-            let mir_cfg = rpl_mir::graph::mir_control_flow_graph(body);
-            let mir_ddg = rpl_mir::graph::mir_data_dep_graph(body, &mir_cfg);
+            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
+            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, pat_item) in &pattern.patt_block {
                     match pat_item {
