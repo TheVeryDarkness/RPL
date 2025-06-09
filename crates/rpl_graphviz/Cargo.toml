@@ -15,6 +15,10 @@ rpl_mir_graph.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true
+rpl_meta.workspace = true
+rpl_parser.workspace = true
+pest_typed.workspace = true
+quote.workspace = true
 
 [features]
 

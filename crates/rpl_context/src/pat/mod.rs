@@ -58,6 +58,15 @@ impl PatternItem<'_> {
     }
 }
 
+impl<'pcx> PatternItem<'pcx> {
+    pub fn expect_rust_items(&'pcx self) -> &'pcx RustItems<'pcx> {
+        match self {
+            Self::RustItems(items) => items,
+            Self::RPLPatternOperation(_) => panic!("Expected RustItems, found PatternOperation"),
+        }
+    }
+}
+
 pub struct RustItems<'pcx> {
     pub pcx: PatCtxt<'pcx>,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
