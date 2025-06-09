@@ -660,6 +660,21 @@ trait Cast<T> {
     fn cast(self) -> T;
 }
 
+impl<'i> Cast<mir::CastKind> for &'i pairs::MirCastKind<'i> {
+    fn cast(self) -> mir::CastKind {
+        match self.deref() {
+            Choice5::_0(_ptr_to_ptr) => mir::CastKind::PtrToPtr,
+            Choice5::_1(_int_to_int) => mir::CastKind::IntToInt,
+            Choice5::_2(_transmute) => mir::CastKind::Transmute,
+            Choice5::_3(pointer_coercion) => {
+                let (_, _, pointer_coercion, _, coercion_source, _) = pointer_coercion.get_matched();
+                mir::CastKind::PointerCoercion(pointer_coercion.cast(), coercion_source.cast())
+            },
+            Choice5::_4(_pointer_expose_provenance) => mir::CastKind::PointerExposeProvenance,
+        }
+    }
+}
+
 impl<'i> Cast<PointerCoercion> for &'i pairs::PointerCoercion<'i> {
     fn cast(self) -> PointerCoercion {
         PointerCoercion::Unsize
@@ -705,15 +720,7 @@ impl<'pcx> Rvalue<'pcx> {
                 let (operand, _, ty, _, cast_kind, _) = cast.get_matched();
                 let operand = Operand::from(with_path(p, operand), pcx, fn_sym_tab);
                 let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);
-                let cast_kind = match cast_kind.deref() {
-                    Choice4::_0(_ptr_to_ptr) => mir::CastKind::PtrToPtr,
-                    Choice4::_1(_int_to_int) => mir::CastKind::IntToInt,
-                    Choice4::_2(_transmute) => mir::CastKind::Transmute,
-                    Choice4::_3(pointer_coercion) => {
-                        let (_, _, pointer_coercion, _, coercion_source, _) = pointer_coercion.get_matched();
-                        mir::CastKind::PointerCoercion(pointer_coercion.cast(), coercion_source.cast())
-                    },
-                };
+                let cast_kind = cast_kind.cast();
                 Rvalue::Cast(cast_kind, operand, ty)
             },
             Choice12::_2(rvalue_use) => {
