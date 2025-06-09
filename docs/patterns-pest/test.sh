@@ -2,6 +2,7 @@ clear
 
 set -eux
 
+# docs/patterns-pest/alloc.rpl
 # docs/patterns-pest/CVE-2018-21000.rpl
 # docs/patterns-pest/CVE-2019-15548.rpl
 # docs/patterns-pest/CVE-2020-25016.rpl
@@ -23,4 +24,5 @@ RPL_PATS="docs/patterns-pest/" cargo uitest -- \
     "tests/ui/cve_2020_35898_9" \
     "tests/ui/cve_2020_35901_2" \
     "tests/ui/cast_size_different_sizes" \
+    "tests/ui/std/alloc/alloc.rs" \
     "tests/ui/unsound_collection_transmute"
