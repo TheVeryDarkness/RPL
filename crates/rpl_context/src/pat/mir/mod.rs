@@ -159,7 +159,10 @@ impl PlaceElem<'_> {
             Choice3::_0(ident) => PlaceElem::FieldPat(Symbol::intern(ident.span.as_str())),
             Choice3::_1(ident) => PlaceElem::Field(FieldAcc::from(Symbol::intern(ident.span.as_str()))),
             Choice3::_2(index) => {
-                let index = index.span.as_str().parse::<u32>().expect("invalid field index");
+                let index_str = index.span.as_str().trim();
+                let index = index_str
+                    .parse::<u32>()
+                    .unwrap_or_else(|err| panic!("invalid field index {index_str:?}: {err}"));
                 PlaceElem::Field(FieldAcc::from(index))
             },
         }
