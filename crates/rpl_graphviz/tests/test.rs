@@ -478,13 +478,12 @@ test_case!{
                 let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _2
                 let $const_ptr_1: *const u8 = copy $ptr_1 as *const u8 (PtrToPtr); // _19
                 let $addr_1: usize = copy $const_ptr_1 as usize (Transmute); // _20
-                let $ptr_2: *mut $T;
                 // It's weird that `$ptr_2` can only be declared before `switchInt`
-                switchInt(move $addr_1) {
-                    0_usize => {}
-                    _ => {}
-                }
-                $ptr_2 = copy $ptr_1 as *mut $T (PtrToPtr); // _4
+                // switchInt(move $addr_1) {
+                //     0_usize => {}
+                //     _ => {}
+                // }
+                let $ptr_2: *mut $T = copy $ptr_1 as *mut $T (PtrToPtr); // _4
                 'write:
                 (*$ptr_2) = _;
             }
@@ -501,10 +500,10 @@ test_case!{
                 let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
                 let $const_ptr_1: *const u8 = copy $ptr_2 as *const u8 (PtrToPtr); // _19
                 let $addr_1: usize = copy $const_ptr_1 as usize (Transmute); // _20
-                switchInt(move $addr_1) {
-                    0_usize => {}
-                    _ => {}
-                }
+                // switchInt(move $addr_1) {
+                //     0_usize => {}
+                //     _ => {}
+                // }
                 'write:
                 (*$ptr_2) = _;
             }

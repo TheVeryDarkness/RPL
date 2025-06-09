@@ -1,12 +1,5 @@
 digraph ControlFlowGraph {
     bb0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb0</td></tr><tr><td align="left">_?0 = alloc::alloc::__rust_alloc(_, _) -&gt; ?bb1</td></tr></table>>];
-    bb1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb1</td></tr><tr><td align="left" balign="left">_?1 = move _?0 as *mut ?T0 (PtrToPtr)<br/>_?2 = copy _?1 as *const u8 (PtrToPtr)<br/>_?3 = copy _?2 as usize (Transmute)<br/></td></tr><tr><td align="left">switchInt(move _?3) -&gt; [0_usize: ?bb3, otherwise: ?bb4]</td></tr></table>>];
-    bb2 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb2</td></tr><tr><td align="left" balign="left">(*_?1) = _<br/></td></tr><tr><td align="left">end</td></tr></table>>];
-    bb3 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb3</td></tr><tr><td align="left">goto ?bb2</td></tr></table>>];
-    bb4 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb4</td></tr><tr><td align="left">goto ?bb2</td></tr></table>>];
+    bb1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb1</td></tr><tr><td align="left" balign="left">_?1 = move _?0 as *mut ?T0 (PtrToPtr)<br/>_?2 = copy _?1 as *const u8 (PtrToPtr)<br/>_?3 = copy _?2 as usize (Transmute)<br/>(*_?1) = _<br/></td></tr><tr><td align="left">end</td></tr></table>>];
     bb0 -> bb1 [label="return"];
-    bb1 -> bb3 [label="0"];
-    bb1 -> bb4 [label="otherwise"];
-    bb3 -> bb2 [label="goto"];
-    bb4 -> bb2 [label="goto"];
 }
