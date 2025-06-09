@@ -51,7 +51,8 @@ macro_rules! test_case {
                 static ARENA: LazyLock<Arena> = LazyLock::new(|| Arena::default());
                 static MCTX: LazyLock<MetaContext> = LazyLock::new(|| MetaContext::new(&ARENA));
 
-                let pat = $pat.replace("$ ", "$");
+                let pat: String = $pat;
+                let pat = pat.replace("$ ", "$");
                 let pat = ARENA.alloc_str(&pat);
                 let pat_item = pairs::RPLPatternItem::try_parse(pat).unwrap_or_else(|err| panic!("{err}"));
                 let pat_item = &*Box::leak(Box::new(pat_item));
@@ -401,6 +402,111 @@ test_case! {
                 let $value: $T = _;
                 drop((*$raw_ptr));
                 (*$raw_ptr) = move $value;
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn unchecked_ptr_offset_base() {
+        let pattern = quote!{
+            p[$T: type] = {
+                fn $pattern(..) -> _ {
+                    'ptr:
+                    let $ptr: *const $T = _;
+                    'offset:
+                    let $ptr_1: *const $T = Offset(copy $ptr, _);
+                }
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn unchecked_ptr_offset_lt() {
+        let pattern = quote!{
+            p[$T: type, $U: type] = {
+                fn $pattern(..) -> _ {
+                    let $index: $U = _;
+                    'ptr:
+                    let $ptr: *const $T = _;
+                    let $cmp: bool = Lt(copy $index, _);
+                    'offset:
+                    let $ptr_1: *const $T = Offset(copy $ptr, _);
+                }
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn unchecked_ptr_offset_le() {
+        let pattern = quote!{
+            p[$T: type, $U: type] = {
+                fn $pattern(..) -> _ {
+                    let $index: $U = _;
+                    'ptr:
+                    let $ptr: *const $T = _;
+                    let $cmp: bool = Le(copy $index, _);
+                    'offset:
+                    let $ptr_1: *const $T = Offset(copy $ptr, _);
+                }
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn alloc_cast_write() {
+        let pattern = quote!{
+            p[$T:type] = fn _() {
+                'alloc:
+                let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
+                let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
+                'write:
+                (*$ptr_2) = _;
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn alloc_check_cast_write() {
+        let pattern = quote!{
+            p[$T:type] = fn _() {
+                'alloc:
+                let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _2
+                let $const_ptr_1: *const u8 = copy $ptr_1 as *const u8 (PtrToPtr); // _19
+                let $addr_1: usize = copy $const_ptr_1 as usize (Transmute); // _20
+                let $ptr_2: *mut $T;
+                // It's weird that `$ptr_2` can only be declared before `switchInt`
+                switchInt(move $addr_1) {
+                    0_usize => {}
+                    _ => {}
+                }
+                $ptr_2 = copy $ptr_1 as *mut $T (PtrToPtr); // _4
+                'write:
+                (*$ptr_2) = _;
+            }
+        }.to_string();
+    }
+}
+
+test_case!{
+    fn alloc_cast_check_write() {
+        let pattern = quote!{
+            p[$T:type] = fn _() {
+                'alloc:
+                let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
+                let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
+                let $const_ptr_1: *const u8 = copy $ptr_2 as *const u8 (PtrToPtr); // _19
+                let $addr_1: usize = copy $const_ptr_1 as usize (Transmute); // _20
+                switchInt(move $addr_1) {
+                    0_usize => {}
+                    _ => {}
+                }
+                'write:
+                (*$ptr_2) = _;
             }
         }.to_string();
     }
