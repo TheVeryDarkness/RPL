@@ -1,6 +1,7 @@
 #![allow(unused)]
 #![feature(rustc_private)]
 #![feature(macro_metavar_expr_concat)]
+#![feature(generic_arg_infer)]
 #![recursion_limit = "256"]
 
 extern crate rustc_arena;
@@ -42,7 +43,8 @@ fn write_to_file(file: &str, content: &[u8]) -> std::io::Result<()> {
 
 macro_rules! test_case {
     ( $(#[$meta:meta])* fn $name:ident() {
-        let pattern = $pat:expr;
+        $(let imports = $imports:expr;)?
+        let pattern = $pattern:expr;
     }) => {
         #[test]
         $(#[$meta])*
@@ -51,7 +53,10 @@ macro_rules! test_case {
                 static ARENA: LazyLock<Arena> = LazyLock::new(|| Arena::default());
                 static MCTX: LazyLock<MetaContext> = LazyLock::new(|| MetaContext::new(&ARENA));
 
-                let pat: String = $pat;
+                let imports: [String; _] = [];
+                $(let imports: [String; _] = $imports;)?
+                let imports: Vec<&'static pairs::UsePath<'static>> = imports.iter().map(|import| &*Box::leak(Box::new(pairs::UsePath::try_parse(ARENA.alloc_str(import)).unwrap_or_else(|err| panic!("{err}"))))).collect();
+                let pat: String = $pattern;
                 let pat = pat.replace("$ ", "$");
                 let pat = ARENA.alloc_str(&pat);
                 let pat_item = pairs::RPLPatternItem::try_parse(pat).unwrap_or_else(|err| panic!("{err}"));
@@ -59,7 +64,7 @@ macro_rules! test_case {
                 let mut errors = Vec::new();
                 let path = Path::new(file!());
                 MCTX.set_active_path(Some(path));
-                let symbol_tables = SymbolTable::collect_symbol_tables(&MCTX, &[], std::iter::once(pat_item), &mut errors);
+                let symbol_tables = SymbolTable::collect_symbol_tables(&MCTX, &imports, std::iter::once(pat_item), &mut errors);
                 if !errors.is_empty() {
                     for error in &errors {
                         eprintln!("{error}");
@@ -331,12 +336,16 @@ test_case! {
 
 test_case! {
     fn cve_2021_29941() {
+        let imports = [
+            quote!{ use std::iter::ExactSizeIterator; }.to_string(),
+            quote!{ use alloc::vec::Vec; }.to_string(),
+        ];
         let pattern = quote!{
             p[$I:type, $T:type] = fn _ () {
                 let $iter: $I = _;
-                let $len: usize = std::iter::ExactSizeIterator::len(move $iter);
-                let $vec: &mut alloc::vec::Vec<$T> = _;
-                _ = alloc::vec::Vec::set_len(move $vec, copy $len);
+                let $len: usize = ExactSizeIterator::len(move $iter);
+                let $vec: &mut Vec<$T> = _;
+                _ = Vec::set_len(move $vec, copy $len);
             }
         }.to_string();
     }
