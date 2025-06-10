@@ -53,8 +53,6 @@ fn alloc_check_as_cast_write<T: Default>() {
         assert_ne!(ptr as usize, 0);
         let ptr = ptr as *mut T;
         ptr.write(T::default());
-        //~^ERROR: it is an undefined behavior to dereference a null pointer, and `std::alloc::alloc` may return a null pointer
-        //FIXME: a false positive
         dealloc(ptr as *mut u8, layout)
     }
 }

@@ -72,6 +72,8 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             let matches_3 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_3.pattern, pattern_3.fn_pat).check();
             let pattern_4 = alloc_cast_check_as_write(self.pcx);
             let matches_4 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_4.pattern, pattern_4.fn_pat).check();
+            let pattern_5 = alloc_check_as_cast_write(self.pcx);
+            let matches_5 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_5.pattern, pattern_5.fn_pat).check();
 
             fn collect_matched(matched: &Matched<'_>, ptr: Location, write: Location, body: &Body<'_>) -> (Span, Span) {
                 let span_alloc = matched[ptr].span_no_inline(body);
@@ -91,6 +93,11 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                     matches_4
                         .iter()
                         .map(|matches| collect_matched(matches, pattern_4.alloc, pattern_4.write, body)),
+                )
+                .chain(
+                    matches_5
+                        .iter()
+                        .map(|matches| collect_matched(matches, pattern_5.alloc, pattern_5.write, body)),
                 )
                 .collect();
 
@@ -244,6 +251,37 @@ fn alloc_cast_check_as_write(pcx: PatCtxt<'_>) -> Pattern<'_> {
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
             let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
             let $addr_1: usize = copy $ptr_2 as usize (PointerExposeProvenance); // _6
+            // switchInt(move $addr_1) {
+            //     0_usize => {}
+            //     _ => {}
+            // }
+            #[export(write)]
+            (*$ptr_2) = _;
+        }
+    };
+    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
+
+    Pattern {
+        pattern,
+        fn_pat,
+        alloc,
+        write,
+        ty,
+    }
+}
+
+#[rpl_macros::pattern_def]
+fn alloc_check_as_cast_write(pcx: PatCtxt<'_>) -> Pattern<'_> {
+    let alloc;
+    let write;
+    let ty;
+    let pattern = rpl! {
+        #[meta(#[export(ty)] $T:ty)]
+        fn $pattern(..) -> _ = mir! {
+            #[export(alloc)]
+            let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _);
+            let $addr_1: usize = copy $ptr_1 as usize (PointerExposeProvenance);
+            let $ptr_2: *mut $T = copy $ptr_1 as *mut $T (PtrToPtr);
             // switchInt(move $addr_1) {
             //     0_usize => {}
             //     _ => {}
