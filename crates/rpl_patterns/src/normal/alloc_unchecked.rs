@@ -204,7 +204,7 @@ fn maybe_misaligned<'tcx>(
         ty::TyKind::Foreign(_) => true,
         _ => {
             let layout = tcx.layout_of(typing_env.as_query_input(ty)).unwrap();
-            alignment.eval_target_usize(tcx, typing_env) < layout.align.pref.bytes()
+            alignment.eval_target_usize(tcx, typing_env) < layout.align.abi.bytes()
         },
     }
 }
