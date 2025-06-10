@@ -11,5 +11,17 @@ LL |         let ptr = unsafe { alloc(layout) as *mut T };
    = note: `-D rpl::misaligned-pointer` implied by `-D warnings`
    = help: to override `-D warnings` add `#[allow(rpl::misaligned_pointer)]`
 
-error: aborting due to 1 previous error
+error: public function `new` allocates a pointer that may be zero-sized, which is an undefined behavior
+  --> tests/ui/cve_2020_35887/cve_2020_35887.rs:38:28
+   |
+LL |     pub fn new(size: usize) -> Self {
+   |                ---- size passed in here
+...
+LL |         let ptr = unsafe { alloc(layout) as *mut T };
+   |                            ^^^^^^^^^^^^^ pointer created here
+   |
+   = note: See https://doc.rust-lang.org/std/alloc/fn.alloc.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#method.alloc
+   = note: `#[deny(rpl::alloc_maybe_zero)]` on by default
+
+error: aborting due to 2 previous errors
 

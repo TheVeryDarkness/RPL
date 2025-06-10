@@ -37,6 +37,7 @@ where
         let layout = Layout::from_size_align(size * objsize, 8).unwrap();
         let ptr = unsafe { alloc(layout) as *mut T };
         //~[regular]^ ERROR: resulting pointer `*mut T` has a different alignment than the original alignment that the pointer was created with
+        //~[regular]| ERROR: public function `new` allocates a pointer that may be zero-sized, which is an undefined behavior
         let default: T = Default::default();
         for i in 0..size {
             unsafe {
