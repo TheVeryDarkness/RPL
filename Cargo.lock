@@ -1180,6 +1180,7 @@ dependencies = [
  "scoped_threadpool",
  "serde",
  "serde_json",
+ "smallvec",
  "syn 2.0.98",
  "tester",
  "thiserror",
