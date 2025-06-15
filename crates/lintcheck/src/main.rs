@@ -264,6 +264,8 @@ fn build_rpl(release_build: bool) -> String {
     build_cmd.args([
         "run",
         "--bin=rpl-driver",
+        "--manifest-path",
+        "crates/Cargo.toml",
         if release_build { "-r" } else { "" },
         "--",
         "--version",
@@ -289,7 +291,7 @@ fn main() {
     }
 
     // assert that we launch lintcheck from the repo root (via cargo lintcheck)
-    if fs::metadata("lintcheck/Cargo.toml").is_err() {
+    if fs::metadata("crates/lintcheck/Cargo.toml").is_err() {
         eprintln!("lintcheck needs to be run from RPL's repo root!\nUse `cargo lintcheck` alternatively.");
         std::process::exit(3);
     }
@@ -371,7 +373,7 @@ fn lintcheck(config: LintcheckConfig) {
 
     if crates.is_empty() {
         eprintln!(
-            "ERROR: could not find crate '{}' in lintcheck/lintcheck_crates.toml",
+            "ERROR: could not find crate '{}' in crates/lintcheck/lintcheck_crates.toml",
             config.only.unwrap(),
         );
         std::process::exit(1);

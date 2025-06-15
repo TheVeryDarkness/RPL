@@ -22,7 +22,7 @@ pub(crate) struct LintcheckConfig {
     #[clap(
         long = "crates-toml",
         value_name = "CRATES-SOURCES-TOML-PATH",
-        default_value = "lintcheck/lintcheck_crates.toml",
+        default_value = "crates/lintcheck/lintcheck_crates.toml",
         hide_default_value = true,
         env = "LINTCHECK_TOML",
         hide_env = true

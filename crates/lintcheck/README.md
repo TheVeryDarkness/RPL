@@ -1,7 +1,7 @@
 ## `cargo lintcheck`
 
 Runs RPL on a fixed set of crates read from
-`lintcheck/lintcheck_crates.toml` and saves logs of the lint warnings into the
+`crates/lintcheck/lintcheck_crates.toml` and saves logs of the lint warnings into the
 repo.  We can then check the diff and spot new or disappearing warnings.
 
 From the repo root, run:
