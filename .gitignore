@@ -22,3 +22,6 @@ mir_dump
 
 # mdbook
 /docs/book/book
+
+# lintcheck
+lintcheck-logs

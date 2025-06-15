@@ -2,6 +2,7 @@
 tests = "test --all"
 uitest = "test --test compile-test"
 uibless = "test --test compile-test -- -- --bless"
+lintcheck = "run --package lintcheck --bin lintcheck --manifest-path lintcheck/Cargo.toml  -- "
 
 [build]
 # -Zbinary-dep-depinfo allows us to track which rlib files to use for compiling UI tests
@@ -10,6 +11,10 @@ target-dir = "target"
 
 [unstable]
 binary-dep-depinfo = true
+# profile-rustflags = true
 
 [profile.dev]
 split-debuginfo = "unpacked"
+
+# [profile.dev.package.lintcheck]
+# rustflags = ["--remap-path-prefix", "=lintcheck"]
