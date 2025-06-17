@@ -1,5 +1,27 @@
+use rustc_lint::Lint;
 use rustc_lint_defs::declare_tool_lint;
 
+macro_rules! declare_rpl_lint {
+    (
+        $(
+            declare_tool_lint! {$(#[$attr:meta])* $vis:vis $tool:ident ::$NAME:ident, $Level: ident, $desc: expr}
+        )*
+    ) => (
+        $(
+            declare_tool_lint!{$(#[$attr])* $vis $tool::$NAME, $Level, $desc, false}
+        )*
+        pub(crate) fn all_lints() -> &'static [&'static Lint] {
+            static ALL_LINTS: &[&Lint] = &[
+                $(
+                    $NAME,
+                )*
+            ];
+            ALL_LINTS
+        }
+    );
+}
+
+declare_rpl_lint! {
 declare_tool_lint! {
     /// The `rpl::lengthless_buffer_passed_to_extern_function` lint detects a buffer
     /// pointer passed to an extern function without specifying its length.
@@ -977,4 +999,5 @@ declare_tool_lint! {
     pub rpl::USE_AFTER_REALLOC,
     Deny,
     "detects using a pointer after it has been reallocated"
+}
 }
