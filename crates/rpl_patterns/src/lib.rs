@@ -90,7 +90,7 @@ pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item: ItemId) {
 }
 
 pub fn register_lints(lint_store: &mut rustc_lint::LintStore) {
-    lint_store.register_lints(&all_lints());
+    lint_store.register_lints(all_lints());
     lint_store.register_group(
         true,
         "rpl::all",
