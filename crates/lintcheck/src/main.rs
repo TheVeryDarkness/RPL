@@ -484,7 +484,11 @@ fn get_perf_data_filename(source_path: &Path) -> String {
 /// Returns the path to the RPL project directory
 #[must_use]
 fn rpl_project_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
 }
 
 /// The qualifier can be used to separate different threads from another. By
