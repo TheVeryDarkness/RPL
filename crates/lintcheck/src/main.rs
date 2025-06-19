@@ -484,7 +484,11 @@ fn get_perf_data_filename(source_path: &Path) -> String {
 /// Returns the path to the RPL project directory
 #[must_use]
 fn rpl_project_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
 }
 
 /// The qualifier can be used to separate different threads from another. By
@@ -501,16 +505,16 @@ fn lintcheck_test() {
     let args = [
         "run",
         "--target-dir",
-        "lintcheck/target",
+        "target",
         "--manifest-path",
-        "./lintcheck/Cargo.toml",
+        "./crates/lintcheck/Cargo.toml",
         "--",
         "--crates-toml",
-        "lintcheck/test_sources.toml",
+        "crates/lintcheck/test_sources.toml",
     ];
     let status = Command::new("cargo")
         .args(args)
-        .current_dir("..") // repo root
+        .current_dir("../..") // repo root
         .status();
     //.output();
 

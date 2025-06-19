@@ -13,7 +13,7 @@ cargo lintcheck
 or
 
 ```
-cargo run --target-dir lintcheck/target --manifest-path lintcheck/Cargo.toml
+cargo run --target-dir target --manifest-path crates/lintcheck/Cargo.toml
 ```
 
 By default, the logs will be saved into
