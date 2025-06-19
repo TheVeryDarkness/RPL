@@ -1,6 +1,6 @@
 {
   "rust-analyzer.rustc.source": "discover",
-  "rust-analyzer.linkedProjects": ["./crates/Cargo.toml"],
+  "rust-analyzer.linkedProjects": ["./Cargo.toml"],
   "rust-analyzer.procMacro.enable": true,
   // Setting to false doesn't work for `#[instrument]`
   "rust-analyzer.procMacro.attributes.enable": true,

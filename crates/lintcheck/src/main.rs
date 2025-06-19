@@ -265,7 +265,7 @@ fn build_rpl(release_build: bool) -> String {
         "run",
         "--bin=rpl-driver",
         "--manifest-path",
-        "crates/Cargo.toml",
+        "Cargo.toml",
         if release_build { "-r" } else { "" },
         "--",
         "--version",
@@ -485,8 +485,6 @@ fn get_perf_data_filename(source_path: &Path) -> String {
 #[must_use]
 fn rpl_project_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
         .parent()
         .unwrap()
 }

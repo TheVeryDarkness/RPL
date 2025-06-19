@@ -1,5 +1,6 @@
 [workspace]
-members = ["./rpl_*", "lintcheck"]
+members = ["./crates/rpl_*", "./crates/lintcheck"]
+exclude = ["./target/lintcheck/sources/"]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,21 +12,21 @@ keywords = ["Bug detection"]
 repository = "https://github.com/RPL-Toolchain/RPL"
 
 [workspace.dependencies]
-rpl_context = { path = "./rpl_context" }
-rpl_driver = { path = "./rpl_driver" }
-rpl_graphviz = { path = "./rpl_graphviz" }
-rpl_interface = { path = "./rpl_interface" }
-rpl_macros = { path = "./rpl_macros" }
-rpl_match = { path = "./rpl_match" }
-rpl_mir = { path = "./rpl_mir" }
-rpl_mir_graph = { path = "./rpl_mir_graph" }
-rpl_mir_transform = { path = "./rpl_mir_transform" }
-rpl_pat_expand = { path = "./rpl_pat_expand" }
-rpl_pat_syntax = { path = "./rpl_pat_syntax" }
-rpl_patterns = { path = "./rpl_patterns" }
-rpl_utils = { path = "./rpl_utils" }
-rpl_parser = { path = "./rpl_parser" }
-rpl_predicates = { path = "./rpl_predicates" }
+rpl_context = { path = "./crates/rpl_context" }
+rpl_driver = { path = "./crates/rpl_driver" }
+rpl_graphviz = { path = "./crates/rpl_graphviz" }
+rpl_interface = { path = "./crates/rpl_interface" }
+rpl_macros = { path = "./crates/rpl_macros" }
+rpl_match = { path = "./crates/rpl_match" }
+rpl_mir = { path = "./crates/rpl_mir" }
+rpl_mir_graph = { path = "./crates/rpl_mir_graph" }
+rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
+rpl_pat_expand = { path = "./crates/rpl_pat_expand" }
+rpl_pat_syntax = { path = "./crates/rpl_pat_syntax" }
+rpl_patterns = { path = "./crates/rpl_patterns" }
+rpl_utils = { path = "./crates/rpl_utils" }
+rpl_parser = { path = "./crates/rpl_parser" }
+rpl_predicates = { path = "./crates/rpl_predicates" }
 rustc_tools_util = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
