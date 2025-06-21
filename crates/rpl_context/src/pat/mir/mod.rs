@@ -192,6 +192,16 @@ impl Debug for PlaceBase {
     }
 }
 
+fn get_place_or_local<'pcx>(sym_tab: &FnSymbolTable<'pcx>, ident: Symbol) -> PlaceBase {
+    if let Some(idx) = sym_tab.meta_vars.place_vars_map().get(&ident) {
+        PlaceBase::Var(idx.0.into())
+    } else if let Some(idx) = sym_tab.inner.symbol_to_local_idx.get(&ident) {
+        PlaceBase::Local((*idx).into())
+    } else {
+        unreachable!("Identifier `{}` is not a place or local variable", ident);
+    }
+}
+
 /// A place is a path to a value in memory.
 #[derive(Clone, Copy)]
 pub struct Place<'pcx, B = PlaceBase> {
@@ -218,8 +228,8 @@ impl<'pcx> Place<'pcx, PlaceBase> {
                     panic!("expect a non-placeholder local");
                 },
                 _ => {
-                    let local = sym_tab.inner.get_local_idx(Symbol::intern(local.span.as_str()));
-                    (PlaceBase::Local(Local::from(local)), vec![])
+                    let base = get_place_or_local(sym_tab, Symbol::intern(local.span.as_str()));
+                    (base, vec![])
                 },
             },
             Choice3::_1(paren) => {
@@ -1132,9 +1142,16 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         }
     }
 
-    pub fn build(mut self) -> FnPatternBody<'pcx> {
+    pub fn build(mut self, name: Symbol) -> FnPatternBody<'pcx> {
         self.new_block_if_terminated();
         self.pattern.basic_blocks[self.current].set_terminator(TerminatorKind::PatEnd);
+
+        // If the function name starts with `$`, it now refers to its output type.
+        let name_str = name.as_str();
+        if let Some(ident) = name_str.strip_prefix("$") {
+            _ = self.pattern.labels.try_insert(Symbol::intern(ident), Spanned::Output);
+        }
+
         self.pattern
     }
 

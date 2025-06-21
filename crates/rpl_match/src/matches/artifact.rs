@@ -1,18 +1,40 @@
-use either::Either;
 use rpl_context::pat::{MatchedMap, Spanned};
+use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
-use rustc_middle::mir::{Const, Local, PlaceRef};
+use rustc_middle::mir::{Body, Const, Local, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
 use super::{Matched, StatementMatch, pat};
 
+/// A normalized version of [`Spanned`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NormalizedSpanned {
+    Location(StatementMatch),
+    Local(Local),
+    Body,
+    Output,
+}
+
+impl NormalizedSpanned {
+    pub fn span(self, body: &Body<'_>, decl: &FnDecl<'_>) -> Span {
+        match self {
+            Self::Location(location) => location.span_no_inline(body),
+            Self::Local(local) => body.local_decls[local].source_info.span,
+            // Special case for the function name, which is not a label.
+            Self::Body => body.span,
+            Self::Output => decl.output.span(),
+        }
+    }
+}
+
+/// A normalized version of [`Matched`].
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
-    pub labels: Vec<(Symbol, Either<StatementMatch, Local>)>,
+    pub labels: Vec<(Symbol, NormalizedSpanned)>,
 }
 
 impl<'tcx> NormalizedMatched<'tcx> {
@@ -24,8 +46,10 @@ impl<'tcx> NormalizedMatched<'tcx> {
         let mut labels: Vec<_> = label_map
             .iter()
             .map(|(label, spanned)| match spanned {
-                Spanned::Location(location) => (*label, Either::Left(matched[*location])),
-                Spanned::Local(local) => (*label, Either::Right(matched[*local])),
+                Spanned::Location(location) => (*label, NormalizedSpanned::Location(matched[*location])),
+                Spanned::Local(local) => (*label, NormalizedSpanned::Local(matched[*local])),
+                Spanned::Body => (*label, NormalizedSpanned::Body),
+                Spanned::Output => (*label, NormalizedSpanned::Output),
             })
             .collect();
         labels.sort_by_key(|(label, _)| *label);
@@ -58,15 +82,14 @@ impl<'tcx> NormalizedMatched<'tcx> {
         );
         let mut labels: Vec<_> = label_map_from
             .iter()
-            .map(|(label, spanned)| match spanned {
-                Spanned::Location(location) => (
-                    *matched_map.labels.get(label).unwrap_or(label),
-                    Either::Left(matched_from[*location]),
-                ),
-                Spanned::Local(local) => (
-                    *matched_map.labels.get(label).unwrap_or(label),
-                    Either::Right(matched_from[*local]),
-                ),
+            .map(|(label, spanned)| {
+                let mapped_label = *matched_map.labels.get(label).unwrap_or(label);
+                match spanned {
+                    Spanned::Location(location) => (mapped_label, NormalizedSpanned::Location(matched_from[*location])),
+                    Spanned::Local(local) => (mapped_label, NormalizedSpanned::Local(matched_from[*local])),
+                    Spanned::Body => (mapped_label, NormalizedSpanned::Body),
+                    Spanned::Output => (mapped_label, NormalizedSpanned::Output),
+                }
             })
             .collect();
         labels.sort_by_key(|(label, _)| *label);
@@ -111,17 +134,14 @@ impl<'tcx> NormalizedMatched<'tcx> {
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, body: &rustc_middle::mir::Body<'_>, name: &str) -> Span {
+    fn span(&self, body: &rustc_middle::mir::Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
         let labels = &self.labels;
         let i = labels
             .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
             .unwrap_or_else(|_| {
                 panic!("label `{name}` not found in pattern labels: {labels:?}");
             });
-        match labels[i].1 {
-            Either::Left(location) => location.span_no_inline(body),
-            Either::Right(local) => body.local_decls[local].source_info.span,
-        }
+        labels[i].1.span(body, decl)
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]

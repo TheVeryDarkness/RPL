@@ -126,6 +126,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                             StatementMatch::Arg(local) => Ok(PredicateArgInstance::Local(local)),
                         }
                     },
+                    _ => Err(format!("label `{}` is not a valid location or local", label)),
                 }
             },
             PredicateArg::MetaVar(name) => {

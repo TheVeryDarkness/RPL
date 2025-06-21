@@ -7,6 +7,7 @@ use rpl_parser::generics::Choice2;
 use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
 use rustc_errors::{Applicability, LintDiagnostic};
+use rustc_hir::FnDecl;
 use rustc_lint::{Level, Lint};
 use rustc_middle::mir::Body;
 use rustc_span::{Span, Symbol};
@@ -75,7 +76,7 @@ impl DynamicError {
     pub const fn lint(&self) -> &'static Lint {
         self.lint
     }
-    pub fn default_diagnostic(span: Span) -> Self {
+    pub fn default_diagnostic(pat_name: Symbol, span: Span) -> Self {
         const LINT: Lint = Lint {
             name: "rpl::missing_diagnostic",
             default_level: Level::Deny,
@@ -86,8 +87,8 @@ impl DynamicError {
         let notes = vec![
             (String::from("This is a fallback diagnostic message."), None),
             (
-                String::from(
-                    "You are seeing this because there is no corresponding diagnostic item in the RPL pattern file.",
+                format!(
+                    "You are seeing this because there is no corresponding diagnostic item for pattern {pat_name:?} in the RPL pattern file.",
                 ),
                 None,
             ),
@@ -117,9 +118,12 @@ impl<'i> SubMsg<'i> {
         for seg in s.iter_matched() {
             match seg {
                 Choice2::_0(arg) => {
+                    let var = Symbol::intern(arg.MetaVariable().span.as_str());
                     let (var_type, idx, _) = meta_vars
-                        .get_from_symbol(Symbol::intern(arg.MetaVariable().span.as_str()))
-                        .unwrap()
+                        .get_from_symbol(var)
+                        .unwrap_or_else(|| {
+                            panic!("Meta variable `{}` not found in the non-local meta symbol table", var)
+                        })
                         .expect_non_adt();
                     match var_type {
                         MetaVariableType::Type => msgs.push(SubMsg::Ty(idx.into())),
@@ -333,7 +337,12 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         Ok(builder)
     }
-    pub(crate) fn build<'tcx>(&self, body: &Body<'tcx>, matched: &impl Matched<'tcx>) -> DynamicError {
+    pub(crate) fn build<'tcx>(
+        &self,
+        body: &Body<'tcx>,
+        decl: &FnDecl<'tcx>,
+        matched: &impl Matched<'tcx>,
+    ) -> DynamicError {
         fn format<'tcx>(message: &Vec<SubMsg>, matched: &impl Matched<'tcx>) -> String {
             let mut s = String::new();
             for msg in message {
@@ -351,21 +360,24 @@ impl<'i> DynamicErrorBuilder<'i> {
             }
             s
         }
-        let primary = (format(&self.primary.0, matched), matched.span(body, self.primary.1));
+        let primary = (
+            format(&self.primary.0, matched),
+            matched.span(body, decl, self.primary.1),
+        );
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (format(label, matched), matched.span(body, span)))
+            .map(|(label, span)| (format(label, matched), matched.span(body, decl, span)))
             .collect();
         let notes = self
             .notes
             .iter()
-            .map(|(note, span)| (format(note, matched), span.map(|span| matched.span(body, span))))
+            .map(|(note, span)| (format(note, matched), span.map(|span| matched.span(body, decl, span))))
             .collect();
         let helps = self
             .helps
             .iter()
-            .map(|(help, span)| (format(help, matched), span.map(|span| matched.span(body, span))))
+            .map(|(help, span)| (format(help, matched), span.map(|span| matched.span(body, decl, span))))
             .collect();
         let suggestions = self
             .suggestions
@@ -374,7 +386,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                 (
                     format(suggestion, matched),
                     format(code, matched),
-                    matched.span(body, span.unwrap()),
+                    matched.span(body, decl, span.unwrap()),
                     *applicability,
                 )
             })

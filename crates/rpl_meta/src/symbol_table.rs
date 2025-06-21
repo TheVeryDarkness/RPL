@@ -76,6 +76,9 @@ impl NonLocalMetaSymTab<'_> {
     pub fn const_vars(&self) -> impl Iterator<Item = (Symbol, usize)> {
         self.const_vars.iter().map(|(symbol, (idx, _, _))| (*symbol, *idx))
     }
+    pub fn place_vars_map(&self) -> &FxHashMap<Symbol, (usize, &pairs::Type<'_>, PredicateConjunction)> {
+        &self.place_vars
+    }
     pub fn place_vars(&self) -> impl Iterator<Item = (Symbol, usize)> {
         self.place_vars.iter().map(|(symbol, (idx, _, _))| (*symbol, *idx))
     }
@@ -717,6 +720,9 @@ impl<'i> FnInner<'i> {
             Choice4::_3(ident) => self.add_local(mctx, label, ident.into(), ty, LocalSpecial::None, errors),
         }
     }
+    fn get_place_impl(&self, ident: Ident<'i>, meta_vars: &NonLocalMetaSymTab<'i>) -> Option<&'i pairs::Type<'i>> {
+        meta_vars.place_vars.get(&ident.name).map(|(_, ty, _)| ty).copied()
+    }
     fn get_local_impl(&self, ident: Ident<'i>) -> Option<&'i pairs::Type<'i>> {
         self.locals
             .get(&ident.name)
@@ -724,25 +730,29 @@ impl<'i> FnInner<'i> {
             .or_else(|| self.params.get(&ident.name))
             .copied()
     }
-    pub fn get_local(
+    pub fn get_place_or_local(
         &self,
         mctx: &MetaContext<'i>,
         ident: Ident<'i>,
+        meta_vars: &NonLocalMetaSymTab<'i>,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) -> Option<&'i pairs::Type<'i>> {
-        self.get_local_impl(ident).or_else(|| {
-            let err = RPLMetaError::SymbolNotDeclared {
-                ident: ident.name,
-                span: SpanWrapper::new(ident.span, mctx.get_active_path()),
-            };
-            errors.push(err);
-            None
-        })
+        self.get_local_impl(ident)
+            .or_else(|| self.get_place_impl(ident, meta_vars))
+            .or_else(|| {
+                let err = RPLMetaError::SymbolNotDeclared {
+                    ident: ident.name,
+                    span: SpanWrapper::new(ident.span, mctx.get_active_path()),
+                };
+                errors.push(err);
+                None
+            })
     }
     pub fn get_place_local(
         &self,
         mctx: &MetaContext<'i>,
         local: &'i pairs::MirPlaceLocal<'i>,
+        meta_vars: &NonLocalMetaSymTab<'i>,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) -> Option<&'i pairs::Type<'i>> {
         match local.deref() {
@@ -754,7 +764,7 @@ impl<'i> FnInner<'i> {
                 None
             }),
 
-            Choice4::_3(ident) => self.get_local(mctx, ident.into(), errors),
+            Choice4::_3(ident) => self.get_place_or_local(mctx, ident.into(), meta_vars, errors),
             Choice4::_1(_) if self.self_value.is_none() && self.self_param.is_none() => {
                 errors.push(RPLMetaError::SelfNotDeclared {
                     span: SpanWrapper::new(local.span, mctx.get_active_path()),

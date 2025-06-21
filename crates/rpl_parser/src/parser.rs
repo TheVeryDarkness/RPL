@@ -269,6 +269,7 @@ pub enum Rule {
     r#PatternExpression,
     r#PatternOperation,
     r#RustItemsOrPatternOperation,
+    r#attr,
     r#RPLPatternItem,
     r#MetaVariableWithDiagMessage,
     r#MetaVariableWithDiagMessageSeparatedByComma,
@@ -8854,14 +8855,53 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#RPLPatternItem , "Corresponds to expression: `(Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RPLPatternItem , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MetaVariableDeclList :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RustItemsOrPatternOperation :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#attr , "Corresponds to expression: `(Hash ~ LeftBracket ~ diagAttrs ~ RightBracket)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#attr , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Hash :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#diagAttrs :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#attr<'i, INHERITED> {
+            #[doc = "A helper function to access [`Hash`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Hash<'s>(&'s self) -> &'s super::super::rules::r#Hash<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`LeftBracket`]."]
+            #[allow(non_snake_case)]
+            pub fn r#LeftBracket<'s>(&'s self) -> &'s super::super::rules::r#LeftBracket<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.1.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`RightBracket`]."]
+            #[allow(non_snake_case)]
+            pub fn r#RightBracket<'s>(&'s self) -> &'s super::super::rules::r#RightBracket<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.3.matched;
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`diagAttrs`]."]
+            #[allow(non_snake_case)]
+            pub fn r#diagAttrs<'s>(&'s self) -> &'s super::super::rules::r#diagAttrs<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.2.matched;
+                    res
+                }
+            }
+        }
+        :: pest_typed :: rule ! (r#RPLPatternItem , "Corresponds to expression: `(attr? ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#RPLPatternItem , super :: super :: generics :: Seq5 :: < (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#attr :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MetaVariableDeclList :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RustItemsOrPatternOperation :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#RPLPatternItem<'i, INHERITED> {
             #[doc = "A helper function to access [`Assign`]."]
             #[allow(non_snake_case)]
             pub fn r#Assign<'s>(&'s self) -> &'s super::super::rules::r#Assign<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.2.matched;
+                    let res = &res.content.3.matched;
                     res
                 }
             }
@@ -8870,7 +8910,7 @@ pub mod rules_impl {
             pub fn r#Identifier<'s>(&'s self) -> &'s super::super::rules::r#Identifier<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.0.matched;
+                    let res = &res.content.1.matched;
                     res
                 }
             }
@@ -8882,7 +8922,7 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = &res.content.1.matched;
+                    let res = &res.content.2.matched;
                     {
                         let res = res.as_ref().map(|res| res);
                         res
@@ -8896,8 +8936,22 @@ pub mod rules_impl {
             ) -> &'s super::super::rules::r#RustItemsOrPatternOperation<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.3.matched;
+                    let res = &res.content.4.matched;
                     res
+                }
+            }
+            #[doc = "A helper function to access [`attr`]."]
+            #[allow(non_snake_case)]
+            pub fn r#attr<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#attr<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
                 }
             }
         }

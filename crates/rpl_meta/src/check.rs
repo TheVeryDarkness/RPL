@@ -46,7 +46,7 @@ impl<'i> CheckCtxt<'i> {
     }
 
     pub fn check_pat_item(&mut self, mctx: &MetaContext<'i>, pat_item: &'i pairs::RPLPatternItem<'i>) {
-        let (_, meta_decl_list, _, rust_item_or_patt_operation) = pat_item.get_matched();
+        let (_, _, meta_decl_list, _, rust_item_or_patt_operation) = pat_item.get_matched();
         if let Some(meta_decl_list) = meta_decl_list {
             self.check_meta_decl_list(mctx, meta_decl_list);
         }
@@ -559,7 +559,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
     }
 
     fn check_mir_place_local(&mut self, mctx: &MetaContext<'i>, local: &'i pairs::MirPlaceLocal<'i>) {
-        self.fn_def.get_place_local(mctx, local, self.errors);
+        self.fn_def.get_place_local(mctx, local, &self.meta_vars, self.errors);
     }
 
     fn check_mir_rvalue_aggregate(

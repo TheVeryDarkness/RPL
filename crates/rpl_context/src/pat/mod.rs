@@ -9,6 +9,7 @@ use rpl_meta::utils::Ident;
 use rpl_parser::generics::{Choice2, Choice3, Choice4};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
+use rustc_hir::FnDecl;
 use rustc_middle::mir::Body;
 use rustc_span::Symbol;
 
@@ -35,6 +36,8 @@ pub type Label = Symbol;
 pub enum Spanned {
     Location(mir::Location),
     Local(mir::Local),
+    Body,
+    Output,
 }
 
 pub type LabelMap = FxHashMap<Label, Spanned>;
@@ -43,6 +46,32 @@ pub type LabelMap = FxHashMap<Label, Spanned>;
 pub enum PattOrUtil {
     Patt,
     Util,
+}
+
+#[derive(Default)]
+pub(crate) struct Attr {
+    diag: Option<Symbol>,
+}
+
+impl Attr {
+    fn parse(pairs: &pairs::attr<'_>) -> Self {
+        let mut result = Self::default();
+        let (_, _, attrs, _) = pairs.get_matched();
+        for attr in collect_elems_separated_by_comma!(attrs) {
+            let (key, value) = attr.get_matched();
+            match key.span.as_str() {
+                "diag" => match value {
+                    Some(Choice2::_0(_)) | None => unreachable!(),
+                    Some(Choice2::_1(msg)) => {
+                        let (_, msg) = msg.get_matched();
+                        result.diag = Some(Symbol::intern(msg.diagMessageInner().span.as_str()));
+                    },
+                },
+                _ => unreachable!(),
+            }
+        }
+        result
+    }
 }
 
 pub enum PatternItem<'pcx> {
@@ -57,6 +86,12 @@ impl PatternItem<'_> {
             PatternItem::RPLPatternOperation(op) => &op.meta,
         }
     }
+    pub(crate) fn diag_name(&self) -> Option<Symbol> {
+        match self {
+            PatternItem::RustItems(items) => items.diag,
+            PatternItem::RPLPatternOperation(op) => op.diag,
+        }
+    }
 }
 
 pub struct RustItems<'pcx> {
@@ -65,16 +100,18 @@ pub struct RustItems<'pcx> {
     pub adts: FxHashMap<Symbol, Adt<'pcx>>,
     pub fns: FnPatterns<'pcx>,
     pub impls: FxHashMap<Symbol, Impl<'pcx>>,
+    pub diag: Option<Symbol>,
 }
 
 impl<'pcx> RustItems<'pcx> {
-    pub(crate) fn new(pcx: PatCtxt<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>) -> Self {
+    pub(crate) fn new(pcx: PatCtxt<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>, attr: Attr) -> Self {
         Self {
             pcx,
             meta,
             adts: Default::default(),
             fns: Default::default(),
             impls: Default::default(),
+            diag: attr.diag,
         }
     }
 
@@ -268,6 +305,7 @@ pub struct PatternOperation<'pcx> {
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub positive: (&'pcx PatternItem<'pcx>, MatchedMap),
     pub negative: Vec<(&'pcx PatternItem<'pcx>, MatchedMap)>,
+    pub diag: Option<Symbol>,
 }
 
 /// Corresponds to a pattern file in RPL, not a pattern item.
@@ -292,13 +330,14 @@ impl<'pcx> Pattern<'pcx> {
         &self,
         pat_name: Symbol,
         body: &Body<'tcx>,
+        decl: &FnDecl<'tcx>,
         matched: &impl Matched<'tcx>,
     ) -> Result<Box<DynamicError>, Box<DynamicError>> {
         Ok(Box::new(
             self.diag_block
                 .get(&pat_name)
-                .ok_or_else(|| Box::new(DynamicError::default_diagnostic(body.span)))?
-                .build(body, matched),
+                .ok_or_else(|| Box::new(DynamicError::default_diagnostic(pat_name, body.span)))?
+                .build(body, decl, matched),
         ))
     }
 }
@@ -311,7 +350,7 @@ impl<'pcx> Pattern<'pcx> {
         block_type: PattOrUtil,
     ) {
         let p = pat_item.path;
-        let (name, meta_decls, _, item_or_patt_op) = pat_item.get_matched();
+        let (attr, name, meta_decls, _, item_or_patt_op) = pat_item.get_matched();
         let name = Symbol::intern(name.span.as_str());
         let symbol_table = symbol_tables.get(&name).unwrap();
         let meta = Arc::new(NonLocalMetaVars::from_meta_decls(
@@ -319,13 +358,21 @@ impl<'pcx> Pattern<'pcx> {
             self.pcx,
             symbol_table,
         ));
-        self.add_item_or_patt_op(name, with_path(p, item_or_patt_op), symbol_table, meta, block_type);
+        self.add_item_or_patt_op(
+            name,
+            attr.as_ref(),
+            with_path(p, item_or_patt_op),
+            symbol_table,
+            meta,
+            block_type,
+        );
     }
 
     #[instrument(level = "debug", skip(self, item_or_patt_op, symbol_table, meta), fields(patt_block = ?self.patt_block.keys(), util_block = ?self.util_block.keys()))]
     fn add_item_or_patt_op(
         &mut self,
         pat_name: Symbol,
+        attr: Option<&'pcx pairs::attr<'pcx>>,
         item_or_patt_op: WithPath<'pcx, &'pcx pairs::RustItemsOrPatternOperation<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
@@ -336,6 +383,7 @@ impl<'pcx> Pattern<'pcx> {
             Choice3::_0(item) => {
                 self.add_items(
                     pat_name,
+                    attr,
                     with_path(p, std::iter::once(item)),
                     symbol_table,
                     meta,
@@ -345,6 +393,7 @@ impl<'pcx> Pattern<'pcx> {
             Choice3::_1(items) => {
                 self.add_items(
                     pat_name,
+                    attr,
                     with_path(p, items.get_matched().1.iter_matched()),
                     symbol_table,
                     meta,
@@ -352,7 +401,7 @@ impl<'pcx> Pattern<'pcx> {
                 );
             },
             Choice3::_2(patt_op) => {
-                self.add_patt_op(pat_name, with_path(p, patt_op), meta, block_type);
+                self.add_patt_op(pat_name, attr, with_path(p, patt_op), meta, block_type);
             },
         }
     }
@@ -371,6 +420,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_patt_op(
         &mut self,
         pat_name: Symbol,
+        attr: Option<&'pcx pairs::attr<'pcx>>,
         patt_op: WithPath<'pcx, &'pcx pairs::PatternOperation<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         block_type: PattOrUtil,
@@ -378,11 +428,13 @@ impl<'pcx> Pattern<'pcx> {
         let (pos, neg) = patt_op.PatternConfiguration();
         let positive = self.patt_op(&meta, pos);
         let negative = neg.iter().map(|negative| self.patt_op(&meta, negative)).collect();
+        let attr = attr.map(Attr::parse).unwrap_or_default();
         let pat_ops = PatternOperation {
             pcx: self.pcx,
             meta,
             positive,
             negative,
+            diag: attr.diag,
         };
         match block_type {
             PattOrUtil::Patt => {
@@ -402,6 +454,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_items(
         &mut self,
         pat_name: Symbol,
+        attr: Option<&'pcx pairs::attr<'pcx>>,
         items: WithPath<'pcx, impl Iterator<Item = &'pcx pairs::RustItemWithConstraint<'pcx>>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
@@ -411,7 +464,8 @@ impl<'pcx> Pattern<'pcx> {
         match block_type {
             PattOrUtil::Patt => {
                 self.patt_block.entry(pat_name).or_insert_with(|| {
-                    let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone());
+                    let attr = attr.map(Attr::parse).unwrap_or_default();
+                    let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone(), attr);
                     for item in items.inner {
                         rpl_rust_items.add_item(Some(pat_name), with_path(p, item), meta.clone(), symbol_table);
                     }
@@ -420,7 +474,8 @@ impl<'pcx> Pattern<'pcx> {
             },
             PattOrUtil::Util => {
                 self.util_block.entry(pat_name).or_insert_with(|| {
-                    let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone());
+                    let attr = attr.map(Attr::parse).unwrap_or_default();
+                    let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone(), attr);
                     for item in items.inner {
                         rpl_rust_items.add_item(Some(pat_name), with_path(p, item), meta.clone(), symbol_table);
                     }
@@ -435,14 +490,26 @@ impl<'pcx> Pattern<'pcx> {
         diag: WithPath<'pcx, &'pcx pairs::diagBlock<'_>>,
         symbol_tables: &'pcx FxHashMap<Symbol, rpl_meta::symbol_table::SymbolTable<'_>>,
     ) {
+        let mut items = FxHashMap::default();
         for item in diag.get_matched().2.iter_matched() {
             let (ident, _, _, _, _, _) = item.get_matched();
             let name = Symbol::intern(ident.span.as_str());
-            let symbol_table = symbol_tables.get(&name).unwrap();
-            let diag = DynamicErrorBuilder::from_item(WithPath::new(diag.path, item), &symbol_table.meta_vars)
-                .unwrap_or_else(|err| panic!("{err}"));
-            let prev = self.diag_block.insert(name, diag);
+            let prev = items.insert(name, item);
             debug_assert!(prev.is_none(), "Duplicate diagnostic for {:?}", name); //FIXME: raise an error
+        }
+
+        for (name, pat_item) in &self.patt_block {
+            let symbol_table = symbol_tables.get(&name).unwrap();
+
+            let diag_name = pat_item.diag_name().unwrap_or(*name);
+            if let Some(diag_item) = items.get(&diag_name) {
+                let diag = DynamicErrorBuilder::from_item(WithPath::new(diag.path, diag_item), &symbol_table.meta_vars)
+                    .unwrap_or_else(|err| panic!("{err}"));
+                let prev = self.diag_block.insert(*name, diag);
+                debug_assert!(prev.is_none(), "Duplicate diagnostic for {:?}", name); //FIXME: raise an error
+            } else {
+                warn!("No diagnostic found for pattern item {:?} ({:?})", name, diag_name);
+            }
         }
     }
 }

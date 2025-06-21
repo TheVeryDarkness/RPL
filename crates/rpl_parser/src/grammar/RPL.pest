@@ -889,9 +889,13 @@ RustItemsOrPatternOperation = {
   | PatternOperation
 }
 
+attr = {
+    Hash ~ LeftBracket ~ diagAttrs ~ RightBracket
+}
+
 // patt block Item
 RPLPatternItem = {
-    Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
+    attr? ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
 }
 
 MetaVariableWithDiagMessage = {

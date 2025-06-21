@@ -6,6 +6,7 @@ use rpl_context::pat::{LabelMap, Spanned};
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;
+use rustc_hir::FnDecl;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::{MutatingUseContext, PlaceContext};
@@ -54,19 +55,27 @@ impl Matched<'_> {
             info!("{place_var:?}: {:?}", matches);
         }
     }
+
+    fn span_spanned<'tcx>(&self, spanned: Spanned, body: &rustc_middle::mir::Body<'tcx>, decl: &FnDecl<'tcx>) -> Span {
+        match spanned {
+            Spanned::Location(location) => self[location].span_no_inline(body),
+            Spanned::Local(local) => body.local_decls[self[local]].source_info.span,
+            // Special case for the function name, which is not a label.
+            Spanned::Body => body.span,
+            Spanned::Output => decl.output.span(),
+        }
+    }
 }
 
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
-    fn span(&self, body: &rustc_middle::mir::Body<'_>, name: &str) -> Span {
+    fn span(&self, body: &rustc_middle::mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
         let MatchedWithLabelMap(labels, matched) = self;
-        match *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
+        let spanned = *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
             panic!("label `{name}` not found in pattern labels: {labels:?}");
-        }) {
-            Spanned::Location(location) => matched[location].span_no_inline(body),
-            Spanned::Local(local) => body.local_decls[matched[local]].source_info.span,
-        }
+        });
+        matched.span_spanned(spanned, body, decl)
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.1.ty_vars[idx]

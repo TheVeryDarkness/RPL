@@ -29,9 +29,9 @@ use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_match::predicate_evaluator::PredicateEvaluator;
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashSet;
-use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor};
+use rustc_hir::{self as hir};
 use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
 use rustc_middle::hir::nested_filter::All;
@@ -121,7 +121,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         _span: Span,
         def_id: LocalDefId,
     ) -> Self::Result {
-        self.check_fn(def_id);
+        self.check_fn(decl, def_id);
         intravisit::walk_fn(self, kind, decl, body_id, def_id);
     }
 }
@@ -305,8 +305,9 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                 let impl_item = self.tcx.hir().impl_item(id);
                 let def_id = impl_item.owner_id.def_id;
                 match impl_item.kind {
-                    hir::ImplItemKind::Fn(..) => {
+                    hir::ImplItemKind::Fn(sig, _) => {
                         if self.tcx.is_mir_available(def_id) {
+                            let decl = sig.decl;
                             let body = self.tcx.optimized_mir(def_id);
                             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
                             let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
@@ -318,7 +319,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                 self.impl_matched(name, rpl_rust_items, body, &mir_cfg, &mir_ddg)
                                             {
                                                 let error = pattern
-                                                    .get_diag(name, body, &MatchedWithLabelMap(labels, &matched))
+                                                    .get_diag(name, body, decl, &MatchedWithLabelMap(labels, &matched))
                                                     .unwrap_or_else(identity);
                                                 self.tcx.emit_node_span_lint(
                                                     error.lint(),
@@ -332,8 +333,9 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                             for matched in
                                                 self.impl_matched_pat_op(name, pat_op, body, &mir_cfg, &mir_ddg)
                                             {
-                                                let error =
-                                                    pattern.get_diag(name, body, &matched).unwrap_or_else(identity);
+                                                let error = pattern
+                                                    .get_diag(name, body, decl, &matched)
+                                                    .unwrap_or_else(identity);
                                                 self.tcx.emit_node_span_lint(
                                                     error.lint(),
                                                     self.tcx.local_def_id_to_hir_id(def_id),
@@ -353,7 +355,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         }
     }
     #[instrument(level = "debug", skip(self))]
-    fn check_fn(&mut self, def_id: LocalDefId) {
+    fn check_fn(&mut self, decl: &hir::FnDecl<'tcx>, def_id: LocalDefId) {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
@@ -364,7 +366,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         PatternItem::RustItems(rpl_rust_items) => {
                             for (matched, labels) in self.fn_matched(name, rpl_rust_items, body, &mir_cfg, &mir_ddg) {
                                 let error = pattern
-                                    .get_diag(name, body, &MatchedWithLabelMap(labels, &matched))
+                                    .get_diag(name, body, decl, &MatchedWithLabelMap(labels, &matched))
                                     .unwrap_or_else(identity);
                                 self.tcx.emit_node_span_lint(
                                     error.lint(),
@@ -376,7 +378,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         },
                         PatternItem::RPLPatternOperation(pat_op) => {
                             for matched in self.fn_matched_pat_op(name, pat_op, body, &mir_cfg, &mir_ddg) {
-                                let error = pattern.get_diag(name, body, &matched).unwrap_or_else(identity);
+                                let error = pattern.get_diag(name, body, decl, &matched).unwrap_or_else(identity);
                                 self.tcx.emit_node_span_lint(
                                     error.lint(),
                                     self.tcx.local_def_id_to_hir_id(def_id),
