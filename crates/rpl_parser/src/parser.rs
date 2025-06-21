@@ -9102,7 +9102,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#diagAttr , "Corresponds to expression: `(Identifier ~ ((LeftParen ~ diagAttrs? ~ RightParen) | (Assign ~ diagMessage))?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#diagAttr , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Choice2 :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#diagAttrs :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#diagMessage :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#diagAttr , "Corresponds to expression: `(Word ~ ((LeftParen ~ diagAttrs? ~ RightParen) | (Assign ~ diagMessage))?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#diagAttr , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Word :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Choice2 :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#diagAttrs :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#diagMessage :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#diagAttr<'i, INHERITED> {
             #[doc = "A helper function to access [`Assign`]."]
             #[allow(non_snake_case)]
@@ -9125,15 +9125,6 @@ pub mod rules_impl {
                             .flatten();
                         res
                     }
-                }
-            }
-            #[doc = "A helper function to access [`Identifier`]."]
-            #[allow(non_snake_case)]
-            pub fn r#Identifier<'s>(&'s self) -> &'s super::super::rules::r#Identifier<'i, INHERITED> {
-                let res = &*self.content;
-                {
-                    let res = &res.content.0.matched;
-                    res
                 }
             }
             #[doc = "A helper function to access [`LeftParen`]."]
@@ -9180,6 +9171,15 @@ pub mod rules_impl {
                             .flatten();
                         res
                     }
+                }
+            }
+            #[doc = "A helper function to access [`Word`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Word<'s>(&'s self) -> &'s super::super::rules::r#Word<'i, INHERITED> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    res
                 }
             }
             #[doc = "A helper function to access [`diagAttrs`]."]

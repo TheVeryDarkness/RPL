@@ -919,7 +919,7 @@ diagMessage = ${
 }
 
 diagAttr = {
-    Identifier ~ (LeftParen ~ diagAttrs? ~ RightParen | Assign ~ diagMessage)?
+    Word ~ (LeftParen ~ diagAttrs? ~ RightParen | Assign ~ diagMessage)?
 }
 
 diagAttrs = {
