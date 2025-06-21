@@ -24,6 +24,8 @@ use std::ops::Deref;
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs;
 
+use crate::predicates::PredicateError;
+
 pub mod attributes;
 pub mod predicates;
 pub mod tribool;
@@ -35,20 +37,26 @@ pub enum Constraint {
 }
 
 impl Constraint {
-    pub fn from_pairs(constraint: &pairs::Constraint<'_>) -> Self {
+    pub fn from_pairs<'i>(
+        constraint: &pairs::Constraint<'i>,
+        path: &'i std::path::Path,
+    ) -> Result<Self, PredicateError<'i>> {
         match constraint.deref() {
             Choice2::_0(attr) => {
                 let attr = attributes::Attribute::from_pairs(attr);
-                Constraint::Attr(attr)
+                Ok(Constraint::Attr(attr))
             },
             Choice2::_1(preds) => {
-                let pred = predicates::PredicateConjunction::from_pairs(preds);
-                Constraint::Pred(pred)
+                let pred = predicates::PredicateConjunction::from_pairs(preds, path);
+                Ok(Constraint::Pred(pred?))
             },
         }
     }
 
-    pub fn from_where_block_opt(where_block: &Option<pairs::WhereBlock<'_>>) -> Vec<Self> {
+    pub fn from_where_block_opt<'i>(
+        where_block: &Option<pairs::WhereBlock<'i>>,
+        path: &'i std::path::Path,
+    ) -> Result<Vec<Self>, PredicateError<'i>> {
         if let Some(where_block) = where_block
             && let Some(constraints) = where_block.ConstraintsSeparatedByComma()
         {
@@ -56,9 +64,14 @@ impl Constraint {
             let following = following
                 .iter_matched()
                 .map(|comma_with_elem| comma_with_elem.get_matched().1);
-            std::iter::once(first).chain(following).map(Self::from_pairs).collect()
+            // FIXME: this is will return early errors if any of the constraints are invalid, consider
+            // collecting all errors instead
+            std::iter::once(first)
+                .chain(following)
+                .map(|pair| Self::from_pairs(pair, path))
+                .collect()
         } else {
-            Vec::new()
+            Ok(Vec::new())
         }
     }
 }

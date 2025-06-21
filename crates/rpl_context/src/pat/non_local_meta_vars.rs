@@ -83,13 +83,9 @@ pub struct NonLocalMetaVars<'pcx> {
 }
 
 impl<'pcx> NonLocalMetaVars<'pcx> {
-    pub fn add_ty_var(&mut self, name: Symbol, preds: Option<&pairs::PredicateConjunction<'_>>) {
+    pub fn add_ty_var(&mut self, name: Symbol, preds: Option<PredicateConjunction>) {
         let idx = self.ty_vars.next_index();
-        let pred = if let Some(preds) = preds {
-            PredicateConjunction::from_pairs(preds)
-        } else {
-            PredicateConjunction::default()
-        };
+        let pred = preds.unwrap_or_default();
         let ty_var = TyVar { idx, name, pred };
         self.ty_vars.push(ty_var);
     }
@@ -122,7 +118,12 @@ impl<'pcx> NonLocalMetaVars<'pcx> {
             for decl in decls {
                 let (ident, _, ty, preds) = decl.get_matched();
                 let ident = Symbol::intern(ident.span.as_str());
-                let preds = preds.as_ref().map(|preds| preds.get_matched().1);
+                let preds = preds
+                    .as_ref()
+                    .map(|preds| preds.get_matched().1)
+                    .map(|pred| PredicateConjunction::from_pairs(pred, p))
+                    .transpose()
+                    .expect("invalid predicates in meta variable decls");
                 match ty.deref() {
                     Choice3::_0(_ty) => type_vars.push((ident, preds)),
                     Choice3::_1(konst) => konst_vars.push((ident, konst)),

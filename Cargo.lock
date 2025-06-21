@@ -1196,8 +1196,10 @@ dependencies = [
 name = "rpl_constraints"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "rpl_parser",
  "rpl_resolve",
+ "thiserror",
 ]
 
 [[package]]

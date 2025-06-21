@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
+use derive_more::derive::Display;
 use rpl_parser::generics::{Choice2, Choice4};
-use rpl_parser::pairs;
+use rpl_parser::{SpanWrapper, pairs};
 use rustc_span::Symbol;
 
 // Attention:
@@ -14,8 +15,17 @@ mod trivial;
 
 pub use multiple_tys::*;
 pub use single_ty::*;
+use thiserror::Error;
 pub use translate::*;
 pub use trivial::*;
+
+#[derive(Clone, Debug, Display, Error)]
+pub enum PredicateError<'i> {
+    #[display("Invalid predicate: {pred}\n{span}")]
+    InvalidPredicate { pred: &'i str, span: SpanWrapper<'i> },
+    #[display("Invalid predicate argument: {_0}")]
+    InvalidArgs(String),
+}
 
 // FIXME: performance
 // Attention:
@@ -48,22 +58,29 @@ pub enum PredicateKind {
     MultipleTys(MultipleTysPredsFnPtr),
 }
 
-impl From<&str> for PredicateKind {
-    fn from(s: &str) -> Self {
-        match s {
+impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
+    type Error = PredicateError<'i>;
+    fn try_from(span: SpanWrapper<'i>) -> Result<Self, Self::Error> {
+        Ok(match span.inner().as_str() {
             "is_all_safe_trait" => Self::Ty(is_all_safe_trait),
             "is_not_unpin" => Self::Ty(is_not_unpin),
             "is_sync" => Self::Ty(is_sync),
             "is_integral" => Self::Ty(is_integral),
             "is_ptr" => Self::Ty(is_ptr),
             "is_primitive" => Self::Ty(is_primitive),
+            "needs_drop" => Self::Ty(needs_drop),
             "translate_from_function" => Self::Translate(translate_from_function),
             "false" => Self::Trivial(r#false),
             "true" => Self::Trivial(r#true),
             "same_size" => Self::MultipleTys(same_size),
             "same_abi_and_pref_align" => Self::MultipleTys(same_abi_and_pref_align),
-            _ => unreachable!("Unknown predicate: {}", s),
-        }
+            _ => {
+                return Err(PredicateError::InvalidPredicate {
+                    pred: span.inner().as_str(),
+                    span,
+                });
+            },
+        })
     }
 }
 
@@ -75,13 +92,16 @@ pub struct PredicateConjunction {
 pub type Predicate<'pcx> = &'pcx PredicateConjunction;
 
 impl PredicateConjunction {
-    pub fn from_pairs(preds: &pairs::PredicateConjunction<'_>) -> Self {
+    pub fn from_pairs<'i>(
+        preds: &pairs::PredicateConjunction<'i>,
+        path: &'i std::path::Path,
+    ) -> Result<Self, PredicateError<'i>> {
         let (first, following) = preds.get_matched();
         let clauses = std::iter::once(first)
             .chain(following.iter_matched().map(|and_pred| and_pred.get_matched().1))
-            .map(|pred| PredicateClause::from_pairs(pred))
-            .collect();
-        Self { clauses }
+            .map(|pred| PredicateClause::from_pairs(pred, path))
+            .collect::<Result<_, _>>()?;
+        Ok(Self { clauses })
     }
 }
 
@@ -92,18 +112,23 @@ pub struct PredicateClause {
 }
 
 impl PredicateClause {
-    fn from_pairs(pred: &pairs::PredicateClause<'_>) -> Self {
+    fn from_pairs<'i>(
+        pred: &pairs::PredicateClause<'i>,
+        path: &'i std::path::Path,
+    ) -> Result<Self, PredicateError<'i>> {
         let terms = match pred.deref() {
-            Choice2::_0(pred) => vec![PredicateTerm::from_pairs(pred)],
+            Choice2::_0(pred) => vec![PredicateTerm::from_pairs(pred, path)?],
             Choice2::_1(preds) => {
                 let (_, first, following, _) = preds.get_matched();
+                // FIXME: this is will return early errors if any of the terms are invalid, consider
+                // collecting all errors instead
                 std::iter::once(first)
                     .chain(following.iter_matched().map(|or_pred| or_pred.get_matched().1))
-                    .map(|pred| PredicateTerm::from_pairs(pred))
-                    .collect()
+                    .map(|pred| PredicateTerm::from_pairs(pred, path))
+                    .collect::<Result<_, _>>()?
             },
         };
-        Self { terms }
+        Ok(Self { terms })
     }
 }
 
@@ -115,13 +140,13 @@ pub struct PredicateTerm {
 }
 
 impl PredicateTerm {
-    fn from_pairs(pred: &pairs::PredicateTerm<'_>) -> Self {
+    fn from_pairs<'i>(pred: &pairs::PredicateTerm<'i>, path: &'i std::path::Path) -> Result<Self, PredicateError<'i>> {
         let (pred, is_neg) = match pred.deref() {
             Choice2::_0(pred) => (pred, false),
             Choice2::_1(pred) => (pred.get_matched().1, true),
         };
         let (pred_name, _, args, _) = pred.get_matched();
-        let kind = PredicateKind::from(pred_name.span.as_str());
+        let kind = PredicateKind::try_from(SpanWrapper::new(pred_name.span, path))?;
         let args = if let Some(args) = args {
             let (first, following, _) = args.get_matched();
             let following = following
@@ -134,7 +159,7 @@ impl PredicateTerm {
         } else {
             vec![]
         };
-        Self { kind, is_neg, args }
+        Ok(Self { kind, is_neg, args })
     }
 }
 

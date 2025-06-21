@@ -7,6 +7,7 @@ use std::sync::Arc;
 use error_enum::error_type;
 use parser::{ParseError, SpanWrapper};
 use pest_typed::Span;
+use rpl_constraints::predicates::PredicateError;
 use rustc_span::Symbol;
 
 // TODO: 排版
@@ -120,11 +121,8 @@ error_type!(
                 span: SpanWrapper<'i>,
             }
                 "The return value `RET` in MIR pattern is already declared. \n{span}",
-            319 UnknownPredicate {
-                pred_name: String,
-                span: SpanWrapper<'i>,
-            }
-                "Unknown predicate `{pred_name}`. \n{span}",
+            319 PredicateError(PredicateError<'i>)
+                "{0}",
             320 ImplAlreadyDeclared {
                 span: SpanWrapper<'i>,
             }
@@ -135,6 +133,11 @@ error_type!(
 impl<'i> From<ParseError<'i>> for RPLMetaError<'i> {
     fn from(value: ParseError<'i>) -> Self {
         Self::ParseError { error: value.into() }
+    }
+}
+impl<'i> From<PredicateError<'i>> for RPLMetaError<'i> {
+    fn from(value: PredicateError<'i>) -> Self {
+        Self::PredicateError(value)
     }
 }
 impl<'a> RPLMetaError<'a> {

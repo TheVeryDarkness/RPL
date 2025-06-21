@@ -87,7 +87,7 @@ impl<'pcx> RustItems<'pcx> {
     ) {
         let path = item.path;
         let (item, where_block) = item.get_matched();
-        let constraints = Constraint::from_where_block_opt(where_block);
+        let constraints = Constraint::from_where_block_opt(where_block, path).expect("unexpected error in constraints");
         match item.deref() {
             Choice4::_0(rust_fn) => {
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
@@ -226,7 +226,8 @@ impl<'pcx> RustItems<'pcx> {
             .iter_matched()
             .map(|rust_fn| {
                 let (rust_fn, where_block) = rust_fn.get_matched();
-                let constraints = Constraint::from_where_block_opt(where_block);
+                let constraints =
+                    Constraint::from_where_block_opt(where_block, p).expect("unexpected error in constraints");
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_sym_tab = impl_sym_tab.inner.get_fn(fn_name).unwrap();
                 let fn_def = FnPattern::from(

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use impls::CheckImplCtxt;
 use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
-use rpl_constraints::predicates::PredicateConjunction;
+use rpl_constraints::predicates::{PredicateConjunction, PredicateError};
 use rustc_data_structures::fx::FxHashMap;
 use rustc_span::Symbol;
 
@@ -65,7 +65,10 @@ impl<'i> CheckCtxt<'i> {
                 let preds = preds.as_ref().map(|preds| preds.get_matched().1);
                 self.check_pred_conjunction_opt(mctx, preds);
                 let preds = if let Some(preds) = preds {
-                    PredicateConjunction::from_pairs(preds)
+                    PredicateConjunction::from_pairs(preds, mctx.get_active_path()).unwrap_or_else(|err| {
+                        self.errors.push(err.into());
+                        PredicateConjunction::default()
+                    })
                 } else {
                     PredicateConjunction::default()
                 };
@@ -109,10 +112,13 @@ impl<'i> CheckCtxt<'i> {
         };
         let pred_name = pred.get_matched().0.span.as_str();
         if !rpl_constraints::predicates::ALL_PREDICATES.contains(&pred_name) {
-            self.errors.push(RPLMetaError::UnknownPredicate {
-                pred_name: pred_name.to_string(),
-                span: SpanWrapper::new(pred.span, mctx.get_active_path()),
-            });
+            self.errors.push(
+                PredicateError::InvalidPredicate {
+                    pred: pred_name,
+                    span: SpanWrapper::new(pred.span, mctx.get_active_path()),
+                }
+                .into(),
+            );
         }
     }
 
