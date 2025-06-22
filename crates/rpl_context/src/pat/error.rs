@@ -6,6 +6,7 @@ use rpl_meta::symbol_table::{MetaVariableType, NonLocalMetaSymTab, WithPath};
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
+use rustc_data_structures::fx::FxHashMap;
 use rustc_errors::{Applicability, LintDiagnostic};
 use rustc_hir::FnDecl;
 use rustc_lint::{Level, Lint};
@@ -113,25 +114,39 @@ enum SubMsg<'i> {
 }
 
 impl<'i> SubMsg<'i> {
-    fn parse(s: &pairs::diagMessageInner<'i, 0>, meta_vars: &NonLocalMetaSymTab) -> Vec<Self> {
+    fn parse(
+        s: &pairs::diagMessageInner<'i, 0>,
+        meta_vars: &NonLocalMetaSymTab,
+        consts: &FxHashMap<Symbol, &'i str>,
+    ) -> Vec<Self> {
         let mut msgs = Vec::new();
         for seg in s.iter_matched() {
             match seg {
                 Choice2::_0(arg) => {
-                    let var = Symbol::intern(arg.MetaVariable().span.as_str());
-                    let (var_type, idx, _) = meta_vars
-                        .get_from_symbol(var)
-                        .unwrap_or_else(|| {
-                            panic!("Meta variable `{}` not found in the non-local meta symbol table", var)
-                        })
-                        .expect_non_adt();
-                    match var_type {
-                        MetaVariableType::Type => msgs.push(SubMsg::Ty(idx.into())),
-                        MetaVariableType::Const => msgs.push(SubMsg::Const(idx.into())),
-                        MetaVariableType::Place => panic!(
-                            "Unexpected place meta variable in diagnostic message: {}",
-                            arg.span.as_str()
-                        ),
+                    let meta_var = arg.MetaVariable();
+                    let name = meta_var.Word();
+                    let meta_var = Symbol::intern(meta_var.span.as_str());
+                    let name = Symbol::intern(name.span.as_str());
+                    if let Some(const_value) = consts.get(&name) {
+                        msgs.push(SubMsg::Str(const_value));
+                    } else {
+                        let (var_type, idx, _) = meta_vars
+                            .get_from_symbol(meta_var)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "Meta variable `{}` not found in the non-local meta symbol table",
+                                    meta_var
+                                )
+                            })
+                            .expect_non_adt();
+                        match var_type {
+                            MetaVariableType::Type => msgs.push(SubMsg::Ty(idx.into())),
+                            MetaVariableType::Const => msgs.push(SubMsg::Const(idx.into())),
+                            MetaVariableType::Place => panic!(
+                                "Unexpected place meta variable in diagnostic message: {}",
+                                arg.span.as_str()
+                            ),
+                        }
                     }
                 },
                 Choice2::_1(text) => {
@@ -252,6 +267,7 @@ impl<'i> DynamicErrorBuilder<'i> {
     pub(super) fn from_item(
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
         meta_vars: &NonLocalMetaSymTab,
+        consts: &FxHashMap<Symbol, &'i str>,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
         let (_, _, _, diags, _, _) = item.get_matched();
@@ -278,22 +294,22 @@ impl<'i> DynamicErrorBuilder<'i> {
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
                     )?;
-                    primary = Some((SubMsg::parse(message, meta_vars), ident));
+                    primary = Some((SubMsg::parse(message, meta_vars, consts), ident));
                 },
                 "label" => {
                     let ident = parse_ident(
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
                     )?;
-                    labels.push((SubMsg::parse(message, meta_vars), ident));
+                    labels.push((SubMsg::parse(message, meta_vars, consts), ident));
                 },
                 "note" => {
                     let ident = args.map(|args| parse_ident(path, args)).transpose()?;
-                    notes.push((SubMsg::parse(message, meta_vars), ident));
+                    notes.push((SubMsg::parse(message, meta_vars, consts), ident));
                 },
                 "help" => {
                     let ident = args.map(|args| parse_ident(path, args)).transpose()?;
-                    helps.push((SubMsg::parse(message, meta_vars), ident));
+                    helps.push((SubMsg::parse(message, meta_vars, consts), ident));
                 },
                 "name" => {
                     if args.is_some() {
@@ -314,8 +330,8 @@ impl<'i> DynamicErrorBuilder<'i> {
                 "suggestion" => {
                     let args = args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?;
                     let (code, span, applicability) = parse_suggestion(path, args)?;
-                    let code = SubMsg::parse(code, meta_vars);
-                    let message = SubMsg::parse(message, meta_vars);
+                    let code = SubMsg::parse(code, meta_vars, consts);
+                    let message = SubMsg::parse(message, meta_vars, consts);
                     suggestions.push((message, code, span, applicability));
                 },
                 _ => unimplemented!("Unrecognized key: {key:?}"),

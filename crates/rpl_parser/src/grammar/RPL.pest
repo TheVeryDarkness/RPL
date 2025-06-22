@@ -59,6 +59,7 @@ kw_Ctor         = @{ "Ctor" ~ !WordFollowing }
 kw_from         = @{ "from" ~ !WordFollowing }
 kw_of           = @{ "of" ~ !WordFollowing }
 kw_raw          = @{ "raw" ~ !WordFollowing }
+// Soft Keyword
 kw_drop         = @{ "drop" ~ !WordFollowing }
 kw_break        = @{ "break" ~ !WordFollowing }
 kw_continue     = @{ "continue" ~ !WordFollowing }
@@ -138,7 +139,6 @@ Keywords = @{
   | kw_from
   | kw_of
   | kw_raw
-  | kw_drop
   | kw_break
   | kw_continue
   | kw_loop
@@ -269,7 +269,7 @@ Word          = @{ WordLeading ~ (WordFollowing)* }
 // RPL identifier and meta variables
 Identifier   = @{ !(Keywords) ~ Word }
 LabelName    = @{ Word }
-MetaVariable = @{ Dollar ~ Word }
+MetaVariable = ${ Dollar ~ Word }
 
 MetaVariableType = {
     kw_type
@@ -908,7 +908,7 @@ Attr = {
 
 // patt block Item
 RPLPatternItem = {
-    Attr? ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
+    Attr* ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
 }
 
 MetaVariableWithDiagMessage = {
