@@ -19,7 +19,6 @@ rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 use std::convert::identity;
 
 use either::Either;
-use rpl_constraints::Constraint;
 use rpl_context::PatCtxt;
 use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::artifact::NormalizedMatched;
@@ -170,20 +169,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     )
                     .check()
                     .into_iter()
-                    .filter(|matched| {
-                        let evaluator = PredicateEvaluator::new(
-                            self.tcx,
-                            ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
-                            body,
-                            &fn_pat.expect_body().labels,
-                            matched,
-                            &fn_pat.symbol_table.meta_vars,
-                        );
-                        fn_pat.constraints.iter().all(|constraint| match constraint {
-                            Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
-                            _ => true,
-                        })
-                    })
+                    .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
                     .map(move |matched| {
                         let labels = &fn_pat.expect_body().labels;
                         (matched, labels, attr_map.clone())
@@ -283,20 +269,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                 )
                 .check()
                 .into_iter()
-                .filter(|matched| {
-                    let evaluator = PredicateEvaluator::new(
-                        self.tcx,
-                        ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
-                        body,
-                        &fn_pat.expect_body().labels,
-                        matched,
-                        &fn_pat.symbol_table.meta_vars,
-                    );
-                    fn_pat.constraints.iter().all(|constraint| match constraint {
-                        Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
-                        _ => true,
-                    })
-                })
+                .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
                 .map(move |matched| {
                     let labels = &fn_pat.expect_body().labels;
                     (matched, labels, attr_map.clone())
@@ -361,6 +334,28 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                 Either::Right(self.fn_matched_pat_op(name, pat_op, def_id, header, has_self, body, mir_cfg, mir_ddg))
             },
         }
+    }
+
+    #[instrument(level = "debug", skip(self, fn_pat, body, matched), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = fn_pat.constraints.len()), ret)]
+    fn check_constraints(
+        &self,
+        name: Symbol,
+        fn_pat: &pat::FnPattern<'pcx>,
+        body: &mir::Body<'tcx>,
+        matched: &Matched<'tcx>,
+    ) -> bool {
+        let evaluator = PredicateEvaluator::new(
+            self.tcx,
+            ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
+            body,
+            &fn_pat.expect_body().labels,
+            matched,
+            &fn_pat.symbol_table.meta_vars,
+        );
+        fn_pat
+            .constraints
+            .iter()
+            .all(|constraint| evaluator.evaluate_constraint(constraint))
     }
 }
 

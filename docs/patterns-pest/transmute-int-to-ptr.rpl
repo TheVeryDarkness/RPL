@@ -11,6 +11,8 @@ patt {
             'to:
             // FIXME: move and copy are both allowed here
             let $transmute_to: $PTR = copy $transmute_from as $PTR (Transmute);
+        } where {
+            translate_from_function($to, std::mem::transmute)
         }
 }
 

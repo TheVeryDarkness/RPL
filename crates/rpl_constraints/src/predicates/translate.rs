@@ -90,6 +90,7 @@ fn get_body_id_from_hir_node(node: Node<'_>) -> Option<BodyId> {
     }
 }
 
+#[instrument(level = "debug", skip(tcx, body), ret)]
 pub fn translate_from_function(
     mir_location: rustc_middle::mir::Location,
     hir_fn_path: Vec<Symbol>,

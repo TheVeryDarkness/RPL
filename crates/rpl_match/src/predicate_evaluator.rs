@@ -1,3 +1,4 @@
+use rpl_constraints::Constraint;
 use rpl_constraints::predicates::{PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm};
 use rpl_context::pat::{ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
 use rpl_meta::symbol_table::{MetaVariable, NonLocalMetaSymTab};
@@ -48,7 +49,15 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         }
     }
 
-    pub fn evaluate_conjunction(&self, conjunction: &PredicateConjunction) -> bool {
+    #[instrument(level = "debug", skip(self), ret)]
+    pub fn evaluate_constraint(&self, constraint: &Constraint) -> bool {
+        match constraint {
+            Constraint::Pred(conjunction) => self.evaluate_conjunction(conjunction),
+            _ => true, // FIX: we should check attributes here
+        }
+    }
+
+    fn evaluate_conjunction(&self, conjunction: &PredicateConjunction) -> bool {
         conjunction.clauses.iter().all(|clause| self.evaluate_clause(clause))
     }
 

@@ -9,7 +9,9 @@ patt {
             let $transmute_from: $T = _;
             'to:
             // FIXME: move and copy are both allowed here
-            let $transmute_to: bool = move $transmute_from as bool (Transmute); // translate_from_hir_function(self.tcx, loc, body, "std::mem::transmute")
+            let $transmute_to: bool = move $transmute_from as bool (Transmute);
+        } where {
+            translate_from_function($to, std::mem::transmute)
         }
 }
 

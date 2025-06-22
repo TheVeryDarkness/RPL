@@ -165,6 +165,7 @@ pub struct FnPattern<'pcx> {
 }
 
 impl<'pcx> FnPattern<'pcx> {
+    #[instrument(level = "trace", skip(pair, pcx, fn_sym_tab))]
     pub fn from(
         pair: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -234,11 +235,12 @@ impl<'pcx> FnPattern<'pcx> {
         (safety, visibility, fn_name, params, ret)
     }
 
+    #[instrument(level = "trace", skip(self, tcx, header), fields(self = ?self.name), ret)]
     pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>) -> bool {
         self.visibility.check(tcx.visibility(def_id)) && self.safety.check_option_header(header.map(|h| h.safety))
     }
     /// Returns the extra spans for this function pattern.
-    #[instrument(level = "debug", skip(tcx), ret)]
+    #[instrument(level = "trace", skip(self, tcx), fields(self = ?self.name), ret)]
     pub fn extra_span<'tcx>(&self, tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Option<ExtraSpan<'tcx>> {
         let mut attr_map = ExtraSpan::default();
         if let Some(inline) = self.inline {
