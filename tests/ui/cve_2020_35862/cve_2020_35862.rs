@@ -2,12 +2,12 @@
 //@compile-flags: -Zinline-mir-forwarder-threshold=200
 //@compile-flags: -Zinline-mir-hint-threshold=200
 
-use core::slice;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::Deref;
 use std::ptr::NonNull;
+use std::slice;
 
 pub trait BitStore: Copy {
     /// The width, in bits, of this type.
@@ -523,3 +523,5 @@ where
         self.into_vec().into_boxed_slice()
     }
 }
+
+fn main() {}

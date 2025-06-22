@@ -127,7 +127,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             intravisit::FnKind::Method(_, fn_sig) => Some(fn_sig.header),
             intravisit::FnKind::Closure => None,
         };
-        self.check_fn(decl, header, def_id);
+        self.check_fn(decl, header, decl.implicit_self.has_implicit_self(), def_id);
         intravisit::walk_fn(self, kind, decl, body_id, def_id);
     }
 }
@@ -139,6 +139,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         rpl_rust_items: &'pcx pat::RustItems<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
+        has_self: bool,
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
@@ -156,98 +157,17 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     // if *fn_name != impl_item.ident.name {
                     //     continue;
                     // }
-                    CheckMirCtxt::new(self.tcx, self.pcx, body, rpl_rust_items, name, fn_pat, mir_cfg, mir_ddg)
-                        .check()
-                        .into_iter()
-                        .filter(|matched| {
-                            let evaluator = PredicateEvaluator::new(
-                                self.tcx,
-                                ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
-                                body,
-                                &fn_pat.expect_body().labels,
-                                matched,
-                                &fn_pat.symbol_table.meta_vars,
-                            );
-                            fn_pat.constraints.iter().all(|constraint| match constraint {
-                                Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
-                                _ => true,
-                            })
-                        })
-                        .map(move |matched| {
-                            let labels = &fn_pat.expect_body().labels;
-                            (matched, labels, attr_map.clone())
-                        })
-                })
-        })
-    }
-
-    fn impl_matched_pat_op<'a>(
-        &self,
-        name: Symbol,
-        pat_op: &pat::PatternOperation<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let positive = self
-            .impl_matched_pat_item(name, pat_op.positive.0, def_id, header, body, mir_cfg, mir_ddg)
-            .map(|matched| matched.map(&pat_op.positive.1));
-        let negative: FxHashSet<_> = pat_op
-            .negative
-            .iter()
-            .flat_map(|negative| {
-                self.impl_matched_pat_item(name, negative.0, def_id, header, body, mir_cfg, mir_ddg)
-                    .map(|matched| matched.map(&negative.1))
-            })
-            .collect();
-        positive
-            .filter(move |matched| !negative.contains(matched))
-            .collect::<Vec<_>>()
-            .into_iter()
-    }
-
-    fn impl_matched_pat_item<'a>(
-        &self,
-        name: Symbol,
-        pat_op: &'pcx PatternItem<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        match pat_op {
-            PatternItem::RustItems(rust_items) => Either::Left(
-                self.impl_matched(name, rust_items, def_id, header, body, mir_cfg, mir_ddg)
-                    .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map)),
-            ),
-            PatternItem::RPLPatternOperation(pat_op) => {
-                Either::Right(self.impl_matched_pat_op(name, pat_op, def_id, header, body, mir_cfg, mir_ddg))
-            },
-        }
-    }
-
-    fn fn_matched<'a>(
-        &self,
-        name: Symbol,
-        rpl_rust_items: &'pcx pat::RustItems<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = (Matched<'tcx>, &'pcx LabelMap, ExtraSpan<'tcx>)> {
-        rpl_rust_items
-            .fns
-            .iter()
-            .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
-            .filter(move |fn_pat| fn_pat.predicates.iter().all(|pred| pred(self.tcx, def_id)))
-            .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
-            .flat_map(move |(fn_pat, attr_map)| {
-                // FIXME: check constraints::attributes, i.e. pre-match filtering
-                CheckMirCtxt::new(self.tcx, self.pcx, body, rpl_rust_items, name, fn_pat, mir_cfg, mir_ddg)
+                    CheckMirCtxt::new(
+                        self.tcx,
+                        self.pcx,
+                        body,
+                        has_self,
+                        rpl_rust_items,
+                        name,
+                        fn_pat,
+                        mir_cfg,
+                        mir_ddg,
+                    )
                     .check()
                     .into_iter()
                     .filter(|matched| {
@@ -268,6 +188,119 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                         let labels = &fn_pat.expect_body().labels;
                         (matched, labels, attr_map.clone())
                     })
+                })
+        })
+    }
+
+    fn impl_matched_pat_op<'a>(
+        &self,
+        name: Symbol,
+        pat_op: &pat::PatternOperation<'pcx>,
+        def_id: LocalDefId,
+        header: Option<FnHeader>,
+        has_self: bool,
+        body: &'a mir::Body<'tcx>,
+        mir_cfg: &'a MirControlFlowGraph,
+        mir_ddg: &'a MirDataDepGraph,
+    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+        let positive = self
+            .impl_matched_pat_item(
+                name,
+                pat_op.positive.0,
+                def_id,
+                header,
+                has_self,
+                body,
+                mir_cfg,
+                mir_ddg,
+            )
+            .map(|matched| matched.map(&pat_op.positive.1));
+        let negative: FxHashSet<_> = pat_op
+            .negative
+            .iter()
+            .flat_map(|negative| {
+                self.impl_matched_pat_item(name, negative.0, def_id, header, has_self, body, mir_cfg, mir_ddg)
+                    .map(|matched| matched.map(&negative.1))
+            })
+            .collect();
+        positive
+            .filter(move |matched| !negative.contains(matched))
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    fn impl_matched_pat_item<'a>(
+        &self,
+        name: Symbol,
+        pat_op: &'pcx PatternItem<'pcx>,
+        def_id: LocalDefId,
+        header: Option<FnHeader>,
+        has_self: bool,
+        body: &'a mir::Body<'tcx>,
+        mir_cfg: &'a MirControlFlowGraph,
+        mir_ddg: &'a MirDataDepGraph,
+    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+        match pat_op {
+            PatternItem::RustItems(rust_items) => Either::Left(
+                self.impl_matched(name, rust_items, def_id, header, has_self, body, mir_cfg, mir_ddg)
+                    .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map)),
+            ),
+            PatternItem::RPLPatternOperation(pat_op) => {
+                Either::Right(self.impl_matched_pat_op(name, pat_op, def_id, header, has_self, body, mir_cfg, mir_ddg))
+            },
+        }
+    }
+
+    fn fn_matched<'a>(
+        &self,
+        name: Symbol,
+        rpl_rust_items: &'pcx pat::RustItems<'pcx>,
+        def_id: LocalDefId,
+        header: Option<FnHeader>,
+        has_self: bool,
+        body: &'a mir::Body<'tcx>,
+        mir_cfg: &'a MirControlFlowGraph,
+        mir_ddg: &'a MirDataDepGraph,
+    ) -> impl Iterator<Item = (Matched<'tcx>, &'pcx LabelMap, ExtraSpan<'tcx>)> {
+        rpl_rust_items
+            .fns
+            .iter()
+            .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
+            .filter(move |fn_pat| fn_pat.predicates.iter().all(|pred| pred(self.tcx, def_id)))
+            .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
+            .flat_map(move |(fn_pat, attr_map)| {
+                // FIXME: check constraints::attributes, i.e. pre-match filtering
+                CheckMirCtxt::new(
+                    self.tcx,
+                    self.pcx,
+                    body,
+                    has_self,
+                    rpl_rust_items,
+                    name,
+                    fn_pat,
+                    mir_cfg,
+                    mir_ddg,
+                )
+                .check()
+                .into_iter()
+                .filter(|matched| {
+                    let evaluator = PredicateEvaluator::new(
+                        self.tcx,
+                        ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
+                        body,
+                        &fn_pat.expect_body().labels,
+                        matched,
+                        &fn_pat.symbol_table.meta_vars,
+                    );
+                    fn_pat.constraints.iter().all(|constraint| match constraint {
+                        Constraint::Pred(conjunction) => evaluator.evaluate_conjunction(conjunction),
+                        _ => true,
+                    })
+                })
+                .map(move |matched| {
+                    let labels = &fn_pat.expect_body().labels;
+                    (matched, labels, attr_map.clone())
+                })
             })
     }
 
@@ -277,18 +310,28 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         pat_op: &pat::PatternOperation<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
+        has_self: bool,
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
         let positive = self
-            .fn_matched_pat_item(name, pat_op.positive.0, def_id, header, body, mir_cfg, mir_ddg)
+            .fn_matched_pat_item(
+                name,
+                pat_op.positive.0,
+                def_id,
+                header,
+                has_self,
+                body,
+                mir_cfg,
+                mir_ddg,
+            )
             .map(|matched| matched.map(&pat_op.positive.1));
         let negative: FxHashSet<_> = pat_op
             .negative
             .iter()
             .flat_map(|negative| {
-                self.fn_matched_pat_item(name, negative.0, def_id, header, body, mir_cfg, mir_ddg)
+                self.fn_matched_pat_item(name, negative.0, def_id, header, has_self, body, mir_cfg, mir_ddg)
                     .map(|matched| matched.map(&negative.1))
             })
             .collect();
@@ -304,17 +347,18 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         pat_op: &'pcx PatternItem<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
+        has_self: bool,
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
         match pat_op {
             PatternItem::RustItems(rust_items) => Either::Left(
-                self.fn_matched(name, rust_items, def_id, header, body, mir_cfg, mir_ddg)
+                self.fn_matched(name, rust_items, def_id, header, has_self, body, mir_cfg, mir_ddg)
                     .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map)),
             ),
             PatternItem::RPLPatternOperation(pat_op) => {
-                Either::Right(self.fn_matched_pat_op(name, pat_op, def_id, header, body, mir_cfg, mir_ddg))
+                Either::Right(self.fn_matched_pat_op(name, pat_op, def_id, header, has_self, body, mir_cfg, mir_ddg))
             },
         }
     }
@@ -324,7 +368,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     #[instrument(level = "debug", skip_all)]
     fn check_impl(&mut self, impl_: &hir::Impl<'tcx>) {
         for impl_item in impl_.items {
-            if let hir::AssocItemKind::Fn { .. } = impl_item.kind {
+            if let hir::AssocItemKind::Fn { has_self } = impl_item.kind {
                 let id = impl_item.id;
                 let impl_item = self.tcx.hir().impl_item(id);
                 let def_id = impl_item.owner_id.def_id;
@@ -345,6 +389,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                 rpl_rust_items,
                                                 def_id,
                                                 header,
+                                                has_self,
                                                 body,
                                                 &mir_cfg,
                                                 &mir_ddg,
@@ -367,7 +412,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                         },
                                         PatternItem::RPLPatternOperation(pat_op) => {
                                             for matched in self.impl_matched_pat_op(
-                                                name, pat_op, def_id, header, body, &mir_cfg, &mir_ddg,
+                                                name, pat_op, def_id, header, has_self, body, &mir_cfg, &mir_ddg,
                                             ) {
                                                 let error = pattern
                                                     .get_diag(name, body, decl, &matched)
@@ -391,7 +436,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         }
     }
     #[instrument(level = "debug", skip(self, decl, header))]
-    fn check_fn(&mut self, decl: &hir::FnDecl<'tcx>, header: Option<FnHeader>, def_id: LocalDefId) {
+    fn check_fn(&mut self, decl: &hir::FnDecl<'tcx>, header: Option<FnHeader>, has_self: bool, def_id: LocalDefId) {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
@@ -400,9 +445,16 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                 for (&name, pat_item) in &pattern.patt_block {
                     match pat_item {
                         PatternItem::RustItems(rpl_rust_items) => {
-                            for (matched, labels, attr_map) in
-                                self.fn_matched(name, rpl_rust_items, def_id, header, body, &mir_cfg, &mir_ddg)
-                            {
+                            for (matched, labels, attr_map) in self.fn_matched(
+                                name,
+                                rpl_rust_items,
+                                def_id,
+                                header,
+                                has_self,
+                                body,
+                                &mir_cfg,
+                                &mir_ddg,
+                            ) {
                                 let error = pattern
                                     .get_diag(name, body, decl, &MatchedWithLabelMap(labels, &matched, &attr_map))
                                     .unwrap_or_else(identity);
@@ -415,9 +467,16 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                             }
                         },
                         PatternItem::RPLPatternOperation(pat_op) => {
-                            for matched in
-                                self.fn_matched_pat_op(name, pat_op, def_id.into(), header, body, &mir_cfg, &mir_ddg)
-                            {
+                            for matched in self.fn_matched_pat_op(
+                                name,
+                                pat_op,
+                                def_id.into(),
+                                header,
+                                has_self,
+                                body,
+                                &mir_cfg,
+                                &mir_ddg,
+                            ) {
                                 let error = pattern.get_diag(name, body, decl, &matched).unwrap_or_else(identity);
                                 self.tcx.emit_node_span_lint(
                                     error.lint(),

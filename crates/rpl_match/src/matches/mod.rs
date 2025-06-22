@@ -407,7 +407,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                         pat::Rvalue::Any,
                     ) = block_pat.statements[loc_pat.statement_index]
                 {
-                    if self.cx.mir_pat.self_idx == Some(local_pat) {
+                    if self.cx.mir_pat.self_idx == Some(local_pat) && self.cx.has_self {
                         let self_value = mir::Local::from_u32(1);
                         if self.cx.match_local(local_pat, self_value) {
                             info!(
