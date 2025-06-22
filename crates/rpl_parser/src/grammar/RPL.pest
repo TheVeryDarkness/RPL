@@ -33,9 +33,10 @@ kw_PointerCoercion = @{ "PointerCoercion" ~ !WordFollowing }
 // Soft Keyword
 kw_Unsize = @{ "Unsize" ~ !WordFollowing }
 // Soft Keyword
-kw_Implicit     = @{ "Implicit" ~ !WordFollowing }
+kw_Implicit                = @{ "Implicit" ~ !WordFollowing }
+kw_PointerExposeProvenance = @{ "PointerExposeProvenance" ~ !WordFollowing }
 // Soft Keyword
-kw_Restricted     = @{ "restricted" ~ !WordFollowing }
+kw_Restricted   = @{ "restricted" ~ !WordFollowing }
 kw_Add          = @{ "Add" ~ !WordFollowing }
 kw_Sub          = @{ "Sub" ~ !WordFollowing }
 kw_Mul          = @{ "Mul" ~ !WordFollowing }
@@ -114,6 +115,7 @@ Keywords = @{
   | kw_IntToInt
   | kw_Transmute
   | kw_PointerCoercion
+  | kw_PointerExposeProvenance
   | kw_Add
   | kw_Sub
   | kw_Mul
@@ -586,6 +588,7 @@ MirCastKind = {
   | kw_IntToInt
   | kw_Transmute
   | kw_PointerCoercion ~ LeftParen ~ PointerCoercion ~ Comma ~ CoercionSource ~ RightParen
+  | kw_PointerExposeProvenance
 }
 
 MirRvalueCast = {

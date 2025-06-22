@@ -1,0 +1,27 @@
+pattern transmute-int-to-ptr
+
+patt {
+    p_transmute_int_to_ptr[
+        $INT: type where is_integral(self),
+        $PTR: type where is_ptr(self),
+    ] =
+        fn _(..) -> _ {
+            'from:
+            let $transmute_from: $INT = _;
+            'to:
+            // FIXME: move and copy are both allowed here
+            let $transmute_to: $PTR = copy $transmute_from as $PTR (Transmute);
+        }
+}
+
+diag {
+    p_transmute_int_to_ptr = {
+        primary(from) = "it is unsound to transmute an integer type `{$INT}` to a pointer type `{$PTR}`",
+        label(from)   = "transmuted from here",
+        label(to)     = "transmuted to here",
+        note          = "transmuting integers to pointers is a largely unspecified operation",
+        help          = "See https://doc.rust-lang.org/std/mem/fn.transmute.html#transmutation-between-pointers-and-integers",
+        level         = "warn",
+        name          = "transmuting_int_to_ptr",
+    }
+}

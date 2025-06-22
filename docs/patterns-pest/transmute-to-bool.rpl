@@ -1,0 +1,26 @@
+pattern transmute-to-bool
+
+patt {
+    p_transmute_to_bool[
+        $T: type,
+    ] =
+        fn _(..) -> _ {
+            'from:
+            let $transmute_from: $T = _;
+            'to:
+            // FIXME: move and copy are both allowed here
+            let $transmute_to: bool = move $transmute_from as bool (Transmute); // translate_from_hir_function(self.tcx, loc, body, "std::mem::transmute")
+        }
+}
+
+diag {
+    p_transmute_to_bool = {
+        primary(from) = "it is unsound to transmute a type `{$T}` to a boolean",
+        label(from)   = "transmuted from here",
+        label(to)     = "transmuted to here",
+        note          = "transmuting types to booleans probably produces a boolean value with an invalid state",
+        help          = "See https://doc.rust-lang.org/std/mem/fn.transmute.html",
+        level         = "warn",
+        name          = "transmuting_type_to_bool",
+    }
+}
