@@ -9,11 +9,13 @@ use rustc_span::Symbol;
 // When you add a new module here,
 // Try to keep all predicate signatures consistent in it.
 mod multiple_tys;
+mod single_fn;
 mod single_ty;
 mod translate;
 mod trivial;
 
 pub use multiple_tys::*;
+pub use single_fn::*;
 pub use single_ty::*;
 use thiserror::Error;
 pub use translate::*;
@@ -48,6 +50,8 @@ pub const ALL_PREDICATES: &[&str] = &[
     // multiple_tys_preds
     "same_size",
     "same_abi_and_pref_align",
+    // single_fn_preds
+    "requires_monomorphization",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -56,6 +60,7 @@ pub enum PredicateKind {
     Translate(TranslatePredsFnPtr),
     Trivial(TrivialPredsFnPtr),
     MultipleTys(MultipleTysPredsFnPtr),
+    Fn(SingleFnPredsFnPtr),
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -74,6 +79,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "true" => Self::Trivial(r#true),
             "same_size" => Self::MultipleTys(same_size),
             "same_abi_and_pref_align" => Self::MultipleTys(same_abi_and_pref_align),
+            "requires_monomorphization" => Self::Fn(requires_monomorphization),
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

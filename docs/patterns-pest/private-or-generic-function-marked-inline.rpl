@@ -1,0 +1,39 @@
+pattern private-or-generic-function-marked-inline
+
+patt {
+    p_private_inline = {
+        #[inline(any)]
+        pub(restricted) fn $fn(..) {
+
+        }
+    }
+    p_generic_inline = {
+        #[inline(any)]
+        #[rpl(requires_monomorphization)]
+        fn $fn(..) {
+
+        }
+    }
+}
+
+diag {
+    p_private_inline = {
+        primary(fn) = "it usually isn't necessary to apply #[inline] to private functions",
+        label(fn)   = "`#[inline]` applied here",
+        // label(attr) = "`#[inline]` here",
+        note        = "the compiler generally makes good inline decisions about private functions",
+        help        = "See https://matklad.github.io/2021/07/09/inline-in-rust.html",
+        level       = "warn",
+        name        = "private_function_marked_inline",
+    }
+
+    p_generic_inline = {
+        primary(fn) = "it usually isn't necessary to apply #[inline] to generic functions",
+        label(fn)   = "`#[inline]` applied here",
+        // label(attr) = "`#[inline]` here",
+        note        = "generic functions are always `#[inline]` (monomorphization)",
+        help        = "See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html",
+        level       = "warn",
+        name        = "generic_function_marked_inline",
+    }
+}

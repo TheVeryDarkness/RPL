@@ -34,6 +34,8 @@ kw_PointerCoercion = @{ "PointerCoercion" ~ !WordFollowing }
 kw_Unsize = @{ "Unsize" ~ !WordFollowing }
 // Soft Keyword
 kw_Implicit     = @{ "Implicit" ~ !WordFollowing }
+// Soft Keyword
+kw_Restricted     = @{ "restricted" ~ !WordFollowing }
 kw_Add          = @{ "Add" ~ !WordFollowing }
 kw_Sub          = @{ "Sub" ~ !WordFollowing }
 kw_Mul          = @{ "Mul" ~ !WordFollowing }
@@ -810,8 +812,16 @@ FnParamsSeparatedByComma = {
     FnParam ~ (Comma ~ FnParam)* ~ Comma?
 }
 
+Visibility = {
+    kw_pub ~ (LeftParen ~ kw_Restricted ~ RightParen)?
+}
+
+Safety = {
+    kw_unsafe
+}
+
 FnSig = {
-    kw_unsafe? ~ kw_pub? ~ kw_fn ~ FnName ~ LeftParen ~ FnParamsSeparatedByComma? ~ RightParen ~ FnRet?
+    Visibility? ~ Safety? ~ kw_fn ~ FnName ~ LeftParen ~ FnParamsSeparatedByComma? ~ RightParen ~ FnRet?
 }
 
 FnBody = {
@@ -866,7 +876,7 @@ RustItem                = {
   | Impl
 }
 RustItemWithConstraint  = {
-    RustItem ~ WhereBlock?
+    Attr* ~ RustItem ~ WhereBlock?
 }
 RustItemsWithConstraint = { LeftBrace ~ (RustItemWithConstraint)+ ~ RightBrace }
 
@@ -889,13 +899,13 @@ RustItemsOrPatternOperation = {
   | PatternOperation
 }
 
-attr = {
+Attr = {
     Hash ~ LeftBracket ~ diagAttrs ~ RightBracket
 }
 
 // patt block Item
 RPLPatternItem = {
-    attr? ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
+    Attr? ~ Identifier ~ MetaVariableDeclList? ~ Assign ~ RustItemsOrPatternOperation
 }
 
 MetaVariableWithDiagMessage = {

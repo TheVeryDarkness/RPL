@@ -3,17 +3,18 @@ use std::sync::Arc;
 
 use derive_more::derive::Debug;
 use rpl_constraints::Constraint;
+use rpl_constraints::predicates::SingleFnPredsFnPtr;
+use rpl_meta::check::{Inline, Safety, Visibility};
 use rpl_meta::collect_elems_separated_by_comma;
-use rpl_meta::symbol_table::{Visibility, WithMetaTable, WithPath};
+use rpl_meta::symbol_table::{WithMetaTable, WithPath};
 use rpl_parser::generics::Choice4;
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
-use rustc_hir::Safety;
 use rustc_middle::mir;
 use rustc_span::Symbol;
 
 use super::utils::mutability_from_pair_mutability;
-use super::{FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
+use super::{FnAttr, FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
 use crate::PatCtxt;
 
 pub type StructInner<'pcx> = Variant<'pcx>;
@@ -149,12 +150,14 @@ pub struct FnPatterns<'pcx> {
 pub struct FnPattern<'pcx> {
     pub safety: Safety,
     pub visibility: Visibility,
+    pub inline: Inline,
     pub name: Symbol,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub symbol_table: &'pcx FnSymbolTable<'pcx>,
     pub params: Params<'pcx>,
     pub ret: Option<Ty<'pcx>>,
     pub body: Option<&'pcx FnPatternBody<'pcx>>,
+    pub predicates: Vec<SingleFnPredsFnPtr>,
     pub constraints: Vec<Constraint>,
 }
 
@@ -164,6 +167,7 @@ impl<'pcx> FnPattern<'pcx> {
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
+        attr: FnAttr,
         constraints: Vec<Constraint>,
     ) -> Self {
         let p = pair.path;
@@ -188,18 +192,20 @@ impl<'pcx> FnPattern<'pcx> {
         builder.mk_locals(fn_sym_tab, pcx);
         builder.mk_raw_decls(raw_decls);
         builder.mk_raw_stmts(raw_stmts);
-        let mir = builder.build(name);
+        let mir = builder.build(name, attr.output);
         let body = Some(pcx.mk_mir_pattern(mir));
 
         Self {
             safety,
             visibility,
+            inline: attr.inline.unwrap_or_default(),
             meta,
             name,
             params,
             ret,
             body,
             constraints,
+            predicates: attr.predicates,
             symbol_table: fn_sym_tab,
         }
     }
@@ -210,17 +216,9 @@ impl<'pcx> FnPattern<'pcx> {
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> (Safety, Visibility, Symbol, Params<'pcx>, Option<Ty<'pcx>>) {
         let p = sig.path;
-        let (unsafety, visibility, _, fn_name, _, params_pair, _, ret) = sig.get_matched();
-        let safety = if unsafety.is_some() {
-            Safety::Unsafe
-        } else {
-            Safety::Safe
-        };
-        let visibility = if visibility.is_some() {
-            Visibility::Public
-        } else {
-            Visibility::Private
-        };
+        let (visibility, unsafety, _, fn_name, _, params_pair, _, ret) = sig.get_matched();
+        let safety = Safety::parse(unsafety.as_ref());
+        let visibility = Visibility::parse(visibility.as_ref());
         let fn_name = Symbol::intern(fn_name.span.as_str());
         let params = if let Some(params_pair) = params_pair {
             Params::from(WithPath::new(p, params_pair), pcx, fn_sym_tab)

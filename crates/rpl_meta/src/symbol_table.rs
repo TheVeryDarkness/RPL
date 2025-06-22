@@ -781,11 +781,6 @@ impl<'i> FnInner<'i> {
     }
 }
 
-pub enum Visibility {
-    Public,
-    Private,
-}
-
 pub type Struct<'i> = WithMetaTable<'i, StructInner<'i>>;
 
 pub type StructInner<'pcx> = Variant<'pcx>;

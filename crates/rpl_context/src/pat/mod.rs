@@ -2,7 +2,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use error::{DynamicError, DynamicErrorBuilder};
-use rpl_constraints::Constraint;
+use rpl_constraints::{Constraint, predicates};
+use rpl_meta::check::Inline;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;
 use rpl_meta::utils::Ident;
@@ -49,12 +50,12 @@ pub enum PattOrUtil {
 }
 
 #[derive(Default)]
-pub(crate) struct Attr {
+pub(crate) struct PatAttr {
     diag: Option<Symbol>,
 }
 
-impl Attr {
-    fn parse(pairs: &pairs::attr<'_>) -> Self {
+impl PatAttr {
+    fn parse(pairs: &pairs::Attr<'_>) -> Self {
         let mut result = Self::default();
         let (_, _, attrs, _) = pairs.get_matched();
         for attr in collect_elems_separated_by_comma!(attrs) {
@@ -68,6 +69,76 @@ impl Attr {
                     },
                 },
                 _ => unreachable!(),
+            }
+        }
+        result
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct FnAttr {
+    output: Option<Symbol>,
+    inline: Option<Inline>,
+    predicates: Vec<predicates::SingleFnPredsFnPtr>,
+}
+
+impl FnAttr {
+    fn parse<'i>(pairs: impl Iterator<Item = &'i pairs::Attr<'i>>) -> Self {
+        let mut result = Self::default();
+        for pairs in pairs {
+            let (_, _, attrs, _) = pairs.get_matched();
+            for attr in collect_elems_separated_by_comma!(attrs) {
+                let (key, value) = attr.get_matched();
+                match key.span.as_str() {
+                    "output" => match value {
+                        Some(Choice2::_0(_)) | None => unreachable!(),
+                        Some(Choice2::_1(msg)) => {
+                            let (_, msg) = msg.get_matched();
+                            result.output = Some(Symbol::intern(msg.diagMessageInner().span.as_str()));
+                        },
+                    },
+                    "inline" => match value {
+                        Some(Choice2::_1(_)) | None => unreachable!(),
+                        Some(Choice2::_0(msg)) => {
+                            let (_, msg, _) = msg.get_matched();
+                            if let Some(msg) = msg {
+                                let inner = collect_elems_separated_by_comma!(msg).collect::<Vec<_>>();
+                                if inner.len() != 1 {
+                                    panic!("Expected exactly one output, found {}", inner.len());
+                                }
+                                let (level, attr) = inner[0].get_matched();
+                                assert!(attr.is_none(), "Unexpected attribute in output: {attr:?}");
+                                result.inline = match level.span.as_str() {
+                                    "always" => Some(Inline::Always),
+                                    "any" => Some(Inline::Any),
+                                    "never" => Some(Inline::Never),
+                                    _ => panic!("Unexpected inline level: {}", level.span.as_str()),
+                                };
+                            } else {
+                                result.inline = Some(Inline::Normal);
+                            }
+                        },
+                    },
+                    "rpl" => match value {
+                        Some(Choice2::_1(_)) | None => unreachable!(),
+                        Some(Choice2::_0(inner)) => {
+                            let (_, inner, _) = inner.get_matched();
+                            if let Some(inner) = inner {
+                                for inner in collect_elems_separated_by_comma!(inner) {
+                                    let (key, value) = inner.get_matched();
+                                    assert!(value.is_none(), "Unexpected value in RPL attribute: {value:?}");
+                                    match key.span.as_str() {
+                                        "requires_monomorphization" => {
+                                            result.predicates.push(predicates::requires_monomorphization);
+                                        },
+                                        _ => panic!("Unexpected RPL attribute: {}", key.span.as_str()),
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    _ => unreachable!(),
+                }
             }
         }
         result
@@ -104,7 +175,7 @@ pub struct RustItems<'pcx> {
 }
 
 impl<'pcx> RustItems<'pcx> {
-    pub(crate) fn new(pcx: PatCtxt<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>, attr: Attr) -> Self {
+    pub(crate) fn new(pcx: PatCtxt<'pcx>, meta: Arc<NonLocalMetaVars<'pcx>>, attr: PatAttr) -> Self {
         Self {
             pcx,
             meta,
@@ -123,21 +194,25 @@ impl<'pcx> RustItems<'pcx> {
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
     ) {
         let path = item.path;
-        let (item, where_block) = item.get_matched();
+        let (attr, item, where_block) = item.get_matched();
         let constraints = Constraint::from_where_block_opt(where_block, path).expect("unexpected error in constraints");
         match item.deref() {
             Choice4::_0(rust_fn) => {
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_symbol_table = symbol_table.get_fn(fn_name).unwrap();
-                self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, constraints);
+                let attr = FnAttr::parse(attr.iter_matched());
+                self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, attr, constraints);
             },
             Choice4::_1(rust_struct) => {
+                debug_assert!(attr.content.is_empty(), "Unhandled attributes in struct: {:?}", attr);
                 self.add_struct(pat_name, with_path(path, rust_struct), meta, symbol_table, constraints)
             },
             Choice4::_2(rust_enum) => {
+                debug_assert!(attr.content.is_empty(), "Unhandled attributes in enum: {:?}", attr);
                 self.add_enum(pat_name, with_path(path, rust_enum), meta, symbol_table, constraints)
             },
             Choice4::_3(rust_impl) => {
+                debug_assert!(attr.content.is_empty(), "Unhandled attributes in impl: {:?}", attr);
                 self.add_impl(pat_name, with_path(path, rust_impl), meta, symbol_table, constraints)
             },
         }
@@ -149,9 +224,10 @@ impl<'pcx> RustItems<'pcx> {
         rust_fn: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         fn_symbol_table: &'pcx FnSymbolTable<'pcx>,
+        attr: FnAttr,
         constraints: Vec<Constraint>,
     ) {
-        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, constraints);
+        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, attr, constraints);
         let fn_pat = self.pcx.alloc_fn(fn_pat);
         let fn_name = fn_pat.name;
         match fn_name.as_str() {
@@ -272,6 +348,7 @@ impl<'pcx> RustItems<'pcx> {
                     self.pcx,
                     fn_sym_tab,
                     Arc::clone(&meta),
+                    FnAttr::default(),
                     constraints,
                 );
                 (fn_name, fn_def)
@@ -372,7 +449,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_item_or_patt_op(
         &mut self,
         pat_name: Symbol,
-        attr: Option<&'pcx pairs::attr<'pcx>>,
+        attr: Option<&'pcx pairs::Attr<'pcx>>,
         item_or_patt_op: WithPath<'pcx, &'pcx pairs::RustItemsOrPatternOperation<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
@@ -420,7 +497,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_patt_op(
         &mut self,
         pat_name: Symbol,
-        attr: Option<&'pcx pairs::attr<'pcx>>,
+        attr: Option<&'pcx pairs::Attr<'pcx>>,
         patt_op: WithPath<'pcx, &'pcx pairs::PatternOperation<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         block_type: PattOrUtil,
@@ -428,7 +505,7 @@ impl<'pcx> Pattern<'pcx> {
         let (pos, neg) = patt_op.PatternConfiguration();
         let positive = self.patt_op(&meta, pos);
         let negative = neg.iter().map(|negative| self.patt_op(&meta, negative)).collect();
-        let attr = attr.map(Attr::parse).unwrap_or_default();
+        let attr = attr.map(PatAttr::parse).unwrap_or_default();
         let pat_ops = PatternOperation {
             pcx: self.pcx,
             meta,
@@ -454,7 +531,7 @@ impl<'pcx> Pattern<'pcx> {
     fn add_items(
         &mut self,
         pat_name: Symbol,
-        attr: Option<&'pcx pairs::attr<'pcx>>,
+        attr: Option<&'pcx pairs::Attr<'pcx>>,
         items: WithPath<'pcx, impl Iterator<Item = &'pcx pairs::RustItemWithConstraint<'pcx>>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
@@ -464,7 +541,7 @@ impl<'pcx> Pattern<'pcx> {
         match block_type {
             PattOrUtil::Patt => {
                 self.patt_block.entry(pat_name).or_insert_with(|| {
-                    let attr = attr.map(Attr::parse).unwrap_or_default();
+                    let attr = attr.map(PatAttr::parse).unwrap_or_default();
                     let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone(), attr);
                     for item in items.inner {
                         rpl_rust_items.add_item(Some(pat_name), with_path(p, item), meta.clone(), symbol_table);
@@ -474,7 +551,7 @@ impl<'pcx> Pattern<'pcx> {
             },
             PattOrUtil::Util => {
                 self.util_block.entry(pat_name).or_insert_with(|| {
-                    let attr = attr.map(Attr::parse).unwrap_or_default();
+                    let attr = attr.map(PatAttr::parse).unwrap_or_default();
                     let mut rpl_rust_items = RustItems::new(self.pcx, meta.clone(), attr);
                     for item in items.inner {
                         rpl_rust_items.add_item(Some(pat_name), with_path(p, item), meta.clone(), symbol_table);

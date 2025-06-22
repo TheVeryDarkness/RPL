@@ -91,6 +91,13 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
                 p(self.tcx, self.typing_env, args)
             },
+            PredicateKind::Fn(_) => {
+                assert!(
+                    arg_instance.len() == 1,
+                    "PredicateKind::Fn should have exactly one argument"
+                );
+                todo!("Implement PredicateKind::Fn evaluation");
+            },
             PredicateKind::Translate(p) => {
                 assert!(
                     arg_instance.len() == 2,

@@ -1142,14 +1142,19 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         }
     }
 
-    pub fn build(mut self, name: Symbol) -> FnPatternBody<'pcx> {
+    pub fn build(mut self, name: Symbol, output: Option<Symbol>) -> FnPatternBody<'pcx> {
         self.new_block_if_terminated();
         self.pattern.basic_blocks[self.current].set_terminator(TerminatorKind::PatEnd);
 
-        // If the function name starts with `$`, it now refers to its output type.
+        // If the function name starts with `$`, it now refers to the function's body.
         let name_str = name.as_str();
         if let Some(ident) = name_str.strip_prefix("$") {
-            _ = self.pattern.labels.try_insert(Symbol::intern(ident), Spanned::Output);
+            _ = self.pattern.labels.try_insert(Symbol::intern(ident), Spanned::Body);
+        }
+
+        // If `output` is `Some`, it refers to the function's output type.
+        if let Some(output) = output {
+            _ = self.pattern.labels.try_insert(output, Spanned::Output);
         }
 
         self.pattern
