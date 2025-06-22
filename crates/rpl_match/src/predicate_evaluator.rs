@@ -68,16 +68,8 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
     fn evaluate_term(&self, term: &PredicateTerm) -> bool {
         let mut arg_instance = Vec::new();
         for arg in term.args.iter() {
-            let res = self.instantiate_arg(arg);
-            if let Ok(instance) = res {
-                arg_instance.push(instance);
-            } else {
-                info!(
-                    "Encountered error when instantiating predicate arg: {}",
-                    res.unwrap_err()
-                );
-                return false; // FIXME: return undecided
-            }
+            let instance = self.instantiate_arg(arg).unwrap();
+            arg_instance.push(instance);
         }
         match term.kind {
             PredicateKind::Ty(p) => {
@@ -147,7 +139,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 let pat_loc = self
                     .label_map
                     .get(label)
-                    .ok_or_else(|| format!("label `{}` not found", label))?;
+                    .ok_or_else(|| format!("label `{}` not found in {:?}", label, self.label_map))?;
                 match pat_loc {
                     Spanned::Local(local) => Ok(PredicateArgInstance::Local(self.matched[*local])),
                     Spanned::Location(location) => {
@@ -182,7 +174,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                         MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
                     }
                 } else {
-                    Err(format!("meta_var `{}` not found", name))
+                    Err(format!("meta_var `{}` not found in {:?}", name, self.symbol_table))
                 }
             },
             PredicateArg::Path(path) => Ok(PredicateArgInstance::Path(path.clone())),
