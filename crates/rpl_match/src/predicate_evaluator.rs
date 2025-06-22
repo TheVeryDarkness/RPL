@@ -114,6 +114,21 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
             },
             PredicateKind::Trivial(p) => p(),
+            PredicateKind::TyConst(p) => {
+                assert!(
+                    arg_instance.len() == 2,
+                    "PredicateKind::TyConst should have exactly two arguments"
+                );
+                match (&arg_instance[0], &arg_instance[1]) {
+                    (PredicateArgInstance::Ty(ty), PredicateArgInstance::Const(konst)) => {
+                        p(self.tcx, self.body, self.typing_env, *ty, *konst)
+                    },
+                    _ => panic!(
+                        "PredicateArgInstance::Ty and PredicateArgInstance::Const expected, got {:?} and {:?}",
+                        &arg_instance[0], &arg_instance[1]
+                    ),
+                }
+            },
         }
     }
 

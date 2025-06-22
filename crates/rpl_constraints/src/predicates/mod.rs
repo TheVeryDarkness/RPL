@@ -13,6 +13,7 @@ mod single_fn;
 mod single_ty;
 mod translate;
 mod trivial;
+mod ty_const;
 
 pub use multiple_tys::*;
 pub use single_fn::*;
@@ -20,6 +21,7 @@ pub use single_ty::*;
 use thiserror::Error;
 pub use translate::*;
 pub use trivial::*;
+pub use ty_const::*;
 
 #[derive(Clone, Debug, Display, Error)]
 pub enum PredicateError<'i> {
@@ -52,6 +54,8 @@ pub const ALL_PREDICATES: &[&str] = &[
     "same_abi_and_pref_align",
     // single_fn_preds
     "requires_monomorphization",
+    // ty_const_preds
+    "maybe_misaligned",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -61,6 +65,7 @@ pub enum PredicateKind {
     Trivial(TrivialPredsFnPtr),
     MultipleTys(MultipleTysPredsFnPtr),
     Fn(SingleFnPredsFnPtr),
+    TyConst(TyConstPredsFnPtr),
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -80,6 +85,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "same_size" => Self::MultipleTys(same_size),
             "same_abi_and_pref_align" => Self::MultipleTys(same_abi_and_pref_align),
             "requires_monomorphization" => Self::Fn(requires_monomorphization),
+            "maybe_misaligned" => Self::TyConst(maybe_misaligned),
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

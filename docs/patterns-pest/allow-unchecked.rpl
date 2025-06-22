@@ -1,16 +1,146 @@
 pattern allow-unchecked
 
 patt {
-    p_unchecked_cast_write[$T: type] = 
-        p_alloc_cast_write[]
-        - p_alloc_check_cast_write[]
-        - p_alloc_cast_check_write[]
-        - p_alloc_cast_check_as_write[]
-        - p_alloc_check_as_cast_write[]
+    unchecked_cast_write[$T: type] = 
+        alloc_cast_write[]
+        - alloc_check_cast_write[]
+        - alloc_cast_check_write[]
+        - alloc_cast_check_as_write[]
+        - alloc_check_as_cast_write[]
+
+    alloc_misaligned_cast[
+        $T: type where is_all_safe_trait(self),
+        $alignment: const(usize),
+    ] =
+        fn $pattern(..) -> _ {
+            let $layout_result: core::result::Result<core::alloc::Layout, _> = alloc::alloc::Layout::from_size_align(
+                _,
+                const $alignment
+            );
+            let $layout: core::alloc::Layout = core::result::Result::unwrap(move $layout_result);
+            'alloc:
+            let $ptr_1: *mut u8 = alloc::alloc::alloc(copy $layout);
+            'cast:
+            let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr);
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_deref_const[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *const $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            let $ref_old: &$T = &*$old_ptr;
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_deref_mut[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *mut $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            let $ref_old: &mut $T = &mut *$old_ptr;
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_read_const[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *const $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            let $ref_old: $T = copy *$old_ptr;
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_read_mut[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *mut $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            let $ref_old: $T = copy *$old_ptr;
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_write_const[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *const $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            *$old_ptr = _;
+        }
+
+    #[diag = "use_after_realloc"]
+    use_after_realloc_write_mut[
+        $T: type,
+    ] =
+        fn $pattern(..) -> _ {
+            let $old_ptr: *mut $T = _;
+            let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
+            'realloc:
+            let $new_ptr_u8: *mut u8 = alloc::alloc::realloc(move $old_ptr_u8, _, _);
+            'use:
+            *$old_ptr = _;
+        }
+
+    alloc_zeroed_maybe_zero_mul =
+        fn $pattern(..) -> _ {
+            'size:
+            let $count: usize;
+            let $size: usize = Mul(copy $count, _);
+            let $result: core::result::Result<alloc::alloc::Layout, alloc::alloc::LayoutError> =
+                alloc::alloc::Layout::from_size_align(
+                    copy $size,
+                    _
+                );
+            let $layout : alloc::alloc::Layout =
+                core::result::Result<alloc::alloc::Layout, alloc::alloc::LayoutError>::unwrap(
+                    move $result
+                );
+            'alloc:
+            _ = alloc::alloc::alloc_zeroed(copy $layout);
+        }
+
+    alloc_maybe_zero_mul =
+        fn $pattern(..) -> _ {
+            'size:
+            let $count: usize;
+            let $size: usize = Mul(copy $count, _);
+            let $result: core::result::Result<alloc::alloc::Layout, alloc::alloc::LayoutError> =
+                alloc::alloc::Layout::from_size_align(
+                    copy $size,
+                    _
+                );
+            let $layout : alloc::alloc::Layout =
+                core::result::Result<alloc::alloc::Layout, alloc::alloc::LayoutError>::unwrap(
+                    move $result
+                );
+            'alloc:
+            _ = alloc::alloc::alloc(copy $layout);
+        }
 }
 
 util {
-    p_alloc_cast_write[$T: type] =
+    alloc_cast_write[$T: type] =
         fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
@@ -18,7 +148,7 @@ util {
             'write:
             (*$ptr_2) = _;
         }
-    p_alloc_check_cast_write[$T: type] =
+    alloc_check_cast_write[$T: type] =
         fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _2
@@ -33,7 +163,7 @@ util {
             'write:
             (*$ptr_2) = _;
         }
-    p_alloc_cast_check_write[$T: type] =
+    alloc_cast_check_write[$T: type] =
         fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
@@ -47,7 +177,7 @@ util {
             'write:
             (*$ptr_2) = _;
         }
-    p_alloc_cast_check_as_write[$T: type] =
+    alloc_cast_check_as_write[$T: type] =
         fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
@@ -60,7 +190,7 @@ util {
             'write:
             (*$ptr_2) = _;
         }
-    p_alloc_check_as_cast_write[$T: type] =
+    alloc_check_as_cast_write[$T: type] =
         fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _);
@@ -76,7 +206,7 @@ util {
 }
 
 diag {
-    p_unchecked_cast_write = {
+    unchecked_cast_write = {
         primary(write) = "it is an undefined behavior to dereference a null pointer, and `std::alloc::alloc` may return a null pointer",
         label(alloc)   = "pointer created here",
         label(write)   = "pointer used here",
@@ -84,5 +214,41 @@ diag {
         // help           = "check whether it's null before dereferencing",
         name           = "unchecked_allocated_pointer",
         level          = "warn",
+    }
+
+    alloc_misaligned_cast = {
+        primary(cast) = "resulting pointer `*mut {$T}` has a different alignment than the original alignment that the pointer was created with",
+        label(alloc)  = "pointer created here",
+        label(write)  = "pointer casted here",
+        note          = "See https://doc.rust-lang.org/std/alloc/fn.alloc.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#tymethod.alloc",
+        help          = "consider using `core::alloc::Layout::new::<T>()` or `core::alloc::Layout::array::<T>(n)` to create a layout for the pointer",
+        name          = "misaligned_pointer",
+        level         = "warn",
+    }
+
+    use_after_realloc = {
+        primary(use)   = "use a pointer from `{$T}` after it's reallocated",
+        label(realloc) = "`realloc` called here",
+        label(use)     = "used here",
+        note           = "the `{$T}` buffer may be reallocated here",
+        name           = "use_after_realloc",
+    }
+
+    alloc_maybe_zero_mul = {
+        primary(alloc) = "public function `alloc` allocates a pointer that may be zero-sized, which is an undefined behavior",
+        label(alloc)   = "pointer created here",
+        label(size)    = "size passed in here",
+        note           = "See https://doc.rust-lang.org/std/alloc/fn.alloc.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#method.alloc",
+        help           = "check whether the size is zero before allocating",
+        name           = "alloc_maybe_zero",
+    }
+
+    alloc_zeroed_maybe_zero_mul = {
+        primary(alloc) = "public function `alloc_zeroed` allocates a pointer that may be zero-sized, which is an undefined behavior",
+        label(alloc)   = "pointer created here",
+        label(size)    = "size passed in here",
+        note           = "See https://doc.rust-lang.org/std/alloc/fn.alloc_zeroed.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#method.alloc_zeroed",
+        help           = "check whether the size is zero before allocating",
+        name           = "alloc_maybe_zero",
     }
 }
