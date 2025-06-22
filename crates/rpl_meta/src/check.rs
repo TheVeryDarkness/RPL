@@ -7,6 +7,7 @@ use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Ch
 use parser::{SpanWrapper, pairs};
 use rpl_constraints::predicates::{PredicateConjunction, PredicateError};
 use rustc_data_structures::fx::FxHashMap;
+use rustc_hir::Attribute;
 use rustc_span::Symbol;
 pub use safety::Safety;
 pub use visibility::Visibility;
@@ -18,6 +19,9 @@ use crate::symbol_table::{
 };
 use crate::utils::{Ident, Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
+
+/// Extra spans that are required for diagnostics or other purposes.
+pub type ExtraSpan<'tcx> = FxHashMap<Symbol, &'tcx Attribute>;
 
 mod impls;
 mod inline;

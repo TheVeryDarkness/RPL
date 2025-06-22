@@ -1,4 +1,5 @@
 use rpl_context::pat::{MatchedMap, Spanned};
+use rpl_meta::check::ExtraSpan;
 use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Const, Local, PlaceRef};
@@ -14,6 +15,9 @@ pub enum NormalizedSpanned {
     Local(Local),
     Body,
     Output,
+    /// A span that is not associated with a specific location, local, or body.
+    /// For example, [`rustc_hir::Attribute`]
+    Span(Span),
 }
 
 impl NormalizedSpanned {
@@ -24,6 +28,7 @@ impl NormalizedSpanned {
             // Special case for the function name, which is not a label.
             Self::Body => body.span,
             Self::Output => decl.output.span(),
+            Self::Span(span) => span,
         }
     }
 }
@@ -34,12 +39,13 @@ pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
-    pub labels: Vec<(Symbol, NormalizedSpanned)>,
+    /// Labels and attributes.
+    pub extra: Vec<(Symbol, NormalizedSpanned)>,
 }
 
 impl<'tcx> NormalizedMatched<'tcx> {
     #[instrument(level = "trace", ret)]
-    pub fn new(matched: &Matched<'tcx>, label_map: &pat::LabelMap) -> Self {
+    pub fn new(matched: &Matched<'tcx>, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
@@ -52,13 +58,18 @@ impl<'tcx> NormalizedMatched<'tcx> {
                 Spanned::Output => (*label, NormalizedSpanned::Output),
             })
             .collect();
+        labels.extend(
+            extra_spans
+                .iter()
+                .map(|(label, span)| (*label, NormalizedSpanned::Span(span.span()))),
+        );
         labels.sort_by_key(|(label, _)| *label);
 
         NormalizedMatched {
             ty_vars,
             const_vars,
             place_vars,
-            labels,
+            extra: labels,
         }
     }
 
@@ -98,7 +109,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
-            labels,
+            extra: labels,
         }
     }
 
@@ -118,7 +129,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             matched_map.place_vars.len(),
         );
         let mut labels: Vec<_> = self
-            .labels
+            .extra
             .iter()
             .map(|(label, spanned)| (*matched_map.labels.get(label).unwrap_or(label), *spanned))
             .collect();
@@ -128,14 +139,14 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
-            labels,
+            extra: labels,
         }
     }
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
     fn span(&self, body: &rustc_middle::mir::Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
-        let labels = &self.labels;
+        let labels = &self.extra;
         let i = labels
             .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
             .unwrap_or_else(|_| {

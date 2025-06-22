@@ -4,13 +4,16 @@ use std::sync::Arc;
 use derive_more::derive::Debug;
 use rpl_constraints::Constraint;
 use rpl_constraints::predicates::SingleFnPredsFnPtr;
-use rpl_meta::check::{Inline, Safety, Visibility};
+use rpl_meta::check::{ExtraSpan, Inline, Safety, Visibility};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{WithMetaTable, WithPath};
 use rpl_parser::generics::Choice4;
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
+use rustc_hir::FnHeader;
+use rustc_hir::def_id::LocalDefId;
 use rustc_middle::mir;
+use rustc_middle::ty::TyCtxt;
 use rustc_span::Symbol;
 
 use super::utils::mutability_from_pair_mutability;
@@ -150,7 +153,7 @@ pub struct FnPatterns<'pcx> {
 pub struct FnPattern<'pcx> {
     pub safety: Safety,
     pub visibility: Visibility,
-    pub inline: Inline,
+    pub inline: Option<Inline>,
     pub name: Symbol,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub symbol_table: &'pcx FnSymbolTable<'pcx>,
@@ -198,7 +201,7 @@ impl<'pcx> FnPattern<'pcx> {
         Self {
             safety,
             visibility,
-            inline: attr.inline.unwrap_or_default(),
+            inline: attr.inline,
             meta,
             name,
             params,
@@ -229,6 +232,21 @@ impl<'pcx> FnPattern<'pcx> {
             .as_ref()
             .map(|ret| Ty::from_fn_ret(WithPath::new(p, ret), pcx, fn_sym_tab));
         (safety, visibility, fn_name, params, ret)
+    }
+
+    pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>) -> bool {
+        self.visibility.check(tcx.visibility(def_id)) && self.safety.check_option_header(header.map(|h| h.safety))
+    }
+    /// Returns the extra spans for this function pattern.
+    #[instrument(level = "debug", skip(tcx), ret)]
+    pub fn extra_span<'tcx>(&self, tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Option<ExtraSpan<'tcx>> {
+        let mut attr_map = ExtraSpan::default();
+        if let Some(inline) = self.inline {
+            let inline_ = Symbol::intern("inline");
+            let attr = inline.check(tcx.get_attrs(def_id, inline_))?;
+            _ = attr_map.try_insert(inline_, attr);
+        }
+        Some(attr_map)
     }
 }
 

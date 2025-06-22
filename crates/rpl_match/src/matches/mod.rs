@@ -3,6 +3,7 @@ use std::fmt;
 use std::ops::Index;
 
 use rpl_context::pat::{LabelMap, Spanned};
+use rpl_meta::check::ExtraSpan;
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;
@@ -67,15 +68,19 @@ impl Matched<'_> {
     }
 }
 
-pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>);
+pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
     fn span(&self, body: &rustc_middle::mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
-        let MatchedWithLabelMap(labels, matched) = self;
-        let spanned = *labels.get(&Symbol::intern(name)).unwrap_or_else(|| {
-            panic!("label `{name}` not found in pattern labels: {labels:?}");
-        });
-        matched.span_spanned(spanned, body, decl)
+        let MatchedWithLabelMap(labels, matched, attr) = self;
+        let name = Symbol::intern(name);
+        labels
+            .get(&name)
+            .map(|spanned| matched.span_spanned(*spanned, body, decl))
+            .or_else(|| attr.get(&name).map(|attr| attr.span))
+            .unwrap_or_else(|| {
+                panic!("label `{name}` not found in:\n    pattern labels: {labels:?}\n    attributes: {attr:?}");
+            })
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.1.ty_vars[idx]
