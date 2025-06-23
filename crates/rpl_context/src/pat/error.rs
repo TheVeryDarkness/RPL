@@ -241,7 +241,7 @@ enum SubMsg<'i> {
     Ty(TyVarIdx),
     Const(ConstVarIdx),
     FnName,
-    Local(pat::Local),
+    Label(Symbol),
 }
 
 impl<'i> SubMsg<'i> {
@@ -263,8 +263,8 @@ impl<'i> SubMsg<'i> {
                         msgs.push(SubMsg::Str(const_value));
                     } else if meta_var.as_str() == "$fn" {
                         msgs.push(SubMsg::FnName)
-                    } else if let Some(local) = locals.get(&meta_var) {
-                        msgs.push(SubMsg::Local(*local))
+                    } else if let Some(_) = locals.get(&meta_var) {
+                        msgs.push(SubMsg::Label(meta_var))
                     } else {
                         let (var_type, idx, _) = meta_vars
                             .get_from_symbol(meta_var)
@@ -502,6 +502,7 @@ impl<'i> DynamicErrorBuilder<'i> {
             source_map: &'a SourceMap,
             fn_name: Option<Symbol>,
             body: &'a Body<'tcx>,
+            decl: &'a FnDecl<'tcx>,
             matched: &'a M,
         }
         impl<'tcx, M: Matched<'tcx>> Formatter<'_, 'tcx, M> {
@@ -519,16 +520,11 @@ impl<'i> DynamicErrorBuilder<'i> {
                             s.push_str(&const_.to_string());
                         },
                         SubMsg::FnName => {
-                            todo!()
+                            s.push_str(self.fn_name.unwrap().as_str());
                         },
-                        SubMsg::Local(local) => {
-                            let local_name = self.matched.local(*local);
-                            s.push_str(
-                                &self
-                                    .source_map
-                                    .span_to_snippet(self.body.local_decls[local_name].source_info.span)
-                                    .unwrap(),
-                            );
+                        SubMsg::Label(local) => {
+                            let local_name = self.matched.span(self.body, self.decl, local.as_str());
+                            s.push_str(&self.source_map.span_to_snippet(local_name).unwrap());
                         },
                     }
                 }
@@ -539,6 +535,7 @@ impl<'i> DynamicErrorBuilder<'i> {
             source_map,
             fn_name,
             body,
+            decl,
             matched,
         };
         let primary = (

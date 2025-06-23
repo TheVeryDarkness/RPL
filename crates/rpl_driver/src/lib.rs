@@ -121,12 +121,12 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         _span: Span,
         def_id: LocalDefId,
     ) -> Self::Result {
-        let header = match kind {
-            intravisit::FnKind::ItemFn(_, _, fn_header) => Some(fn_header),
-            intravisit::FnKind::Method(_, fn_sig) => Some(fn_sig.header),
-            intravisit::FnKind::Closure => None,
+        let (name, header) = match kind {
+            intravisit::FnKind::ItemFn(name, _, fn_header) => (Some(name), Some(fn_header)),
+            intravisit::FnKind::Method(name, fn_sig) => (Some(name), Some(fn_sig.header)),
+            intravisit::FnKind::Closure => (None, None),
         };
-        self.check_fn(decl, header, decl.implicit_self.has_implicit_self(), def_id);
+        self.check_fn(name, decl, header, decl.implicit_self.has_implicit_self(), def_id);
 
         let attrs: Vec<_> = self
             .tcx
@@ -395,6 +395,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
                             let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
                             let header = Some(sig.header);
+                            let source_map = self.tcx.sess.source_map();
                             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                                 for (&name, pat_item) in &pattern.patt_block {
                                     match pat_item {
@@ -410,7 +411,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                 &mir_ddg,
                                             ) {
                                                 let error = pattern
-                                                    .get_diag(name, body, decl, &matched)
+                                                    .get_diag(name, source_map, None, body, decl, &matched)
                                                     .unwrap_or_else(identity);
                                                 self.tcx.emit_node_span_lint(
                                                     error.lint(),
@@ -425,7 +426,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                 name, pat_op, def_id, header, has_self, body, &mir_cfg, &mir_ddg,
                                             ) {
                                                 let error = pattern
-                                                    .get_diag(name, body, decl, &matched)
+                                                    .get_diag(name, source_map, None, body, decl, &matched)
                                                     .unwrap_or_else(identity);
                                                 self.tcx.emit_node_span_lint(
                                                     error.lint(),
@@ -446,11 +447,20 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         }
     }
     #[instrument(level = "debug", skip(self, decl, header))]
-    fn check_fn(&mut self, decl: &hir::FnDecl<'tcx>, header: Option<FnHeader>, has_self: bool, def_id: LocalDefId) {
+    fn check_fn(
+        &mut self,
+        fn_name: Option<Ident>,
+        decl: &hir::FnDecl<'tcx>,
+        header: Option<FnHeader>,
+        has_self: bool,
+        def_id: LocalDefId,
+    ) {
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
             let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+            let fn_name = fn_name.map(|ident| ident.name);
+            let source_map = self.tcx.sess.source_map();
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, pat_item) in &pattern.patt_block {
                     match pat_item {
@@ -465,7 +475,9 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                 &mir_cfg,
                                 &mir_ddg,
                             ) {
-                                let error = pattern.get_diag(name, body, decl, &matched).unwrap_or_else(identity);
+                                let error = pattern
+                                    .get_diag(name, source_map, fn_name, body, decl, &matched)
+                                    .unwrap_or_else(identity);
                                 self.tcx.emit_node_span_lint(
                                     error.lint(),
                                     self.tcx.local_def_id_to_hir_id(def_id),
@@ -485,7 +497,9 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                 &mir_cfg,
                                 &mir_ddg,
                             ) {
-                                let error = pattern.get_diag(name, body, decl, &matched).unwrap_or_else(identity);
+                                let error = pattern
+                                    .get_diag(name, source_map, fn_name, body, decl, &matched)
+                                    .unwrap_or_else(identity);
                                 self.tcx.emit_node_span_lint(
                                     error.lint(),
                                     self.tcx.local_def_id_to_hir_id(def_id),

@@ -9,7 +9,7 @@ use rustc_index::IndexVec;
 use rustc_span::Symbol;
 
 use crate::PatCtxt;
-use crate::pat::{ColumnType, TableHead, Ty, with_path};
+use crate::pat::{ColumnType, Local, TableHead, Ty, with_path};
 
 rustc_index::newtype_index! {
     #[debug_format = "?T{}"]
@@ -75,14 +75,29 @@ impl<'pcx> PlaceVar<'pcx> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct LocalVar<'pcx> {
+    pub idx: Local,
+    pub name: Symbol,
+    pub ty: Ty<'pcx>,
+}
+
+impl<'pcx> LocalVar<'pcx> {
+    pub fn new(idx: Local, name: Symbol, ty: Ty<'pcx>) -> Self {
+        Self { idx, name, ty }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct NonLocalMetaVars<'pcx> {
     pub ty_var_names: IndexVec<TyVarIdx, Symbol>,
     pub const_var_names: IndexVec<ConstVarIdx, Symbol>,
     pub place_var_names: IndexVec<PlaceVarIdx, Symbol>,
+    pub local_names: IndexVec<Local, Symbol>,
     pub ty_vars: IndexVec<TyVarIdx, TyVar>,
     pub const_vars: IndexVec<ConstVarIdx, ConstVar<'pcx>>,
     pub place_vars: IndexVec<PlaceVarIdx, PlaceVar<'pcx>>,
+    pub locals: IndexVec<Local, LocalVar<'pcx>>,
 }
 
 impl<'pcx> NonLocalMetaVars<'pcx> {

@@ -6910,7 +6910,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirLocalDecl , "Corresponds to expression: `(kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirLocalDecl , super :: super :: generics :: Seq7 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_let :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Mutability :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirPlaceLocal :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Colon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirRvalueOrCall :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#SemiColon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#MirLocalDecl , "Corresponds to expression: `(LabelWithColon? ~ kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirLocalDecl , super :: super :: generics :: Seq8 :: < (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#LabelWithColon :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_let :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Mutability :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirPlaceLocal :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Colon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Assign :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirRvalueOrCall :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#SemiColon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirLocalDecl<'i, INHERITED> {
             #[doc = "A helper function to access [`Assign`]."]
             #[allow(non_snake_case)]
@@ -6919,7 +6919,7 @@ pub mod rules_impl {
             ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Assign<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.5.matched;
+                    let res = &res.content.6.matched;
                     {
                         let res = res.as_ref().map(|res| {
                             let res = &res.content.0.matched;
@@ -6934,8 +6934,23 @@ pub mod rules_impl {
             pub fn r#Colon<'s>(&'s self) -> &'s super::super::rules::r#Colon<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.3.matched;
+                    let res = &res.content.4.matched;
                     res
+                }
+            }
+            #[doc = "A helper function to access [`LabelWithColon`]."]
+            #[allow(non_snake_case)]
+            pub fn r#LabelWithColon<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#LabelWithColon<'i, INHERITED>>
+            {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
                 }
             }
             #[doc = "A helper function to access [`MirPlaceLocal`]."]
@@ -6943,7 +6958,7 @@ pub mod rules_impl {
             pub fn r#MirPlaceLocal<'s>(&'s self) -> &'s super::super::rules::r#MirPlaceLocal<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.2.matched;
+                    let res = &res.content.3.matched;
                     res
                 }
             }
@@ -6955,7 +6970,7 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = &res.content.5.matched;
+                    let res = &res.content.6.matched;
                     {
                         let res = res.as_ref().map(|res| {
                             let res = &res.content.1.matched;
@@ -6970,7 +6985,7 @@ pub mod rules_impl {
             pub fn r#Mutability<'s>(&'s self) -> &'s super::super::rules::r#Mutability<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.1.matched;
+                    let res = &res.content.2.matched;
                     res
                 }
             }
@@ -6979,7 +6994,7 @@ pub mod rules_impl {
             pub fn r#SemiColon<'s>(&'s self) -> &'s super::super::rules::r#SemiColon<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.6.matched;
+                    let res = &res.content.7.matched;
                     res
                 }
             }
@@ -6988,7 +7003,7 @@ pub mod rules_impl {
             pub fn r#Type<'s>(&'s self) -> &'s super::super::rules::r#Type<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.4.matched;
+                    let res = &res.content.5.matched;
                     res
                 }
             }
@@ -6997,7 +7012,7 @@ pub mod rules_impl {
             pub fn r#kw_let<'s>(&'s self) -> &'s super::super::rules::r#kw_let<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.0.matched;
+                    let res = &res.content.1.matched;
                     res
                 }
             }

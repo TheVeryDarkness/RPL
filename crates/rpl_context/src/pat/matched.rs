@@ -5,19 +5,18 @@ use rpl_parser::generics::{Choice2, Choice3};
 use rpl_parser::pairs;
 use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
-use rustc_middle::mir::{self, Body, Const, PlaceRef};
+use rustc_middle::mir::{Body, Const, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
 use super::non_local_meta_vars::{ConstVarIdx, PlaceVarIdx, TyVarIdx};
-use crate::pat::{Local, NonLocalMetaVars};
+use crate::pat::NonLocalMetaVars;
 
 pub trait Matched<'tcx> {
     fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span;
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
     fn place_meta_var(&self, idx: PlaceVarIdx) -> PlaceRef<'tcx>;
-    fn local(&self, local: Local) -> mir::Local;
 }
 
 /// - Key: indices/names in destination

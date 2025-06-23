@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -43,6 +44,7 @@ pub type Label = Symbol;
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Spanned {
     Location(mir::Location),
+    Local(mir::Local),
     Body,
     Output,
 }
@@ -317,7 +319,7 @@ impl<'pcx> RustItems<'pcx> {
         columns
     }
 
-    pub fn post_process<M: Eq + Hash>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
+    pub fn post_process<M: Eq + Hash + Debug>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
         self.attr.post_process(iter)
     }
 }
@@ -344,7 +346,7 @@ impl PatternOperation<'_> {
         head
     }
 
-    pub fn post_process<M: Eq + Hash>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
+    pub fn post_process<M: Eq + Hash + Debug>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
         self.attr.post_process(iter)
     }
 }
