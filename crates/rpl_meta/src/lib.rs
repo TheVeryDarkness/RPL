@@ -47,10 +47,11 @@ pub fn parse_and_collect<'mcx>(
     for (path, content) in path_and_content {
         let idx = mctx.request_rpl_idx(path);
         let content = mctx.alloc_str(content);
-        mctx.contents.insert(idx, content);
+        debug_assert_eq!(mctx.contents.next_index(), idx);
+        mctx.contents.push(content);
     }
 
-    for (idx, content) in &mctx.contents {
+    for (idx, content) in mctx.contents.iter_enumerated() {
         let path = mctx.id2path.get(idx).unwrap(); // safe unwrap
         mctx.set_active_path(Some(path));
         let parse_res = parser::parse_main(content, path);
@@ -58,11 +59,13 @@ pub fn parse_and_collect<'mcx>(
             Ok(main) => {
                 // Cache the syntax tree
                 let main = mctx.alloc_ast(main);
-                mctx.syntax_trees.insert(*idx, main);
+                debug_assert_eq!(mctx.syntax_trees.next_index(), idx);
+                mctx.syntax_trees.push(main);
                 // Perform meta collection
-                let meta = SymbolTables::collect(path, main, *idx, &mctx);
+                let meta = SymbolTables::collect(path, main, idx, &mctx);
                 meta.show_error(&mut handler);
-                mctx.symbol_tables.insert(*idx, meta);
+                debug_assert_eq!(mctx.symbol_tables.next_index(), idx);
+                mctx.symbol_tables.push(meta);
             },
             Err(err) => {
                 handler(&RPLMetaError::from(err));

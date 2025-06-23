@@ -3,6 +3,7 @@ use std::sync::RwLock;
 
 use parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
+use rustc_index::IndexVec;
 
 use crate::arena::Arena;
 use crate::idx::RPLIdx;
@@ -12,10 +13,10 @@ use crate::meta::SymbolTables;
 pub struct MetaContext<'mcx> {
     arena: &'mcx Arena<'mcx>,
     pub path2id: FxHashMap<&'mcx Path, RPLIdx>,
-    pub id2path: FxHashMap<RPLIdx, &'mcx Path>,
-    pub contents: FxHashMap<RPLIdx, &'mcx str>,
-    pub syntax_trees: FxHashMap<RPLIdx, &'mcx pairs::main<'mcx>>,
-    pub symbol_tables: FxHashMap<RPLIdx, SymbolTables<'mcx>>,
+    pub id2path: IndexVec<RPLIdx, &'mcx Path>,
+    pub contents: IndexVec<RPLIdx, &'mcx str>,
+    pub syntax_trees: IndexVec<RPLIdx, &'mcx pairs::main<'mcx>>,
+    pub symbol_tables: IndexVec<RPLIdx, SymbolTables<'mcx>>,
     active_path: RwLock<Option<&'mcx Path>>,
 }
 
@@ -33,10 +34,10 @@ impl<'mcx> MetaContext<'mcx> {
         Self {
             arena,
             path2id: FxHashMap::default(),
-            id2path: FxHashMap::default(),
-            contents: FxHashMap::default(),
-            syntax_trees: FxHashMap::default(),
-            symbol_tables: FxHashMap::default(),
+            id2path: IndexVec::new(),
+            contents: IndexVec::new(),
+            syntax_trees: IndexVec::new(),
+            symbol_tables: IndexVec::new(),
             active_path: RwLock::new(None),
         }
     }
@@ -52,7 +53,8 @@ impl<'mcx> MetaContext<'mcx> {
             let path = self.arena.alloc(path);
             let id: RPLIdx = self.path2id.len().into();
             self.path2id.insert(path, id);
-            self.id2path.insert(id, path);
+            debug_assert_eq!(self.id2path.next_index(), id);
+            self.id2path.push(path);
             id
         }
     }

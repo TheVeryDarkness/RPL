@@ -4,9 +4,9 @@ use std::ops::Deref;
 use rpl_meta::idx::RPLIdx;
 use rpl_meta::meta::collect_blocks;
 use rpl_parser::pairs;
-use rustc_data_structures::fx::FxHashMap;
 use rustc_data_structures::sync::{Lock, Registry, WorkerLocal};
 use rustc_hir as hir;
+use rustc_index::IndexVec;
 use rustc_middle::{mir, ty};
 use rustc_span::Symbol;
 
@@ -70,7 +70,7 @@ impl<'pcx> Deref for PatCtxt<'pcx> {
 
 pub struct PatternCtxt<'pcx> {
     arena: &'pcx WorkerLocal<crate::Arena<'pcx>>,
-    rpl_patterns: Lock<FxHashMap<RPLIdx, &'pcx pat::Pattern<'pcx>>>,
+    rpl_patterns: Lock<IndexVec<RPLIdx, &'pcx pat::Pattern<'pcx>>>,
     pub primitive_types: PrimitiveTypes<'pcx>,
 }
 
@@ -183,12 +183,12 @@ impl<'pcx> PatCtxt<'pcx> {
         self.arena.alloc(pat)
     }
     pub fn add_parsed_patterns<'mcx: 'pcx>(self, mctx: &'mcx rpl_meta::context::MetaContext<'mcx>) {
-        for (id, syntax_tree) in mctx.syntax_trees.iter() {
-            self.add_parsed_pattern(*id, syntax_tree, mctx);
+        for (id, syntax_tree) in mctx.syntax_trees.iter_enumerated() {
+            self.add_parsed_pattern(id, syntax_tree, mctx);
         }
     }
     pub fn for_each_rpl_pattern(self, mut f: impl FnMut(RPLIdx, &'pcx pat::Pattern<'pcx>)) {
-        for (&id, pattern) in self.rpl_patterns.lock().iter() {
+        for (id, pattern) in self.rpl_patterns.lock().iter_enumerated() {
             f(id, pattern);
         }
     }
@@ -204,7 +204,7 @@ impl<'pcx> PatCtxt<'pcx> {
 
         {
             let patt_items = utils.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
-            let patt_symbol_tables = &mctx.symbol_tables.get(&id).unwrap().util_symbol_tables;
+            let patt_symbol_tables = &mctx.symbol_tables.get(id).unwrap().util_symbol_tables;
             patt_items.for_each(|item| {
                 pattern.add_pattern_item(
                     with_path(mctx.get_active_path(), item),
@@ -215,7 +215,7 @@ impl<'pcx> PatCtxt<'pcx> {
         }
         {
             let patt_items = patts.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
-            let patt_symbol_tables = &mctx.symbol_tables.get(&id).unwrap().patt_symbol_tables;
+            let patt_symbol_tables = &mctx.symbol_tables.get(id).unwrap().patt_symbol_tables;
             patt_items.for_each(|item| {
                 pattern.add_pattern_item(
                     with_path(mctx.get_active_path(), item),
@@ -229,6 +229,8 @@ impl<'pcx> PatCtxt<'pcx> {
             }
         }
 
-        self.rpl_patterns.lock().insert(id, pattern);
+        let mut patterns = self.rpl_patterns.lock();
+        debug_assert_eq!(patterns.next_index(), id);
+        patterns.push(pattern);
     }
 }
