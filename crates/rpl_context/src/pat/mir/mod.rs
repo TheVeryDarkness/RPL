@@ -453,6 +453,7 @@ pub enum RawStatement<'pcx> {
     Continue,
     Loop(Vec<RawStatement<'pcx>>),
     SwitchInt {
+        label: Option<Label>,
         operand: Operand<'pcx>,
         targets: Vec<(IntValue, Vec<RawStatement<'pcx>>)>,
         otherwise: Option<Vec<RawStatement<'pcx>>>,
@@ -568,7 +569,7 @@ impl<'pcx> RawStatement<'pcx> {
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
         let p = switch_int.path;
-        let (_, _, op, _, _, targets, _) = switch_int.get_matched();
+        let (label, _, _, op, _, _, targets, _) = switch_int.get_matched();
         let operand = Operand::from(with_path(p, op), pcx, fn_sym_tab);
         let mut target_value_and_stmts: Vec<(IntValue, Vec<Self>)> = Vec::new();
         let mut otherwise_stmts: Option<Vec<Self>> = None;
@@ -582,7 +583,11 @@ impl<'pcx> RawStatement<'pcx> {
                 otherwise_stmts = Some(statements);
             }
         });
+        let label = label
+            .as_ref()
+            .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
         Self::SwitchInt {
+            label,
             operand,
             targets: target_value_and_stmts,
             otherwise: otherwise_stmts,
@@ -1225,10 +1230,11 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             RawStatement::Continue => self.mk_continue(),
             RawStatement::Loop(stmts) => self.mk_loop(stmts),
             RawStatement::SwitchInt {
+                label,
                 operand,
                 targets,
                 otherwise,
-            } => self.mk_switch_int(operand, targets, otherwise),
+            } => self.mk_switch_int(label, operand, targets, otherwise),
         }
     }
 
@@ -1320,6 +1326,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     }
     pub fn mk_switch_int(
         &mut self,
+        label: Option<Label>,
         operand: Operand<'pcx>,
         target_value_and_stmts: Vec<(IntValue, Vec<RawStatement<'pcx>>)>,
         otherwise_stmts: Option<Vec<RawStatement<'pcx>>>,
@@ -1340,7 +1347,13 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         }
         self.pattern.basic_blocks[current].set_switch_targets(targets);
         self.current = next;
-        self.pattern.terminator_loc(current)
+        let loc = self.pattern.terminator_loc(current);
+
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, Spanned::Location(loc));
+        }
+
+        loc
     }
     pub fn mk_switch_target(
         &mut self,

@@ -4,7 +4,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "drop", fn_2 = "drop")]
     double_drop[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 
@@ -20,7 +20,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "take", fn_2 = "take")]
     double_take[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 
@@ -36,7 +36,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "drop", fn_2 = "take")]
     drop_after_take[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 
@@ -52,7 +52,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "take", fn_2 = "drop")]
     take_after_drop[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 
@@ -68,7 +68,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "take", fn_2 = "into_inner")]
     into_inner_after_take[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 
@@ -84,7 +84,7 @@ patt {
     #[diag = "manually_drop"]
     #[const(fn_1 = "drop", fn_2 = "into_inner")]
     into_inner_after_drop[$T: type] = 
-        fn _(..) -> _ {
+        unsafe? fn _(..) -> _ {
             'create:
             let $manually_drop: core::mem::ManuallyDrop<$T> = _;
 

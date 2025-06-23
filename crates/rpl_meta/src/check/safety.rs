@@ -32,7 +32,15 @@ impl Safety {
         }
     }
     pub fn parse(safety: Option<&pairs::Safety>) -> Self {
-        // FIXME: a way to express `Safe`
-        if safety.is_some() { Safety::Unsafe } else { Safety::Any }
+        if let Some(safety) = safety {
+            let (_, question) = safety.get_matched();
+            if question.is_some() {
+                Safety::Any
+            } else {
+                Safety::Unsafe
+            }
+        } else {
+            Safety::Safe
+        }
     }
 }

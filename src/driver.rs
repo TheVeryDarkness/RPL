@@ -258,7 +258,13 @@ pub fn main() {
             /* rustc_driver::RunCompiler::new(&args, &mut RplCallbacks::new(rpl_args_var))
             .set_using_internal_features(using_internal_features)
             .run() */
-            rustc_driver::run_compiler(&args, &mut RplCallbacks::new(rpl_args_var, vec![pattern_paths]))
+            rustc_driver::run_compiler(
+                &args,
+                &mut RplCallbacks::new(
+                    rpl_args_var,
+                    pattern_paths.split(':').map(ToString::to_string).collect(),
+                ),
+            )
         } else {
             rustc_driver::run_compiler(&args, &mut RustcCallbacks::new(rpl_args_var))
         }

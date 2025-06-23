@@ -44,6 +44,7 @@ pub struct NormalizedMatched<'tcx> {
 }
 
 impl<'tcx> NormalizedMatched<'tcx> {
+    /// Create a new [`NormalizedMatched`] from a [`Matched`] and a [`pat::LabelMap`].
     #[instrument(level = "trace", ret)]
     pub fn new(matched: &Matched<'tcx>, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
         let ty_vars = matched.ty_vars.clone();
@@ -141,6 +142,19 @@ impl<'tcx> NormalizedMatched<'tcx> {
             place_vars,
             extra: labels,
         }
+    }
+
+    #[instrument(level = "trace", ret)]
+    pub fn has_same_head(&self, other: &Self) -> bool {
+        self.ty_vars.len() == other.ty_vars.len()
+            && self.const_vars.len() == other.const_vars.len()
+            && self.place_vars.len() == other.place_vars.len()
+            && self.extra.len() == other.extra.len()
+            && self
+                .extra
+                .iter()
+                .zip(&other.extra)
+                .all(|((label1, _), (label2, _))| label1 == label2)
     }
 }
 

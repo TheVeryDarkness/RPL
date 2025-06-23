@@ -3,14 +3,14 @@ pattern private-or-generic-function-marked-inline
 patt {
     p_private_inline = {
         #[inline(any)]
-        pub(restricted) fn $fn(..) {
+        pub(restricted) unsafe? fn $fn(..) {
 
         }
     }
     p_generic_inline = {
         #[inline(any)]
         #[rpl(requires_monomorphization)]
-        fn $fn(..) {
+        unsafe? fn $fn(..) {
 
         }
     }

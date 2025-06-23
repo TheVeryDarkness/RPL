@@ -2,8 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use error::{DynamicError, DynamicErrorBuilder};
-use rpl_constraints::{Constraint, predicates};
-use rpl_meta::check::Inline;
+use rpl_constraints::Constraint;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;
 use rpl_meta::utils::Ident;
@@ -15,20 +14,25 @@ use rustc_middle::mir::Body;
 use rustc_span::Symbol;
 
 use crate::PatCtxt;
+use crate::pat::table::ColumnType;
 
+mod attr;
 mod error;
 mod item;
 mod matched;
 mod mir;
 mod non_local_meta_vars;
 mod pretty;
+mod table;
 mod ty;
 mod utils;
 
+pub use attr::{FnAttr, PatAttr};
 pub use item::*;
 pub use matched::{Matched, MatchedMap};
 pub use mir::*;
 pub use non_local_meta_vars::*;
+pub(crate) use table::TableHead;
 pub use ty::*;
 
 pub type Label = Symbol;
@@ -47,136 +51,6 @@ pub type LabelMap = FxHashMap<Label, Spanned>;
 pub enum PattOrUtil {
     Patt,
     Util,
-}
-
-#[derive(Default)]
-pub struct PatAttr<'i> {
-    diag: Option<Symbol>,
-    consts: FxHashMap<Symbol, &'i str>,
-}
-
-impl<'i> PatAttr<'i> {
-    fn parse_all<'a>(attrs: impl Iterator<Item = &'a pairs::Attr<'i>>) -> Self
-    where
-        'i: 'a,
-    {
-        let mut result = Self::default();
-        for attr in attrs {
-            result.parse(attr);
-        }
-        result
-    }
-    fn parse(&mut self, pairs: &pairs::Attr<'i>) {
-        let (_, _, attrs, _) = pairs.get_matched();
-        for attr in collect_elems_separated_by_comma!(attrs) {
-            let (key, value) = attr.get_matched();
-            match key.span.as_str() {
-                // #[diag = "diag_name"]
-                "diag" => match value {
-                    Some(Choice2::_0(_)) | None => unreachable!(),
-                    Some(Choice2::_1(msg)) => {
-                        let (_, msg) = msg.get_matched();
-                        self.diag = Some(Symbol::intern(msg.diagMessageInner().span.as_str()));
-                    },
-                },
-                // #[const(name1 = "...", name2 = "."]
-                "const" => match value {
-                    Some(Choice2::_1(_)) | None => unreachable!(),
-                    Some(Choice2::_0(list)) => {
-                        let (_, list, _) = list.get_matched();
-                        if let Some(list) = list {
-                            for pair in collect_elems_separated_by_comma!(list) {
-                                let (name, value) = pair.get_matched();
-                                let name = Symbol::intern(name.span.as_str());
-                                let value = value
-                                    .as_ref()
-                                    .unwrap()
-                                    ._1()
-                                    .unwrap()
-                                    .1
-                                    .matched
-                                    .diagMessageInner()
-                                    .span
-                                    .as_str();
-                                self.consts.insert(name, value);
-                            }
-                        }
-                    },
-                },
-                _ => unreachable!(),
-            }
-        }
-    }
-}
-
-#[derive(Default, Debug)]
-pub struct FnAttr {
-    output: Option<Symbol>,
-    inline: Option<Inline>,
-    predicates: Vec<predicates::SingleFnPredsFnPtr>,
-}
-
-impl FnAttr {
-    fn parse<'i>(pairs: impl Iterator<Item = &'i pairs::Attr<'i>>) -> Self {
-        let mut result = Self::default();
-        for pairs in pairs {
-            let (_, _, attrs, _) = pairs.get_matched();
-            for attr in collect_elems_separated_by_comma!(attrs) {
-                let (key, value) = attr.get_matched();
-                match key.span.as_str() {
-                    "output" => match value {
-                        Some(Choice2::_0(_)) | None => unreachable!(),
-                        Some(Choice2::_1(msg)) => {
-                            let (_, msg) = msg.get_matched();
-                            result.output = Some(Symbol::intern(msg.diagMessageInner().span.as_str()));
-                        },
-                    },
-                    "inline" => match value {
-                        Some(Choice2::_1(_)) | None => unreachable!(),
-                        Some(Choice2::_0(msg)) => {
-                            let (_, msg, _) = msg.get_matched();
-                            if let Some(msg) = msg {
-                                let inner = collect_elems_separated_by_comma!(msg).collect::<Vec<_>>();
-                                if inner.len() != 1 {
-                                    panic!("Expected exactly one output, found {}", inner.len());
-                                }
-                                let (level, attr) = inner[0].get_matched();
-                                assert!(attr.is_none(), "Unexpected attribute in output: {attr:?}");
-                                result.inline = match level.span.as_str() {
-                                    "always" => Some(Inline::Always),
-                                    "any" => Some(Inline::Any),
-                                    "never" => Some(Inline::Never),
-                                    _ => panic!("Unexpected inline level: {}", level.span.as_str()),
-                                };
-                            } else {
-                                result.inline = Some(Inline::Normal);
-                            }
-                        },
-                    },
-                    "rpl" => match value {
-                        Some(Choice2::_1(_)) | None => unreachable!(),
-                        Some(Choice2::_0(inner)) => {
-                            let (_, inner, _) = inner.get_matched();
-                            if let Some(inner) = inner {
-                                for inner in collect_elems_separated_by_comma!(inner) {
-                                    let (key, value) = inner.get_matched();
-                                    assert!(value.is_none(), "Unexpected value in RPL attribute: {value:?}");
-                                    match key.span.as_str() {
-                                        "requires_monomorphization" => {
-                                            result.predicates.push(predicates::requires_monomorphization);
-                                        },
-                                        _ => panic!("Unexpected RPL attribute: {}", key.span.as_str()),
-                                    }
-                                }
-                            }
-                        },
-                    },
-                    _ => unreachable!(),
-                }
-            }
-        }
-        result
-    }
 }
 
 pub enum PatternItem<'pcx> {
@@ -201,6 +75,12 @@ impl<'pcx> PatternItem<'pcx> {
         match self {
             PatternItem::RustItems(items) => &items.attr.consts,
             PatternItem::RPLPatternOperation(op) => &op.attr.consts,
+        }
+    }
+    pub(crate) fn table_head(&self) -> TableHead {
+        match self {
+            PatternItem::RustItems(items) => items.table_head(),
+            PatternItem::RPLPatternOperation(op) => op.table_head(),
         }
     }
 }
@@ -411,6 +291,29 @@ impl<'pcx> RustItems<'pcx> {
     pub fn get_adt(&self, adt: Symbol) -> Option<&Adt<'pcx>> {
         self.adts.get(&adt)
     }
+
+    fn table_head(&self) -> TableHead {
+        let mut columns = FxHashMap::default();
+
+        self.meta.table_head(&mut columns);
+
+        for (name, _) in &self.adts {
+            columns.try_insert(*name, ColumnType::Ty).unwrap();
+        }
+
+        // FIX: should self.attr be included in the table head?
+
+        for pat in &self.fns {
+            if pat.name.as_str().starts_with("$") {
+                columns.try_insert(pat.name, ColumnType::Ty).unwrap();
+            }
+            for (label, _) in &pat.expect_body().labels {
+                columns.try_insert(*label, ColumnType::Label).unwrap();
+            }
+        }
+
+        columns
+    }
 }
 
 /// `positive` is a list of positive pattern items, `negative` is a list of negative pattern items,
@@ -420,9 +323,20 @@ impl<'pcx> RustItems<'pcx> {
 pub struct PatternOperation<'pcx> {
     pub pcx: PatCtxt<'pcx>,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
-    pub positive: (&'pcx PatternItem<'pcx>, MatchedMap),
-    pub negative: Vec<(&'pcx PatternItem<'pcx>, MatchedMap)>,
+    pub positive: (Symbol, &'pcx PatternItem<'pcx>, MatchedMap),
+    pub negative: Vec<(Symbol, &'pcx PatternItem<'pcx>, MatchedMap)>,
     pub attr: PatAttr<'pcx>,
+}
+
+impl PatternOperation<'_> {
+    fn table_head(&self) -> TableHead {
+        let head = self.positive.1.table_head();
+        debug_assert!(
+            self.negative.iter().all(|(_, item, _)| item.table_head() == head),
+            "All negative pattern items should have the same table head as the positive one"
+        );
+        head
+    }
 }
 
 /// Corresponds to a pattern file in RPL, not a pattern item.
@@ -527,10 +441,11 @@ impl<'pcx> Pattern<'pcx> {
         &self,
         meta: &NonLocalMetaVars<'pcx>,
         pat_cfg: &'pcx pairs::PatternConfiguration<'pcx>,
-    ) -> (&'pcx PatternItem<'pcx>, MatchedMap) {
-        let item = *self.util_block.get(&Ident::from(pat_cfg.Identifier()).name).unwrap();
+    ) -> (Symbol, &'pcx PatternItem<'pcx>, MatchedMap) {
+        let name = Ident::from(pat_cfg.Identifier()).name;
+        let item = *self.util_block.get(&name).unwrap();
         let map = MatchedMap::new(meta, item.meta(), pat_cfg.MetaVariableAssignList());
-        (item, map)
+        (name, item, map)
     }
 
     #[instrument(level = "debug", skip(self, attr, patt_op, meta), fields(patt_block = ?self.patt_block.keys(), util_block = ?self.util_block.keys()))]
@@ -554,17 +469,16 @@ impl<'pcx> Pattern<'pcx> {
             attr,
         };
         match block_type {
-            PattOrUtil::Patt => {
-                self.patt_block
-                    .entry(pat_name)
-                    .or_insert(PatternItem::RPLPatternOperation(pat_ops));
-            },
-            PattOrUtil::Util => {
-                self.util_block
-                    .entry(pat_name)
-                    .or_insert_with(|| self.pcx.alloc_pattern_item(PatternItem::RPLPatternOperation(pat_ops)));
-            },
-        };
+            PattOrUtil::Patt => self
+                .patt_block
+                .entry(pat_name)
+                .or_insert(PatternItem::RPLPatternOperation(pat_ops)),
+            PattOrUtil::Util => *self
+                .util_block
+                .entry(pat_name)
+                .or_insert_with(|| self.pcx.alloc_pattern_item(PatternItem::RPLPatternOperation(pat_ops))),
+        }
+        .table_head();
     }
 
     #[instrument(level = "debug", skip(self, attr, items, symbol_table, meta))]

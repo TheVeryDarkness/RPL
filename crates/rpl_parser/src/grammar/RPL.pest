@@ -60,34 +60,34 @@ kw_from         = @{ "from" ~ !WordFollowing }
 kw_of           = @{ "of" ~ !WordFollowing }
 kw_raw          = @{ "raw" ~ !WordFollowing }
 // Soft Keyword
-kw_drop         = @{ "drop" ~ !WordFollowing }
-kw_break        = @{ "break" ~ !WordFollowing }
-kw_continue     = @{ "continue" ~ !WordFollowing }
-kw_loop         = @{ "loop" ~ !WordFollowing }
-kw_switchInt    = @{ "switchInt" ~ !WordFollowing }
-kw_true         = @{ "true" ~ !WordFollowing }
-kw_false        = @{ "false" ~ !WordFollowing }
-kw_unsafe       = @{ "unsafe" ~ !WordFollowing }
-kw_pub          = @{ "pub" ~ !WordFollowing }
-kw_struct       = @{ "struct" ~ !WordFollowing }
-kw_enum         = @{ "enum" ~ !WordFollowing }
-kw_impl         = @{ "impl" ~ !WordFollowing }
-kw_for          = @{ "for" ~ !WordFollowing }
-kw_u8           = @{ "u8" ~ !WordFollowing }
-kw_u16          = @{ "u16" ~ !WordFollowing }
-kw_u32          = @{ "u32" ~ !WordFollowing }
-kw_u64          = @{ "u64" ~ !WordFollowing }
-kw_usize        = @{ "usize" ~ !WordFollowing }
-kw_i8           = @{ "i8" ~ !WordFollowing }
-kw_i16          = @{ "i16" ~ !WordFollowing }
-kw_i32          = @{ "i32" ~ !WordFollowing }
-kw_i64          = @{ "i64" ~ !WordFollowing }
-kw_isize        = @{ "isize" ~ !WordFollowing }
-kw_RET          = @{ "RET" ~ !WordFollowing }
-kw_bool         = @{ "bool" ~ !WordFollowing }
-kw_str          = @{ "str" ~ !WordFollowing }
-kw_place        = @{ "place" ~ !WordFollowing }
-kw_where        = @{ "where" ~ !WordFollowing }
+kw_drop      = @{ "drop" ~ !WordFollowing }
+kw_break     = @{ "break" ~ !WordFollowing }
+kw_continue  = @{ "continue" ~ !WordFollowing }
+kw_loop      = @{ "loop" ~ !WordFollowing }
+kw_switchInt = @{ "switchInt" ~ !WordFollowing }
+kw_true      = @{ "true" ~ !WordFollowing }
+kw_false     = @{ "false" ~ !WordFollowing }
+kw_unsafe    = @{ "unsafe" ~ !WordFollowing }
+kw_pub       = @{ "pub" ~ !WordFollowing }
+kw_struct    = @{ "struct" ~ !WordFollowing }
+kw_enum      = @{ "enum" ~ !WordFollowing }
+kw_impl      = @{ "impl" ~ !WordFollowing }
+kw_for       = @{ "for" ~ !WordFollowing }
+kw_u8        = @{ "u8" ~ !WordFollowing }
+kw_u16       = @{ "u16" ~ !WordFollowing }
+kw_u32       = @{ "u32" ~ !WordFollowing }
+kw_u64       = @{ "u64" ~ !WordFollowing }
+kw_usize     = @{ "usize" ~ !WordFollowing }
+kw_i8        = @{ "i8" ~ !WordFollowing }
+kw_i16       = @{ "i16" ~ !WordFollowing }
+kw_i32       = @{ "i32" ~ !WordFollowing }
+kw_i64       = @{ "i64" ~ !WordFollowing }
+kw_isize     = @{ "isize" ~ !WordFollowing }
+kw_RET       = @{ "RET" ~ !WordFollowing }
+kw_bool      = @{ "bool" ~ !WordFollowing }
+kw_str       = @{ "str" ~ !WordFollowing }
+kw_place     = @{ "place" ~ !WordFollowing }
+kw_where     = @{ "where" ~ !WordFollowing }
 
 Keywords = @{
     kw_pattern
@@ -193,6 +193,7 @@ And        = @{ "&" }
 AndAnd     = @{ "&&" }
 OrOr       = @{ "||" }
 Bang       = @{ "!" }
+Question   = @{ "?" }
 Star       = @{ "*" }
 Arrow      = @{ "->" }
 RightArrow = @{ "=>" }
@@ -785,7 +786,7 @@ MirSwitchTarget = {
 }
 
 MirSwitchInt = {
-    kw_switchInt ~ LeftParen ~ MirOperand ~ RightParen ~ LeftBrace ~ (MirSwitchTarget)* ~ RightBrace
+    LabelWithColon? ~ kw_switchInt ~ LeftParen ~ MirOperand ~ RightParen ~ LeftBrace ~ (MirSwitchTarget)* ~ RightBrace
 }
 
 MirAssign = {
@@ -820,7 +821,7 @@ Visibility = {
 }
 
 Safety = {
-    kw_unsafe
+    kw_unsafe ~ Question?
 }
 
 FnSig = {

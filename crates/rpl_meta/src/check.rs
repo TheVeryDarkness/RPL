@@ -350,7 +350,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
     }
 
     fn check_mir_switch_int(&mut self, mctx: &MetaContext<'i>, switch_int: &'i pairs::MirSwitchInt<'i>) {
-        let (_, _, operand, _, _, targets, _) = switch_int.get_matched();
+        let (_, _, _, operand, _, _, targets, _) = switch_int.get_matched();
         self.check_mir_operand(mctx, operand);
         let mut has_otherwise = false;
         targets.iter_matched().for_each(|target| {

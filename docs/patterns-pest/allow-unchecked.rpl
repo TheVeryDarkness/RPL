@@ -12,7 +12,7 @@ patt {
         $T: type where is_all_safe_trait(self),
         $alignment: const(usize),
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $layout_result: core::result::Result<core::alloc::Layout, _> = alloc::alloc::Layout::from_size_align(
                 _,
                 const $alignment
@@ -28,7 +28,7 @@ patt {
     use_after_realloc_deref_const[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *const $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -41,7 +41,7 @@ patt {
     use_after_realloc_deref_mut[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *mut $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -54,7 +54,7 @@ patt {
     use_after_realloc_read_const[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *const $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -67,7 +67,7 @@ patt {
     use_after_realloc_read_mut[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *mut $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -80,7 +80,7 @@ patt {
     use_after_realloc_write_const[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *const $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -93,7 +93,7 @@ patt {
     use_after_realloc_write_mut[
         $T: type,
     ] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             let $old_ptr: *mut $T = _;
             let $old_ptr_u8: *mut u8 = copy $old_ptr as *mut u8 (PtrToPtr);
             'realloc:
@@ -103,7 +103,7 @@ patt {
         }
 
     alloc_zeroed_maybe_zero_mul =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'size:
             let $count: usize;
             let $size: usize = Mul(copy $count, _);
@@ -121,7 +121,7 @@ patt {
         }
 
     alloc_maybe_zero_mul =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'size:
             let $count: usize;
             let $size: usize = Mul(copy $count, _);
@@ -141,7 +141,7 @@ patt {
 
 util {
     alloc_cast_write[$T: type] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
             let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
@@ -149,7 +149,7 @@ util {
             (*$ptr_2) = _;
         }
     alloc_check_cast_write[$T: type] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _2
             let $const_ptr_1: *const u8 = copy $ptr_1 as *const u8 (PtrToPtr); // _19
@@ -164,7 +164,7 @@ util {
             (*$ptr_2) = _;
         }
     alloc_cast_check_write[$T: type] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
             let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
@@ -178,7 +178,7 @@ util {
             (*$ptr_2) = _;
         }
     alloc_cast_check_as_write[$T: type] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _); // _3
             let $ptr_2: *mut $T = move $ptr_1 as *mut $T (PtrToPtr); // _2
@@ -191,7 +191,7 @@ util {
             (*$ptr_2) = _;
         }
     alloc_check_as_cast_write[$T: type] =
-        fn $pattern(..) -> _ {
+        unsafe? fn $pattern(..) -> _ {
             'alloc:
             let $ptr_1: *mut u8 = alloc::alloc::__rust_alloc(_, _);
             let $addr_1: usize = copy $ptr_1 as usize (PointerExposeProvenance);

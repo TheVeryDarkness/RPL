@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{File, read_to_string};
 use std::io::Write as _;
 use std::process::{Command, Stdio};
 
@@ -30,6 +30,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     write!(stdin, "{}", parser)?;
     let output = child.wait_with_output()?;
+    if let Ok(s) = read_to_string("src/parser.rs") {
+        if s == String::from_utf8_lossy(&output.stdout) {
+            eprintln!("No changes in parser.rs, skipping write.");
+            return Ok(()); // No changes, no need to write
+        }
+    }
     File::create("src/parser.rs")?.write_all(&output.stdout)?;
 
     Ok(())

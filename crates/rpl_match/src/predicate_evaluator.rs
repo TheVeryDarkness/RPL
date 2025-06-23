@@ -130,6 +130,16 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     ),
                 }
             },
+            PredicateKind::MultipleConsts(p) => {
+                let mut args = Vec::new();
+                for arg in arg_instance.iter() {
+                    match arg {
+                        PredicateArgInstance::Const(konst) => args.push(*konst),
+                        _ => panic!("PredicateArgInstance::Ty expected, got {:?}", arg),
+                    }
+                }
+                p(self.tcx, self.typing_env, args)
+            },
         }
     }
 

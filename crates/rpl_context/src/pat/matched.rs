@@ -46,7 +46,11 @@ impl MatchedMap {
                     Choice2::_0(assign) => {
                         let (source_var, _, target_var) = assign.get_matched();
                         match target_var {
-                            Choice3::_0(_target_label) => todo!(),
+                            Choice3::_0(target_label) => {
+                                if target_label.span.as_str() != "_" {
+                                    todo!()
+                                }
+                            },
                             Choice3::_1(target_var) => {
                                 let target_var = Symbol::intern(target_var.span.as_str());
                                 let source_var = Symbol::intern(source_var.span.as_str());
