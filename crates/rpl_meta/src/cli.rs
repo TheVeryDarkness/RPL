@@ -27,6 +27,7 @@ pub fn collect_file_from_string_args(args: &[String]) -> Vec<(PathBuf, String)> 
             res.push((path, buf));
         });
     }
+    res.sort_by(|(p1, _), (p2, _)| p1.cmp(p2));
     res
 }
 
