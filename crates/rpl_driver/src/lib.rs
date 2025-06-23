@@ -102,6 +102,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         self.tcx.hir()
     }
 
+    #[instrument(level = "debug", skip_all, fields(item_id = ?item.owner_id.def_id))]
     fn visit_item(&mut self, item: &'tcx hir::Item<'tcx>) -> Self::Result {
         match item.kind {
             hir::ItemKind::Trait(hir::IsAuto::No, hir::Safety::Safe, ..) | hir::ItemKind::Fn { .. } => {},
@@ -113,6 +114,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         intravisit::walk_item(self, item);
     }
 
+    #[instrument(level = "debug", skip(self, kind, decl, body_id, _span))]
     fn visit_fn(
         &mut self,
         kind: intravisit::FnKind<'tcx>,
@@ -148,6 +150,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
 
 impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     #[expect(clippy::too_many_arguments)]
+    #[instrument(level = "trace", skip(self, rpl_rust_items, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
     fn impl_matched<'a>(
         &self,
         name: Symbol,
@@ -196,7 +199,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         rpl_rust_items.post_process(iter)
     }
 
-    #[instrument(level = "debug", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
+    #[instrument(level = "trace", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
     #[expect(clippy::too_many_arguments)]
     fn impl_matched_pat_op<'a>(
         &self,
@@ -258,6 +261,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 
     #[expect(clippy::too_many_arguments)]
+    #[instrument(level = "trace", skip(self, rpl_rust_items, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
     fn fn_matched<'a>(
         &self,
         name: Symbol,
@@ -301,7 +305,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         rpl_rust_items.post_process(iter)
     }
 
-    #[instrument(level = "debug", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
+    #[instrument(level = "trace", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
     #[expect(clippy::too_many_arguments)]
     fn fn_matched_pat_op<'a>(
         &self,

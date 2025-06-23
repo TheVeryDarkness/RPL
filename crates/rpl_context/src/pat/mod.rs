@@ -11,7 +11,7 @@ use rpl_meta::symbol_table::WithPath;
 use rpl_meta::utils::Ident;
 use rpl_parser::generics::{Choice2, Choice3, Choice4};
 use rpl_parser::pairs;
-use rustc_data_structures::fx::FxHashMap;
+use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_hir::FnDecl;
 use rustc_middle::mir::Body;
 use rustc_span::Symbol;
@@ -354,8 +354,8 @@ impl PatternOperation<'_> {
 /// Corresponds to a pattern file in RPL, not a pattern item.
 pub struct Pattern<'pcx> {
     pub pcx: PatCtxt<'pcx>,
-    pub patt_block: FxHashMap<Symbol, PatternItem<'pcx>>, // indexed by pat_name
-    pub util_block: FxHashMap<Symbol, &'pcx PatternItem<'pcx>>, // indexed by pat_name
+    pub patt_block: FxIndexMap<Symbol, PatternItem<'pcx>>, // indexed by pat_name
+    pub util_block: FxIndexMap<Symbol, &'pcx PatternItem<'pcx>>, // indexed by pat_name
     diag_block: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
 }
 
