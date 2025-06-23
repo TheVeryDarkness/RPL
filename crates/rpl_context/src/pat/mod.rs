@@ -2,7 +2,8 @@ use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use error::{DynamicError, DynamicErrorBuilder};
+pub use error::DynamicError;
+use error::DynamicErrorBuilder;
 use rpl_constraints::Constraint;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;

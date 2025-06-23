@@ -20,6 +20,7 @@ use std::convert::identity;
 
 use either::Either;
 use rpl_context::PatCtxt;
+use rpl_context::pat::DynamicError;
 use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
 use rpl_match::matches::artifact::NormalizedMatched;
@@ -126,6 +127,21 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             intravisit::FnKind::Closure => None,
         };
         self.check_fn(decl, header, decl.implicit_self.has_implicit_self(), def_id);
+
+        let attrs: Vec<_> = self
+            .tcx
+            .get_attrs_by_path(def_id.to_def_id(), &[Symbol::intern("rpl"), Symbol::intern("dynamic")])
+            .collect();
+        for attr in &attrs {
+            let error = DynamicError::from_attr(attr, self.tcx.def_span(def_id.to_def_id()));
+            self.tcx.emit_node_span_lint(
+                error.lint(),
+                self.tcx.local_def_id_to_hir_id(def_id),
+                error.primary_span(),
+                error,
+            );
+        }
+
         intravisit::walk_fn(self, kind, decl, body_id, def_id);
     }
 }

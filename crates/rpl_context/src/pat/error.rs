@@ -69,6 +69,134 @@ impl LintDiagnostic<'_, ()> for DynamicError {
     }
 }
 
+const LINT: Lint = Lint {
+    name: "RPL::DYNAMIC",
+    desc: "dynamic RPL pattern",
+    ..Lint::default_fields_for_macro()
+};
+
+impl DynamicError {
+    // const fn attr_error(span: Span) -> DynamicError {
+    //     DynamicError {
+    //         primary: (Cow::Borrowed("Ill-formed RPL dynamic attribute"), span),
+    //         labels: Vec::new(),
+    //         notes: Vec::new(),
+    //         helps: Vec::new(),
+    //     }
+    // }
+    fn unknown_attribute_error(span: Span) -> Self {
+        Self {
+            primary: ("Unknown attribute key".to_string(), span),
+            labels: Vec::new(),
+            notes: vec![(
+                "Allowed attribute keys are: `primary_message`, `labels`, `note`, `help`".to_string(),
+                None,
+            )],
+            helps: Vec::new(),
+            suggestions: Vec::new(),
+            lint: &LINT,
+        }
+    }
+    fn missing_primary_message_error(attr: &rustc_hir::Attribute) -> Self {
+        Self {
+            primary: ("Missing primary message".to_string(), attr.span),
+            labels: Vec::new(),
+            notes: Vec::new(),
+            helps: Vec::new(),
+            suggestions: Vec::new(),
+            lint: &LINT,
+        }
+    }
+    fn item_to_value_str(item: &rustc_ast::MetaItemInner) -> Result<Symbol, Self> {
+        item.value_str().ok_or_else(|| {
+            // If the value is not a string, we return an error.
+            // This is a fallback to ensure that we always return a valid error.
+            Self {
+                primary: ("Expected a string value".to_string(), item.span()),
+                labels: Vec::new(),
+                notes: Vec::new(),
+                helps: Vec::new(),
+                suggestions: Vec::new(),
+                lint: &LINT,
+            }
+        })
+    }
+    fn expected_meta_item_list_error(span: Span) -> Self {
+        Self {
+            primary: ("Expected a meta item list".to_string(), span),
+            labels: Vec::new(),
+            notes: Vec::new(),
+            helps: Vec::new(),
+            suggestions: Vec::new(),
+            lint: &LINT,
+        }
+    }
+    fn attr_to_meta_item_list(
+        attr: &rustc_hir::Attribute,
+    ) -> Result<impl Iterator<Item = rustc_ast::MetaItemInner>, Self> {
+        attr.meta_item_list().map_or_else(
+            || Err(Self::expected_meta_item_list_error(attr.span())),
+            |vec| Ok(vec.into_iter()),
+        )
+    }
+    fn item_to_meta_item_list(
+        item: &rustc_ast::MetaItemInner,
+    ) -> Result<impl Iterator<Item = &rustc_ast::MetaItemInner>, Self> {
+        item.meta_item_list().map_or_else(
+            || Err(Self::expected_meta_item_list_error(item.span())),
+            |vec| Ok(vec.iter()),
+        )
+    }
+    fn from_attr_impl(attr: &rustc_hir::Attribute, span: Span) -> Result<DynamicError, DynamicError> {
+        let items = Self::attr_to_meta_item_list(attr)?;
+        let mut primary_message = None;
+        let mut labels = Vec::new();
+        let mut notes = Vec::new();
+        let mut helps = Vec::new();
+        for item in items {
+            match item.name_or_empty().as_str() {
+                "primary_message" => {
+                    primary_message = Some(Self::item_to_value_str(&item)?.to_string());
+                },
+                "labels" => {
+                    let label_list = Self::item_to_meta_item_list(&item)?;
+                    for label_item in label_list {
+                        // FIXME: `label_item.span()` is not the actual span it refers to,
+                        labels.push((Self::item_to_value_str(label_item)?.to_string(), label_item.span()));
+                    }
+                },
+                "note" => {
+                    notes.push((Self::item_to_value_str(&item)?.to_string(), None));
+                },
+                "help" => {
+                    helps.push((Self::item_to_value_str(&item)?.to_string(), None));
+                },
+                _ => {
+                    // error!("Unknown attribute key {:?}", item.name_or_empty())
+                    return Err(Self::unknown_attribute_error(item.span()));
+                },
+            }
+        }
+        let primary_message = primary_message.ok_or_else(|| Self::missing_primary_message_error(attr))?;
+        let primary = (primary_message, span);
+        Ok(DynamicError {
+            primary,
+            labels,
+            notes,
+            helps,
+            suggestions: Vec::new(),
+            lint: &LINT,
+        })
+    }
+    pub fn from_attr(attr: &rustc_hir::Attribute, span: Span) -> DynamicError {
+        Self::from_attr_impl(attr, span).unwrap_or_else(|err| {
+            // If we fail to parse the attribute, we return an error.
+            // This is a fallback to ensure that we always return a valid error.
+            err
+        })
+    }
+}
+
 impl DynamicError {
     pub const fn primary_span(&self) -> Span {
         self.primary.1
