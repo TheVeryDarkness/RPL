@@ -32,10 +32,10 @@ jobs:
       - run: cargo fmt --check
       - run: cargo test --all
         env:
-          RPL_PATS: docs/pattens-pest
+          RPL_PATS: docs/patterns-pest
       - run: cargo clippy -- -D warnings
       - run: cargo install --path .
       - run: cargo rpl --workspace --all-targets
         env:
-          RPL_PATS: docs/pattens-pest
+          RPL_PATS: docs/patterns-pest
       # - uses: actions-rust-lang/audit@v1.2.4
