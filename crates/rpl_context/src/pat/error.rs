@@ -43,6 +43,33 @@ pub struct DynamicError {
     lint: &'static Lint,
 }
 
+impl LintDiagnostic<'_, ()> for Box<DynamicError> {
+    fn decorate_lint(self, diag: &mut rustc_errors::Diag<'_, ()>) {
+        let primary_message = self.primary.0;
+        diag.primary_message(primary_message);
+        for (label, span) in self.labels {
+            diag.span_label(span, label);
+        }
+        for (help, span_help) in self.helps {
+            if let Some(span_help) = span_help {
+                diag.span_help(span_help, help);
+            } else {
+                diag.help(help);
+            }
+        }
+        for (note, span_note) in self.notes {
+            if let Some(span_note) = span_note {
+                diag.span_note(span_note, note);
+            } else {
+                diag.note(note);
+            }
+        }
+        for (suggestion, code, span, applicability) in self.suggestions {
+            diag.span_suggestion(span, suggestion, code, applicability);
+        }
+    }
+}
+
 impl LintDiagnostic<'_, ()> for DynamicError {
     fn decorate_lint(self, diag: &mut rustc_errors::Diag<'_, ()>) {
         let primary_message = self.primary.0;
@@ -108,7 +135,7 @@ impl DynamicError {
             lint: &LINT,
         }
     }
-    fn item_to_value_str(item: &rustc_ast::MetaItemInner) -> Result<Symbol, Self> {
+    fn item_to_value_str(item: &rustc_ast::MetaItemInner) -> Result<Symbol, Box<Self>> {
         item.value_str().ok_or_else(|| {
             // If the value is not a string, we return an error.
             // This is a fallback to ensure that we always return a valid error.
@@ -120,9 +147,10 @@ impl DynamicError {
                 suggestions: Vec::new(),
                 lint: &LINT,
             }
+            .into()
         })
     }
-    fn expected_meta_item_list_error(span: Span) -> Self {
+    fn expected_meta_item_list_error(span: Span) -> Box<Self> {
         Self {
             primary: ("Expected a meta item list".to_string(), span),
             labels: Vec::new(),
@@ -131,10 +159,11 @@ impl DynamicError {
             suggestions: Vec::new(),
             lint: &LINT,
         }
+        .into()
     }
     fn attr_to_meta_item_list(
         attr: &rustc_hir::Attribute,
-    ) -> Result<impl Iterator<Item = rustc_ast::MetaItemInner>, Self> {
+    ) -> Result<impl Iterator<Item = rustc_ast::MetaItemInner>, Box<Self>> {
         attr.meta_item_list().map_or_else(
             || Err(Self::expected_meta_item_list_error(attr.span())),
             |vec| Ok(vec.into_iter()),
@@ -142,13 +171,13 @@ impl DynamicError {
     }
     fn item_to_meta_item_list(
         item: &rustc_ast::MetaItemInner,
-    ) -> Result<impl Iterator<Item = &rustc_ast::MetaItemInner>, Self> {
+    ) -> Result<impl Iterator<Item = &rustc_ast::MetaItemInner>, Box<Self>> {
         item.meta_item_list().map_or_else(
             || Err(Self::expected_meta_item_list_error(item.span())),
             |vec| Ok(vec.iter()),
         )
     }
-    fn from_attr_impl(attr: &rustc_hir::Attribute, span: Span) -> Result<DynamicError, DynamicError> {
+    fn from_attr_impl(attr: &rustc_hir::Attribute, span: Span) -> Result<Box<DynamicError>, Box<DynamicError>> {
         let items = Self::attr_to_meta_item_list(attr)?;
         let mut primary_message = None;
         let mut labels = Vec::new();
@@ -174,7 +203,7 @@ impl DynamicError {
                 },
                 _ => {
                     // error!("Unknown attribute key {:?}", item.name_or_empty())
-                    return Err(Self::unknown_attribute_error(item.span()));
+                    return Err(Self::unknown_attribute_error(item.span()).into());
                 },
             }
         }
@@ -187,9 +216,10 @@ impl DynamicError {
             helps,
             suggestions: Vec::new(),
             lint: &LINT,
-        })
+        }
+        .into())
     }
-    pub fn from_attr(attr: &rustc_hir::Attribute, span: Span) -> DynamicError {
+    pub fn from_attr(attr: &rustc_hir::Attribute, span: Span) -> Box<DynamicError> {
         Self::from_attr_impl(attr, span).unwrap_or_else(|err| {
             // If we fail to parse the attribute, we return an error.
             // This is a fallback to ensure that we always return a valid error.

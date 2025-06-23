@@ -192,7 +192,7 @@ impl Debug for PlaceBase {
     }
 }
 
-fn get_place_or_local<'pcx>(sym_tab: &FnSymbolTable<'pcx>, ident: Symbol) -> PlaceBase {
+fn get_place_or_local(sym_tab: &FnSymbolTable<'_>, ident: Symbol) -> PlaceBase {
     if let Some(idx) = sym_tab.meta_vars.place_vars_map().get(&ident) {
         PlaceBase::Var(idx.0.into())
     } else if let Some(idx) = sym_tab.inner.symbol_to_local_idx.get(&ident) {

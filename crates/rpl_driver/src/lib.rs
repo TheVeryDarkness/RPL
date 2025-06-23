@@ -147,6 +147,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
 }
 
 impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
+    #[expect(clippy::too_many_arguments)]
     fn impl_matched<'a>(
         &self,
         name: Symbol,
@@ -196,6 +197,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 
     #[instrument(level = "debug", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
+    #[expect(clippy::too_many_arguments)]
     fn impl_matched_pat_op<'a>(
         &self,
         name: Symbol,
@@ -233,6 +235,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         pat_op.post_process(iter)
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn impl_matched_pat_item<'a>(
         &self,
         name: Symbol,
@@ -254,6 +257,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn fn_matched<'a>(
         &self,
         name: Symbol,
@@ -298,6 +302,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 
     #[instrument(level = "debug", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
+    #[expect(clippy::too_many_arguments)]
     fn fn_matched_pat_op<'a>(
         &self,
         name: Symbol,
@@ -335,6 +340,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         pat_op.post_process(iter)
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn fn_matched_pat_item<'a>(
         &self,
         name: Symbol,
@@ -487,16 +493,9 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                             }
                         },
                         PatternItem::RPLPatternOperation(pat_op) => {
-                            for matched in self.fn_matched_pat_op(
-                                name,
-                                pat_op,
-                                def_id.into(),
-                                header,
-                                has_self,
-                                body,
-                                &mir_cfg,
-                                &mir_ddg,
-                            ) {
+                            for matched in
+                                self.fn_matched_pat_op(name, pat_op, def_id, header, has_self, body, &mir_cfg, &mir_ddg)
+                            {
                                 let error = pattern
                                     .get_diag(name, source_map, fn_name, body, decl, &matched)
                                     .unwrap_or_else(identity);

@@ -301,7 +301,7 @@ impl<'pcx> RustItems<'pcx> {
 
         self.meta.table_head(&mut columns);
 
-        for (name, _) in &self.adts {
+        for name in self.adts.keys() {
             columns.try_insert(*name, ColumnType::Ty).unwrap();
         }
 
@@ -311,7 +311,7 @@ impl<'pcx> RustItems<'pcx> {
             if pat.name.as_str().starts_with("$") {
                 columns.try_insert(pat.name, ColumnType::Ty).unwrap();
             }
-            for (label, _) in &pat.expect_body().labels {
+            for label in pat.expect_body().labels.keys() {
                 columns.try_insert(*label, ColumnType::Label).unwrap();
             }
         }
@@ -544,7 +544,7 @@ impl<'pcx> Pattern<'pcx> {
         }
 
         for (name, pat_item) in &self.patt_block {
-            let symbol_table = symbol_tables.get(&name).unwrap();
+            let symbol_table = symbol_tables.get(name).unwrap();
 
             let diag_name = pat_item.diag_name().unwrap_or(*name);
             if let Some(diag_item) = items.get(&diag_name) {
