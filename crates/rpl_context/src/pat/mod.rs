@@ -548,12 +548,12 @@ impl<'pcx> Pattern<'pcx> {
 
             let diag_name = pat_item.diag_name().unwrap_or(*name);
             if let Some(diag_item) = items.get(&diag_name) {
-                let locals = FxHashMap::default();
+                let labels = symbol_table.labels();
                 let diag = DynamicErrorBuilder::from_item(
                     WithPath::new(diag.path, diag_item),
                     &symbol_table.meta_vars,
                     pat_item.consts(),
-                    &locals,
+                    &labels.collect(),
                 )
                 .unwrap_or_else(|err| panic!("{err}"));
                 let prev = self.diag_block.insert(*name, diag);

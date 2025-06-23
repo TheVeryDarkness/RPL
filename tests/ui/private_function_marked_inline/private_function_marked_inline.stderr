@@ -44,17 +44,6 @@ LL | pub(crate) fn foo22() {}
    = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html
    = note: the compiler generally makes good inline decisions about private functions
 
-error: it usually isn't necessary to apply #[inline] to private functions
-  --> tests/ui/private_function_marked_inline/private_function_marked_inline.rs:33:5
-   |
-LL |     #[inline]
-   |     --------- `#[inline]` here
-LL |     fn foo_in_trait() {}
-   |     ^^^^^^^^^^^^^^^^^^^^ `#[inline]` applied here
-   |
-   = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html
-   = note: the compiler generally makes good inline decisions about private functions
-
 error: it usually isn't necessary to apply #[inline] to generic functions
   --> tests/ui/private_function_marked_inline/private_function_marked_inline.rs:33:5
    |
@@ -67,6 +56,17 @@ LL |     fn foo_in_trait() {}
    = note: generic functions are always `#[inline]` (monomorphization)
    = note: `-D rpl::generic-function-marked-inline` implied by `-D warnings`
    = help: to override `-D warnings` add `#[allow(rpl::generic_function_marked_inline)]`
+
+error: it usually isn't necessary to apply #[inline] to private functions
+  --> tests/ui/private_function_marked_inline/private_function_marked_inline.rs:33:5
+   |
+LL |     #[inline]
+   |     --------- `#[inline]` here
+LL |     fn foo_in_trait() {}
+   |     ^^^^^^^^^^^^^^^^^^^^ `#[inline]` applied here
+   |
+   = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html
+   = note: the compiler generally makes good inline decisions about private functions
 
 error: it usually isn't necessary to apply #[inline] to private functions
   --> tests/ui/private_function_marked_inline/private_function_marked_inline.rs:42:5

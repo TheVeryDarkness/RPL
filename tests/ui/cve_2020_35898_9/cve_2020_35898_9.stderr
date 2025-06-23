@@ -5,12 +5,13 @@ LL |         unsafe { &mut *self.inner.as_ref().get() }
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `UnsafeCell::get_mut` called here
    |
    = help: use `std::cell::RefCell` instead
-note: there will be multiple mutable references to the value at the same time
+help: use `std::cell::RefCell` instead
   --> tests/ui/cve_2020_35898_9/cve_2020_35898_9.rs:18:18
    |
 LL |         unsafe { &mut *self.inner.as_ref().get() }
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: use `std::cell::RefCell` instead
+   = help: use `std::cell::RefCell` instead
+note: there will be multiple mutable references to the value at the same time
   --> tests/ui/cve_2020_35898_9/cve_2020_35898_9.rs:18:18
    |
 LL |         unsafe { &mut *self.inner.as_ref().get() }

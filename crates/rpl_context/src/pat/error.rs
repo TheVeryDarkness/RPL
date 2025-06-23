@@ -6,7 +6,7 @@ use rpl_meta::symbol_table::{MetaVariableType, NonLocalMetaSymTab, WithPath};
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
-use rustc_data_structures::fx::FxHashMap;
+use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::{Applicability, LintDiagnostic};
 use rustc_hir::FnDecl;
 use rustc_lint::{Level, Lint};
@@ -17,7 +17,7 @@ use sync_arena::declare_arena;
 use thiserror::Error;
 
 use super::Matched;
-use crate::pat::{self, ConstVarIdx, TyVarIdx};
+use crate::pat::{ConstVarIdx, TyVarIdx};
 
 /// A dynamic error that can be used to report user-defined errors
 ///
@@ -236,6 +236,7 @@ impl DynamicError {
     }
 }
 
+#[derive(Debug)]
 enum SubMsg<'i> {
     Str(&'i str),
     Ty(TyVarIdx),
@@ -249,7 +250,7 @@ impl<'i> SubMsg<'i> {
         s: &pairs::diagMessageInner<'i, 0>,
         meta_vars: &NonLocalMetaSymTab,
         consts: &FxHashMap<Symbol, &'i str>,
-        locals: &FxHashMap<Symbol, pat::Local>,
+        labels: &FxHashSet<Symbol>,
     ) -> Vec<Self> {
         let mut msgs = Vec::new();
         for seg in s.iter_matched() {
@@ -262,16 +263,17 @@ impl<'i> SubMsg<'i> {
                     if let Some(const_value) = consts.get(&name) {
                         msgs.push(SubMsg::Str(const_value));
                     } else if meta_var.as_str() == "$fn" {
+                        // FIXME: this is a hack to handle `$fn` meta variable
                         msgs.push(SubMsg::FnName)
-                    } else if let Some(_) = locals.get(&meta_var) {
-                        msgs.push(SubMsg::Label(meta_var))
+                    } else if labels.contains(&name) {
+                        msgs.push(SubMsg::Label(name))
                     } else {
                         let (var_type, idx, _) = meta_vars
                             .get_from_symbol(meta_var)
                             .unwrap_or_else(|| {
                                 panic!(
-                                    "Meta variable `{}` not found in the non-local meta symbol table",
-                                    meta_var
+                                    "Meta variable `{}` not found:\n    non-local meta symbol table {:?}\n    labels: {:?}",
+                                    meta_var, meta_vars, labels
                                 )
                             })
                             .expect_non_adt();
@@ -404,7 +406,7 @@ impl<'i> DynamicErrorBuilder<'i> {
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
         meta_vars: &NonLocalMetaSymTab,
         consts: &FxHashMap<Symbol, &'i str>,
-        locals: &FxHashMap<Symbol, pat::Local>,
+        locals: &FxHashSet<Symbol>,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
         let (_, _, _, diags, _, _) = item.get_matched();

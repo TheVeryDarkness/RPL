@@ -222,11 +222,12 @@ diag {
     }
 
     alloc_misaligned_cast = {
+        // FIXME: simplify the diagnostic message
         primary(cast) = "resulting pointer `*mut {$T}` has a different alignment than the original alignment that the pointer was created with",
         label(alloc)  = "pointer created here",
         label(cast)  = "pointer casted here",
         note          = "See https://doc.rust-lang.org/std/alloc/fn.alloc.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#tymethod.alloc",
-        help          = "consider using `core::alloc::Layout::new::<T>()` or `core::alloc::Layout::array::<T>(n)` to create a layout for the pointer",
+        // help          = "consider using `core::alloc::Layout::new::<T>()` or `core::alloc::Layout::array::<T>(n)` to create a layout for the pointer",
         name          = "misaligned_pointer",
         level         = "warn",
     }
@@ -240,7 +241,7 @@ diag {
     }
 
     alloc_maybe_zero_mul = {
-        primary(alloc) = "public function {$fn} allocates a pointer that may be zero-sized, which is an undefined behavior",
+        primary(alloc) = "public function `{$fn}` allocates a pointer that may be zero-sized, which is an undefined behavior",
         label(alloc)   = "pointer created here",
         label(size)    = "size passed in here",
         note           = "See https://doc.rust-lang.org/std/alloc/fn.{$alloc}.html and https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#method.{$alloc}",

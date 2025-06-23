@@ -391,6 +391,13 @@ impl<'i> SymbolTable<'i> {
             None
         }
     }
+
+    pub fn labels(&self) -> impl Iterator<Item = Symbol> {
+        self.fns
+            .values()
+            .chain(self.unnamed_fns.iter())
+            .flat_map(|f| f.inner.locals.iter().filter_map(|l| l.1.0))
+    }
 }
 
 impl<'i> SymbolTable<'i> {
