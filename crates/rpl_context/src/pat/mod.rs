@@ -14,6 +14,7 @@ use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::FnDecl;
 use rustc_middle::mir::Body;
 use rustc_span::Symbol;
+use rustc_span::source_map::SourceMap;
 
 use crate::PatCtxt;
 use crate::pat::table::ColumnType;
@@ -42,7 +43,6 @@ pub type Label = Symbol;
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Spanned {
     Location(mir::Location),
-    Local(mir::Local),
     Body,
     Output,
 }
@@ -370,6 +370,8 @@ impl<'pcx> Pattern<'pcx> {
     pub fn get_diag<'tcx>(
         &self,
         pat_name: Symbol,
+        source_map: &SourceMap,
+        fn_name: Option<Symbol>,
         body: &Body<'tcx>,
         decl: &FnDecl<'tcx>,
         matched: &impl Matched<'tcx>,
@@ -378,7 +380,7 @@ impl<'pcx> Pattern<'pcx> {
             self.diag_block
                 .get(&pat_name)
                 .ok_or_else(|| Box::new(DynamicError::default_diagnostic(pat_name, body.span)))?
-                .build(body, decl, matched),
+                .build(source_map, fn_name, body, decl, matched),
         ))
     }
 }
@@ -544,10 +546,12 @@ impl<'pcx> Pattern<'pcx> {
 
             let diag_name = pat_item.diag_name().unwrap_or(*name);
             if let Some(diag_item) = items.get(&diag_name) {
+                let locals = FxHashMap::default();
                 let diag = DynamicErrorBuilder::from_item(
                     WithPath::new(diag.path, diag_item),
                     &symbol_table.meta_vars,
                     pat_item.consts(),
+                    &locals,
                 )
                 .unwrap_or_else(|err| panic!("{err}"));
                 let prev = self.diag_block.insert(*name, diag);

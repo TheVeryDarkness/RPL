@@ -7,6 +7,7 @@ use parser::generics::{Choice3, Choice4};
 use parser::{SpanWrapper, pairs};
 use pest_typed::Span;
 use rpl_constraints::predicates::PredicateConjunction;
+use rustc_data_structures::sync::RwLock;
 use rustc_hash::FxHashMap;
 use rustc_span::Symbol;
 
@@ -61,12 +62,12 @@ pub type Type<'i> = &'i pairs::Type<'i>;
 // PredicateConjunction is the predicates after the meta variable declaration
 // (These predicates should have only one parameter, which is the meta variable itself)
 // like `$T: type where is_all_safe_trait(self) && !is_primitive(self)`
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Debug)]
 pub struct NonLocalMetaSymTab<'i> {
     type_vars: FxHashMap<Symbol, (usize, PredicateConjunction)>,
     const_vars: FxHashMap<Symbol, (usize, Type<'i>, PredicateConjunction)>,
     place_vars: FxHashMap<Symbol, (usize, Type<'i>, PredicateConjunction)>,
-    adt_pats: FxHashMap<Symbol, AdtPatType>,
+    adt_pats: RwLock<FxHashMap<Symbol, AdtPatType>>,
 }
 
 impl NonLocalMetaSymTab<'_> {
@@ -134,13 +135,14 @@ impl<'i> NonLocalMetaSymTab<'i> {
     }
 
     pub fn add_adt_pat(
-        &mut self,
+        &self,
         mctx: &MetaContext<'i>,
         meta_var: Ident<'i>,
         adt_pat_ty: AdtPatType,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) -> Option<()> {
         self.adt_pats
+            .write()
             .try_insert(meta_var.name, adt_pat_ty)
             .map_err(|_| {
                 let err = RPLMetaError::NonLocalMetaVariableAlreadyDeclared {
@@ -188,7 +190,7 @@ impl<'i> NonLocalMetaSymTab<'i> {
             Some(MetaVariable::Const(*idx, ty, preds.clone()))
         } else if let Some((idx, ty, preds)) = self.place_vars.get(&symbol) {
             Some(MetaVariable::Place(*idx, ty, preds.clone()))
-        } else if let Some(adt_pat_ty) = self.adt_pats.get(&symbol) {
+        } else if let Some(adt_pat_ty) = self.adt_pats.read().get(&symbol) {
             Some(MetaVariable::AdtPat(*adt_pat_ty, symbol))
         } else {
             None

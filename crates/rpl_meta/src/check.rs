@@ -189,12 +189,9 @@ impl<'i> CheckCtxt<'i> {
     fn check_struct(&mut self, mctx: &MetaContext<'i>, rust_struct: &'i pairs::Struct<'i>) {
         let struct_name = rust_struct.get_matched().2;
         let struct_name = struct_name.into();
-        Arc::get_mut(&mut self.symbol_table.meta_vars).unwrap().add_adt_pat(
-            mctx,
-            struct_name,
-            AdtPatType::Struct,
-            &mut self.errors,
-        );
+        self.symbol_table
+            .meta_vars
+            .add_adt_pat(mctx, struct_name, AdtPatType::Struct, &mut self.errors);
         let struct_def = self.symbol_table.add_struct(mctx, struct_name, &mut self.errors);
         if let Some(struct_def) = struct_def {
             CheckVariantCtxt {
@@ -209,12 +206,9 @@ impl<'i> CheckCtxt<'i> {
     fn check_enum(&mut self, mctx: &MetaContext<'i>, rust_enum: &'i pairs::Enum<'i>) {
         let enum_name = rust_enum.get_matched().1;
         let enum_name = enum_name.into();
-        Arc::get_mut(&mut self.symbol_table.meta_vars).unwrap().add_adt_pat(
-            mctx,
-            enum_name,
-            AdtPatType::Enum,
-            &mut self.errors,
-        );
+        self.symbol_table
+            .meta_vars
+            .add_adt_pat(mctx, enum_name, AdtPatType::Enum, &mut self.errors);
         let enum_def = self.symbol_table.add_enum(mctx, enum_name, &mut self.errors);
         if let Some(enum_def) = enum_def {
             CheckEnumCtxt {

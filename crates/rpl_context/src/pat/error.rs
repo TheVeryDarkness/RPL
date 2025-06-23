@@ -11,12 +11,13 @@ use rustc_errors::{Applicability, LintDiagnostic};
 use rustc_hir::FnDecl;
 use rustc_lint::{Level, Lint};
 use rustc_middle::mir::Body;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 use sync_arena::declare_arena;
 use thiserror::Error;
 
 use super::Matched;
-use crate::pat::{ConstVarIdx, TyVarIdx};
+use crate::pat::{self, ConstVarIdx, TyVarIdx};
 
 /// A dynamic error that can be used to report user-defined errors
 ///
@@ -239,6 +240,8 @@ enum SubMsg<'i> {
     Str(&'i str),
     Ty(TyVarIdx),
     Const(ConstVarIdx),
+    FnName,
+    Local(pat::Local),
 }
 
 impl<'i> SubMsg<'i> {
@@ -246,6 +249,7 @@ impl<'i> SubMsg<'i> {
         s: &pairs::diagMessageInner<'i, 0>,
         meta_vars: &NonLocalMetaSymTab,
         consts: &FxHashMap<Symbol, &'i str>,
+        locals: &FxHashMap<Symbol, pat::Local>,
     ) -> Vec<Self> {
         let mut msgs = Vec::new();
         for seg in s.iter_matched() {
@@ -257,6 +261,10 @@ impl<'i> SubMsg<'i> {
                     let name = Symbol::intern(name.span.as_str());
                     if let Some(const_value) = consts.get(&name) {
                         msgs.push(SubMsg::Str(const_value));
+                    } else if meta_var.as_str() == "$fn" {
+                        msgs.push(SubMsg::FnName)
+                    } else if let Some(local) = locals.get(&meta_var) {
+                        msgs.push(SubMsg::Local(*local))
                     } else {
                         let (var_type, idx, _) = meta_vars
                             .get_from_symbol(meta_var)
@@ -396,6 +404,7 @@ impl<'i> DynamicErrorBuilder<'i> {
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
         meta_vars: &NonLocalMetaSymTab,
         consts: &FxHashMap<Symbol, &'i str>,
+        locals: &FxHashMap<Symbol, pat::Local>,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
         let (_, _, _, diags, _, _) = item.get_matched();
@@ -422,22 +431,22 @@ impl<'i> DynamicErrorBuilder<'i> {
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
                     )?;
-                    primary = Some((SubMsg::parse(message, meta_vars, consts), ident));
+                    primary = Some((SubMsg::parse(message, meta_vars, consts, locals), ident));
                 },
                 "label" => {
                     let ident = parse_ident(
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
                     )?;
-                    labels.push((SubMsg::parse(message, meta_vars, consts), ident));
+                    labels.push((SubMsg::parse(message, meta_vars, consts, locals), ident));
                 },
                 "note" => {
                     let ident = args.map(|args| parse_ident(path, args)).transpose()?;
-                    notes.push((SubMsg::parse(message, meta_vars, consts), ident));
+                    notes.push((SubMsg::parse(message, meta_vars, consts, locals), ident));
                 },
                 "help" => {
                     let ident = args.map(|args| parse_ident(path, args)).transpose()?;
-                    helps.push((SubMsg::parse(message, meta_vars, consts), ident));
+                    helps.push((SubMsg::parse(message, meta_vars, consts, locals), ident));
                 },
                 "name" => {
                     if args.is_some() {
@@ -458,8 +467,8 @@ impl<'i> DynamicErrorBuilder<'i> {
                 "suggestion" => {
                     let args = args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?;
                     let (code, span, applicability) = parse_suggestion(path, args)?;
-                    let code = SubMsg::parse(code, meta_vars, consts);
-                    let message = SubMsg::parse(message, meta_vars, consts);
+                    let code = SubMsg::parse(code, meta_vars, consts, locals);
+                    let message = SubMsg::parse(message, meta_vars, consts, locals);
                     suggestions.push((message, code, span, applicability));
                 },
                 _ => unimplemented!("Unrecognized key: {key:?}"),
@@ -483,53 +492,81 @@ impl<'i> DynamicErrorBuilder<'i> {
     }
     pub(crate) fn build<'tcx>(
         &self,
+        source_map: &SourceMap,
+        fn_name: Option<Symbol>,
         body: &Body<'tcx>,
         decl: &FnDecl<'tcx>,
         matched: &impl Matched<'tcx>,
     ) -> DynamicError {
-        fn format<'tcx>(message: &Vec<SubMsg>, matched: &impl Matched<'tcx>) -> String {
-            let mut s = String::new();
-            for msg in message {
-                match msg {
-                    SubMsg::Str(smsg) => s.push_str(smsg),
-                    SubMsg::Ty(idx) => {
-                        let ty = matched.type_meta_var(*idx);
-                        s.push_str(&ty.to_string());
-                    },
-                    SubMsg::Const(idx) => {
-                        let const_ = matched.const_meta_var(*idx);
-                        s.push_str(&const_.to_string());
-                    },
-                }
-            }
-            s
+        struct Formatter<'a, 'tcx, M: Matched<'tcx>> {
+            source_map: &'a SourceMap,
+            fn_name: Option<Symbol>,
+            body: &'a Body<'tcx>,
+            matched: &'a M,
         }
+        impl<'tcx, M: Matched<'tcx>> Formatter<'_, 'tcx, M> {
+            fn format(&self, message: &Vec<SubMsg>) -> String {
+                let mut s = String::new();
+                for msg in message {
+                    match msg {
+                        SubMsg::Str(smsg) => s.push_str(smsg),
+                        SubMsg::Ty(idx) => {
+                            let ty = self.matched.type_meta_var(*idx);
+                            s.push_str(&ty.to_string());
+                        },
+                        SubMsg::Const(idx) => {
+                            let const_ = self.matched.const_meta_var(*idx);
+                            s.push_str(&const_.to_string());
+                        },
+                        SubMsg::FnName => {
+                            todo!()
+                        },
+                        SubMsg::Local(local) => {
+                            let local_name = self.matched.local(*local);
+                            s.push_str(
+                                &self
+                                    .source_map
+                                    .span_to_snippet(self.body.local_decls[local_name].source_info.span)
+                                    .unwrap(),
+                            );
+                        },
+                    }
+                }
+                s
+            }
+        }
+        let formatter = Formatter {
+            source_map,
+            fn_name,
+            body,
+            matched,
+        };
         let primary = (
-            format(&self.primary.0, matched),
+            formatter.format(&self.primary.0),
             matched.span(body, decl, self.primary.1),
         );
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (format(label, matched), matched.span(body, decl, span)))
+            .map(|(label, span)| (formatter.format(label), matched.span(body, decl, span)))
             .collect();
         let notes = self
             .notes
             .iter()
-            .map(|(note, span)| (format(note, matched), span.map(|span| matched.span(body, decl, span))))
+            .map(|(note, span)| (formatter.format(note), span.map(|span| matched.span(body, decl, span))))
             .collect();
         let helps = self
             .helps
             .iter()
-            .map(|(help, span)| (format(help, matched), span.map(|span| matched.span(body, decl, span))))
+            .map(|(help, span)| (formatter.format(help), span.map(|span| matched.span(body, decl, span))))
             .collect();
         let suggestions = self
             .suggestions
             .iter()
             .map(|(suggestion, code, span, applicability)| {
                 (
-                    format(suggestion, matched),
-                    format(code, matched),
+                    formatter.format(suggestion),
+                    formatter.format(code),
                     matched.span(body, decl, span.unwrap()),
                     *applicability,
                 )

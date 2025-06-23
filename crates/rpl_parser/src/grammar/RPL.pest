@@ -48,6 +48,9 @@ kw_Gt           = @{ "Gt" ~ !WordFollowing }
 kw_Ge           = @{ "Ge" ~ !WordFollowing }
 kw_Eq           = @{ "Eq" ~ !WordFollowing }
 kw_Ne           = @{ "Ne" ~ !WordFollowing }
+kw_BitAnd       = @{ "BitAnd" ~ !WordFollowing }
+kw_BitOr        = @{ "BitOr" ~ !WordFollowing }
+kw_BitXor       = @{ "BitXor" ~ !WordFollowing }
 kw_Offset       = @{ "Offset" ~ !WordFollowing }
 kw_SizeOf       = @{ "SizeOf" ~ !WordFollowing }
 kw_AlignOf      = @{ "AlignOf" ~ !WordFollowing }
@@ -128,6 +131,9 @@ Keywords = @{
   | kw_Ge
   | kw_Eq
   | kw_Ne
+  | kw_BitAnd
+  | kw_BitOr
+  | kw_BitXor
   | kw_Offset
   | kw_SizeOf
   | kw_AlignOf
@@ -608,6 +614,9 @@ MirBinOp = {
   | kw_Ge
   | kw_Eq
   | kw_Ne
+  | kw_BitAnd
+  | kw_BitOr
+  | kw_BitXor
   | kw_Offset
 }
 
@@ -727,7 +736,7 @@ MirTypeDecl = {
 }
 
 MirLocalDecl = {
-    LabelWithColon? ~ kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon
+    kw_let ~ Mutability ~ MirPlaceLocal ~ Colon ~ Type ~ (Assign ~ MirRvalueOrCall)? ~ SemiColon
 }
 
 UsePath = {
