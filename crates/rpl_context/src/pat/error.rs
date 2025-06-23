@@ -1,3 +1,12 @@
+// #![warn(
+//     clippy::unreachable,
+//     clippy::todo,
+//     clippy::panic,
+//     clippy::unwrap_used,
+//     clippy::unimplemented,
+//     clippy::manual_assert,
+//     clippy::missing_panics_doc
+// )]
 use std::sync::LazyLock;
 
 use derive_more::{Debug, Display};
@@ -347,8 +356,7 @@ pub(crate) struct DynamicErrorBuilder<'i> {
     /// Suggestions, alternative code, their spans, and its [`Applicability`].
     ///
     /// See [`DynamicError::suggestions`].
-    #[expect(clippy::type_complexity)]
-    suggestions: Vec<(Vec<SubMsg<'i>>, Vec<SubMsg<'i>>, Option<&'i str>, Applicability)>,
+    suggestions: Vec<(Vec<SubMsg<'i>>, Vec<SubMsg<'i>>, &'i str, Applicability)>,
     lint: &'static Lint,
 }
 
@@ -364,6 +372,8 @@ static ARENA: LazyLock<Arena<'static>> = LazyLock::new(Arena::default);
 pub enum ParseError<'i> {
     #[display("Primary message not found:\n{_0}")]
     PrimaryNotFound(SpanWrapper<'i>),
+    #[display("Lint name not found:\n{_0}")]
+    MissingName(SpanWrapper<'i>),
     #[display("Expected an identifier, but found:\n{_0}")]
     NotAnIdentifier(SpanWrapper<'i>),
     #[display("Expected a argument list, but found:\n{_0}")]
@@ -382,6 +392,8 @@ pub enum ParseError<'i> {
     InvalidKey(&'i str, SpanWrapper<'i>),
     #[display("Missing {_0} in {_1}:\n{_2}")]
     MissingValue(&'static str, &'static str, SpanWrapper<'i>),
+    #[display("Unrecognized enum {_0} {_1:?}:\n{_2}")]
+    UnrecognizedEnum(&'static str, &'i str, SpanWrapper<'i>),
 }
 
 fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> Result<&'i str, ParseError<'i>> {
@@ -399,7 +411,7 @@ fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> R
 fn parse_suggestion<'i>(
     path: &'i std::path::Path,
     attrs: &'i pairs::diagAttrs<'i>,
-) -> Result<(&'i diagMessageInner<'i, 0>, Option<&'i str>, Applicability), ParseError<'i>> {
+) -> Result<(&'i diagMessageInner<'i, 0>, &'i str, Applicability), ParseError<'i>> {
     let mut code = None;
     let mut span = None;
     let mut applicability = None;
@@ -411,12 +423,17 @@ fn parse_suggestion<'i>(
                 "code" => code = Some(message.diagMessageInner()),
                 "span" => span = Some(message.diagMessageInner().span.as_str()),
                 "applicability" => {
-                    applicability = Some(match message.span.as_str() {
+                    let msg = message.span.as_str();
+                    applicability = Some(match msg {
                         "machine_applicable" => Applicability::MachineApplicable,
                         "maybe_incorrect" => Applicability::MaybeIncorrect,
                         "has_placeholders" => Applicability::HasPlaceholders,
                         "unspecified" => Applicability::Unspecified,
-                        _ => unimplemented!("Unrecognized applicability: {}", message.span.as_str()),
+                        _ => Err(ParseError::UnrecognizedEnum(
+                            "applicability",
+                            msg,
+                            SpanWrapper::new(message.span, path),
+                        ))?,
                     })
                 },
                 _ => return Err(ParseError::InvalidKey(key, SpanWrapper::new(attr.span, path))),
@@ -425,6 +442,8 @@ fn parse_suggestion<'i>(
     }
     let code =
         code.ok_or_else(|| ParseError::MissingValue("code", "suggestion", SpanWrapper::new(attrs.span, path)))?;
+    let span =
+        span.ok_or_else(|| ParseError::MissingValue("span", "suggestion", SpanWrapper::new(attrs.span, path)))?;
     let applicability = applicability.unwrap_or(Applicability::Unspecified);
     Ok((code, span, applicability))
 }
@@ -493,7 +512,11 @@ impl<'i> DynamicErrorBuilder<'i> {
                         "warn" => Level::Warn,
                         "deny" => Level::Deny,
                         "forbid" => Level::Forbid,
-                        _ => unimplemented!("Unrecognized level: {message}",),
+                        _ => Err(ParseError::UnrecognizedEnum(
+                            "level",
+                            key,
+                            SpanWrapper::new(diag.span, path),
+                        ))?,
                     };
                 },
                 "suggestion" => {
@@ -503,11 +526,14 @@ impl<'i> DynamicErrorBuilder<'i> {
                     let message = SubMsg::parse(message, meta_vars, consts, locals);
                     suggestions.push((message, code, span, applicability));
                 },
-                _ => unimplemented!("Unrecognized key: {key:?}"),
+                _ => Err(ParseError::InvalidKey(key, SpanWrapper::new(diag.span, path)))?,
             }
         }
         let primary = primary.ok_or_else(|| ParseError::PrimaryNotFound(SpanWrapper::new(item.span, path)))?;
-        let name = name.unwrap().span.as_str();
+        let name = name
+            .ok_or_else(|| ParseError::MissingName(SpanWrapper::new(item.span, path)))?
+            .span
+            .as_str();
         let builder = DynamicErrorBuilder {
             primary,
             labels,
@@ -596,7 +622,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                 (
                     formatter.format(suggestion),
                     formatter.format(code),
-                    matched.span(body, decl, span.unwrap()),
+                    matched.span(body, decl, span),
                     *applicability,
                 )
             })
