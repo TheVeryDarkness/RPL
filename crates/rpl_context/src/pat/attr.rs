@@ -1,13 +1,17 @@
+use std::hash::Hash;
+
+use either::Either;
 use rpl_constraints::predicates;
 use rpl_meta::check::Inline;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs;
-use rustc_data_structures::fx::FxHashMap;
+use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_span::Symbol;
 
 #[derive(Default)]
 pub struct PatAttr<'i> {
+    pub(super) deduplicate: bool,
     pub(super) diag: Option<Symbol>,
     pub(super) consts: FxHashMap<Symbol, &'i str>,
 }
@@ -28,6 +32,13 @@ impl<'i> PatAttr<'i> {
         for attr in collect_elems_separated_by_comma!(attrs) {
             let (key, value) = attr.get_matched();
             match key.span.as_str() {
+                // #[deduplicate]
+                "deduplicate" => match value {
+                    Some(_) => unreachable!(),
+                    None => {
+                        self.deduplicate = true;
+                    },
+                },
                 // #[diag = "diag_name"]
                 "diag" => match value {
                     Some(Choice2::_0(_)) | None => unreachable!(),
@@ -62,6 +73,13 @@ impl<'i> PatAttr<'i> {
                 },
                 _ => unreachable!(),
             }
+        }
+    }
+
+    pub fn post_process<M: Eq + Hash>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
+        match self.deduplicate {
+            true => Either::Left(iter.collect::<FxHashSet<_>>().into_iter()),
+            false => Either::Right(iter),
         }
     }
 }

@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -314,6 +315,10 @@ impl<'pcx> RustItems<'pcx> {
 
         columns
     }
+
+    pub fn post_process<M: Eq + Hash>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
+        self.attr.post_process(iter)
+    }
 }
 
 /// `positive` is a list of positive pattern items, `negative` is a list of negative pattern items,
@@ -336,6 +341,10 @@ impl PatternOperation<'_> {
             "All negative pattern items should have the same table head as the positive one"
         );
         head
+    }
+
+    pub fn post_process<M: Eq + Hash>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
+        self.attr.post_process(iter)
     }
 }
 
