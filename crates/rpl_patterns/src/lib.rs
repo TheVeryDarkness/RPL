@@ -24,8 +24,11 @@ extern crate rpl_macros;
 
 use rpl_context::PatCtxt;
 use rustc_hir::ItemId;
+use rustc_lint::LintId;
 use rustc_middle::ty::TyCtxt;
 use rustc_session::config::OptLevel;
+
+use crate::lints::all_lints;
 
 mod inline;
 mod normal;
@@ -84,6 +87,16 @@ static DEBUG_PATTERN: &[fn(TyCtxt<'_>, PatCtxt<'_>, ItemId)] = &[inline::transmu
 pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item: ItemId) {
     // rustc_data_structures::sync::par_for_each_in(ALL_PATTERNS, |check| check(tcx, pcx, item))
     rustc_data_structures::sync::par_for_each_in(ALL_PATTERNS, |check| check(tcx, pcx, item));
+}
+
+pub fn register_lints(lint_store: &mut rustc_lint::LintStore) {
+    lint_store.register_lints(all_lints());
+    lint_store.register_group(
+        true,
+        "rpl::all",
+        None,
+        all_lints().iter().copied().map(LintId::of).collect(),
+    );
 }
 
 #[allow(unused)]

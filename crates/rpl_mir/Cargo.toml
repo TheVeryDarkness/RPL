@@ -20,6 +20,7 @@ quote.workspace = true
 proc-macro2.workspace = true
 
 [features]
+strict = []
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

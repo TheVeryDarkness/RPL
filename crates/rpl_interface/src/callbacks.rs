@@ -78,7 +78,7 @@ impl rustc_driver::Callbacks for RplCallbacks {
         }));
         config.locale_resources = crate::default_locale_resources();
 
-        /*
+        let previous = config.register_lints.take();
         config.register_lints = Some(Box::new(move |sess, lint_store| {
             // technically we're ~guaranteed that this is none but might as well call anything that
             // is there already. Certainly it can't hurt.
@@ -86,9 +86,8 @@ impl rustc_driver::Callbacks for RplCallbacks {
                 (previous)(sess, lint_store);
             }
 
-            rpl_driver::register_lints(lint_store);
+            rpl_patterns::register_lints(lint_store);
         }));
-        */
 
         config.override_queries = Some(|_sess, providers| {
             rpl_driver::provide(providers);
