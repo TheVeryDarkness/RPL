@@ -1184,7 +1184,7 @@ dependencies = [
  "syn 2.0.98",
  "tester",
  "thiserror",
- "tokio 1.43.0",
+ "tokio",
  "tokio-util",
  "toml",
  "tracing",
@@ -1633,17 +1633,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6703a273949a90131b290be1fe7b039d0fc884aa1935860dfcbe056f28cd8092"
 dependencies = [
  "bytes 0.5.6",
+ "memchr",
  "pin-project-lite 0.1.12",
-]
-
-[[package]]
-name = "tokio"
-version = "1.43.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d61fa4ffa3de412bfea335c6ecff681de2b609ba3c77ef3e00e521813a9ed9e"
-dependencies = [
- "backtrace",
- "pin-project-lite 0.2.16",
 ]
 
 [[package]]
@@ -1657,7 +1648,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.1.12",
- "tokio 0.2.25",
+ "tokio",
 ]
 
 [[package]]
