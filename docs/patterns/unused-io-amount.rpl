@@ -1,0 +1,57 @@
+pattern unused-io-amount
+
+patt {
+    use std::io::Error;
+    use std::io::Write;
+    use std::io::Read;
+    use core::result::Result;
+    
+    #[diag = "write"]
+    write_try =
+        fn _(..) -> _ {
+            'write:
+            let $result: Result<usize, Error> = Write::write(_, _);
+
+            let $amount: usize = move (($result as Ok).0);
+        }
+    
+    #[diag = "read"]
+    read_try =
+        fn _(..) -> _ {
+            'read:
+            let $result: Result<usize, Error> = Read::read(_, _);
+
+            let $amount: usize = move (($result as Ok).0);
+        }
+    
+    #[diag = "write"]
+    write_vectored_try =
+        fn _(..) -> _ {
+            'write:
+            let $result: Result<usize, Error> = Write::write_vectored(_, _);
+
+            let $amount: usize = move (($result as Ok).0);
+        }
+    
+    #[diag = "read"]
+    read_vectored_try =
+        fn _(..) -> _ {
+            'read:
+            let $result: Result<usize, Error> = Read::read_vectored(_, _);
+
+            let $amount: usize = move (($result as Ok).0);
+        }
+}
+
+diag {
+    write = {
+        primary(write) = "written amount is not handled",
+        name           = "unused_io_amount",
+        level          = "warn",
+    }
+    read = {
+        primary(read) = "read amount is not handled",
+        name           = "unused_io_amount",
+        level          = "warn",
+    }
+}
