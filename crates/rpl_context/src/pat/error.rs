@@ -514,7 +514,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                         "forbid" => Level::Forbid,
                         _ => Err(ParseError::UnrecognizedEnum(
                             "level",
-                            key,
+                            message,
                             SpanWrapper::new(diag.span, path),
                         ))?,
                     };
