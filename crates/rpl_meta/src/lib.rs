@@ -20,6 +20,7 @@ extern crate rustc_span;
 #[macro_use]
 extern crate tracing;
 extern crate either;
+extern crate itertools;
 
 pub mod arena;
 pub mod check;

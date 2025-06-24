@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use itertools::Itertools as _;
 use parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_span::Symbol;
@@ -36,13 +37,15 @@ impl<'mcx> SymbolTables<'mcx> {
         // Collect the blocks.
         let (utils, patts, diags) = collect_blocks(main);
         // Collect the symbol table of the util blocks.
+        let util_imports = utils.iter().flat_map(|util| util.get_matched().2.iter_matched());
         let util_items = utils.iter().flat_map(|util| util.get_matched().3.iter_matched());
-        let util_symbol_tables = SymbolTable::collect_symbol_tables(mctx, &[], util_items, &mut errors);
+        let util_symbol_tables =
+            SymbolTable::collect_symbol_tables(mctx, &util_imports.collect_vec(), util_items, &mut errors);
         // Collect the symbol table of the patt blocks.
         let patt_imports = patts.iter().flat_map(|patt| patt.get_matched().2.iter_matched());
         let patt_items = patts.iter().flat_map(|patt| patt.get_matched().3.iter_matched());
         let patt_symbol_tables =
-            SymbolTable::collect_symbol_tables(mctx, &patt_imports.collect::<Vec<_>>(), patt_items, &mut errors);
+            SymbolTable::collect_symbol_tables(mctx, &patt_imports.collect_vec(), patt_items, &mut errors);
         // Collect the symbol table of the diag blocks.
         let diag_items = diags.iter().flat_map(|diag| diag.get_matched().2.iter_matched());
         let diag_symbol_tables = DiagSymbolTable::collect_symbol_tables(mctx, diag_items, &mut errors);
