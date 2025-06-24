@@ -1,10 +1,11 @@
-use parser::pairs;
+use rpl_parser::pairs;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
 
 /// See [`ty::Visibility`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Visibility {
+    #[default]
     Unspecified,
     Public,
     Restricted,

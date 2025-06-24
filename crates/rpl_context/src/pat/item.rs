@@ -2,9 +2,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use derive_more::derive::Debug;
-use rpl_constraints::Constraint;
-use rpl_constraints::predicates::SingleFnPredsFnPtr;
-use rpl_meta::check::{ExtraSpan, Inline, Safety, Visibility};
+use rpl_constraints::Constraints;
+use rpl_constraints::attributes::{ExtraSpan, Safety, Visibility};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{WithMetaTable, WithPath};
 use rpl_parser::generics::Choice4;
@@ -17,7 +16,7 @@ use rustc_middle::ty::TyCtxt;
 use rustc_span::Symbol;
 
 use super::utils::mutability_from_pair_mutability;
-use super::{FnAttr, FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
+use super::{FnPatternBody, FnSymbolTable, NonLocalMetaVars, Path, RawDecleration, RawStatement, Ty};
 use crate::PatCtxt;
 
 pub type StructInner<'pcx> = Variant<'pcx>;
@@ -30,14 +29,14 @@ pub type Enum<'pcx> = WithMetaTable<'pcx, EnumInner<'pcx>>;
 pub struct Adt<'pcx> {
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub kind: AdtKind<'pcx>,
-    pub constraints: Vec<Constraint>,
+    pub constraints: Constraints,
 }
 
 impl<'pcx> Adt<'pcx> {
     pub(crate) fn new_struct(
         inner: StructInner<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) -> Self {
         Self {
             meta,
@@ -48,7 +47,7 @@ impl<'pcx> Adt<'pcx> {
     pub(crate) fn new_enum(
         inner: EnumInner<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) -> Self {
         Self {
             meta,
@@ -139,7 +138,7 @@ pub struct Impl<'pcx> {
     pub(crate) ty: Ty<'pcx>,
     pub(crate) trait_id: Option<Path<'pcx>>,
     pub fns: FxHashMap<Symbol, FnPattern<'pcx>>,
-    pub constraints: Vec<Constraint>,
+    pub constraints: Constraints,
 }
 
 #[derive(Default)]
@@ -151,17 +150,13 @@ pub struct FnPatterns<'pcx> {
 }
 
 pub struct FnPattern<'pcx> {
-    pub safety: Safety,
-    pub visibility: Visibility,
-    pub inline: Option<Inline>,
     pub name: Symbol,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
     pub symbol_table: &'pcx FnSymbolTable<'pcx>,
     pub params: Params<'pcx>,
     pub ret: Option<Ty<'pcx>>,
     pub body: Option<&'pcx FnPatternBody<'pcx>>,
-    pub predicates: Vec<SingleFnPredsFnPtr>,
-    pub constraints: Vec<Constraint>,
+    pub constraints: Constraints,
 }
 
 impl<'pcx> FnPattern<'pcx> {
@@ -171,12 +166,13 @@ impl<'pcx> FnPattern<'pcx> {
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        attr: FnAttr,
-        constraints: Vec<Constraint>,
+        mut constraints: Constraints,
     ) -> Self {
         let p = pair.path;
         let (sig, body) = pair.get_matched();
         let (safety, visibility, name, params, ret) = Self::from_sig(WithPath::new(p, sig), pcx, fn_sym_tab);
+        constraints.attrs.add_safety(safety);
+        constraints.attrs.add_visibility(visibility);
 
         let (decls, stmts) = if let Some(body) = body.MirBody() {
             let (decls, stmts) = body.get_matched();
@@ -196,20 +192,16 @@ impl<'pcx> FnPattern<'pcx> {
         builder.mk_locals(fn_sym_tab, pcx);
         builder.mk_raw_decls(raw_decls);
         builder.mk_raw_stmts(raw_stmts);
-        let mir = builder.build(name, attr.output);
+        let mir = builder.build(name, constraints.attrs.output_name);
         let body = Some(pcx.mk_mir_pattern(mir));
 
         Self {
-            safety,
-            visibility,
-            inline: attr.inline,
             meta,
             name,
             params,
             ret,
             body,
             constraints,
-            predicates: attr.predicates,
             symbol_table: fn_sym_tab,
         }
     }
@@ -237,13 +229,13 @@ impl<'pcx> FnPattern<'pcx> {
 
     #[instrument(level = "trace", skip(self, tcx, header), fields(self = ?self.name), ret)]
     pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>) -> bool {
-        self.visibility.check(tcx.visibility(def_id)) && self.safety.check_option_header(header.map(|h| h.safety))
+        self.constraints.attrs.filter(tcx, def_id, header)
     }
     /// Returns the extra spans for this function pattern.
     #[instrument(level = "trace", skip(self, tcx), fields(self = ?self.name), ret)]
     pub fn extra_span<'tcx>(&self, tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Option<ExtraSpan<'tcx>> {
         let mut attr_map = ExtraSpan::default();
-        if let Some(inline) = self.inline {
+        if let Some(inline) = self.constraints.attrs.inline {
             let inline_ = Symbol::intern("inline");
             let attr = inline.check(tcx.get_attrs(def_id, inline_))?;
             _ = attr_map.try_insert(inline_, attr);

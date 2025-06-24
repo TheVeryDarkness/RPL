@@ -12,8 +12,8 @@ repository.workspace = true
 rpl_parser.workspace = true
 rpl_resolve.workspace = true
 
-thiserror.workspace = true
 derive_more.workspace = true
+thiserror.workspace = true
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

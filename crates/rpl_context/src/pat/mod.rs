@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 pub use error::DynamicError;
 use error::DynamicErrorBuilder;
-use rpl_constraints::Constraint;
+use rpl_constraints::Constraints;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::WithPath;
 use rpl_meta::utils::Ident;
@@ -31,7 +31,7 @@ mod table;
 mod ty;
 mod utils;
 
-pub use attr::{FnAttr, PatAttr};
+pub use attr::PatAttr;
 pub use item::*;
 pub use matched::{Matched, MatchedMap};
 pub use mir::*;
@@ -119,24 +119,21 @@ impl<'pcx> RustItems<'pcx> {
     ) {
         let path = item.path;
         let (attr, item, where_block) = item.get_matched();
-        let constraints = Constraint::from_where_block_opt(where_block, path).expect("unexpected error in constraints");
+        let constraints = Constraints::from_where_block_opt(attr.iter_matched(), where_block, path)
+            .expect("unexpected error in constraints");
         match item.deref() {
             Choice4::_0(rust_fn) => {
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_symbol_table = symbol_table.get_fn(fn_name).unwrap();
-                let attr = FnAttr::parse(attr.iter_matched());
-                self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, attr, constraints);
+                self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, constraints);
             },
             Choice4::_1(rust_struct) => {
-                debug_assert!(attr.content.is_empty(), "Unhandled attributes in struct: {:?}", attr);
                 self.add_struct(pat_name, with_path(path, rust_struct), meta, symbol_table, constraints)
             },
             Choice4::_2(rust_enum) => {
-                debug_assert!(attr.content.is_empty(), "Unhandled attributes in enum: {:?}", attr);
                 self.add_enum(pat_name, with_path(path, rust_enum), meta, symbol_table, constraints)
             },
             Choice4::_3(rust_impl) => {
-                debug_assert!(attr.content.is_empty(), "Unhandled attributes in impl: {:?}", attr);
                 self.add_impl(pat_name, with_path(path, rust_impl), meta, symbol_table, constraints)
             },
         }
@@ -148,10 +145,9 @@ impl<'pcx> RustItems<'pcx> {
         rust_fn: WithPath<'pcx, &'pcx pairs::Fn<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         fn_symbol_table: &'pcx FnSymbolTable<'pcx>,
-        attr: FnAttr,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) {
-        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, attr, constraints);
+        let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, constraints);
         let fn_pat = self.pcx.alloc_fn(fn_pat);
         let fn_name = fn_pat.name;
         match fn_name.as_str() {
@@ -173,7 +169,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_struct: WithPath<'pcx, &'pcx pairs::Struct<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) {
         let mut struct_inner = StructInner::default();
         let name = rust_struct.MetaVariable();
@@ -200,7 +196,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_enum: WithPath<'pcx, &'pcx pairs::Enum<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) {
         let mut enum_inner = EnumInner::default();
         let name = rust_enum.MetaVariable();
@@ -250,7 +246,7 @@ impl<'pcx> RustItems<'pcx> {
         rust_impl: WithPath<'pcx, &'pcx pairs::Impl<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
-        constraints: Vec<Constraint>,
+        constraints: Constraints,
     ) {
         let p = rust_impl.path;
         let (_, impl_kind, ty, _, fns, _) = rust_impl.get_matched();
@@ -263,8 +259,9 @@ impl<'pcx> RustItems<'pcx> {
             .iter_matched()
             .map(|rust_fn| {
                 let (rust_fn, where_block) = rust_fn.get_matched();
-                let constraints =
-                    Constraint::from_where_block_opt(where_block, p).expect("unexpected error in constraints");
+                // FIXME: attributes on associated functions are not supported yet
+                let constraints = Constraints::from_where_block_opt(std::iter::empty(), where_block, p)
+                    .expect("unexpected error in constraints");
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
                 let fn_sym_tab = impl_sym_tab.inner.get_fn(fn_name).unwrap();
                 let fn_def = FnPattern::from(
@@ -272,7 +269,6 @@ impl<'pcx> RustItems<'pcx> {
                     self.pcx,
                     fn_sym_tab,
                     Arc::clone(&meta),
-                    FnAttr::default(),
                     constraints,
                 );
                 (fn_name, fn_def)

@@ -1,6 +1,7 @@
 #![feature(rustc_private)]
 
 pub mod error;
+mod macros;
 pub mod parser;
 pub mod position;
 pub mod span;

@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
+use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{LabelMap, Spanned};
-use rpl_meta::check::ExtraSpan;
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;

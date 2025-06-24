@@ -1,6 +1,7 @@
 #![feature(rustc_private)]
 #![feature(let_chains)]
 #![feature(if_let_guard)]
+#![feature(map_try_insert)]
 
 extern crate rustc_data_structures;
 extern crate rustc_driver;
@@ -21,6 +22,8 @@ extern crate either;
 
 use std::ops::Deref;
 
+use attributes::FnAttr;
+use predicates::PredicateConjunction;
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs;
 
@@ -30,33 +33,18 @@ pub mod attributes;
 pub mod predicates;
 pub mod tribool;
 
-#[derive(Debug, Clone)]
-pub enum Constraint {
-    Pred(predicates::PredicateConjunction),
-    Attr(attributes::Attribute),
+#[derive(Debug, Clone, Default)]
+pub struct Constraints {
+    pub preds: Vec<predicates::PredicateConjunction>,
+    pub attrs: attributes::FnAttr,
 }
 
-impl Constraint {
-    pub fn from_pairs<'i>(
-        constraint: &pairs::Constraint<'i>,
-        path: &'i std::path::Path,
-    ) -> Result<Self, PredicateError<'i>> {
-        match constraint.deref() {
-            Choice2::_0(attr) => {
-                let attr = attributes::Attribute::from_pairs(attr);
-                Ok(Constraint::Attr(attr))
-            },
-            Choice2::_1(preds) => {
-                let pred = predicates::PredicateConjunction::from_pairs(preds, path);
-                Ok(Constraint::Pred(pred?))
-            },
-        }
-    }
-
+impl Constraints {
     pub fn from_where_block_opt<'i>(
+        pre_attrs: impl Iterator<Item = &'i pairs::Attr<'i>>,
         where_block: &Option<pairs::WhereBlock<'i>>,
         path: &'i std::path::Path,
-    ) -> Result<Vec<Self>, PredicateError<'i>> {
+    ) -> Result<Self, PredicateError<'i>> {
         if let Some(where_block) = where_block
             && let Some(constraints) = where_block.ConstraintsSeparatedByComma()
         {
@@ -66,12 +54,21 @@ impl Constraint {
                 .map(|comma_with_elem| comma_with_elem.get_matched().1);
             // FIXME: this is will return early errors if any of the constraints are invalid, consider
             // collecting all errors instead
-            std::iter::once(first)
-                .chain(following)
-                .map(|pair| Self::from_pairs(pair, path))
-                .collect()
+            let mut all = std::iter::once(first).chain(following);
+            let (preds, attrs): (Vec<PredicateConjunction>, Vec<&pairs::Attribute<'_>>) =
+                all.try_fold((Vec::new(), Vec::new()), |(mut preds, mut attrs), constraint| {
+                    match constraint.deref() {
+                        Choice2::_0(attr) => attrs.push(attr),
+                        Choice2::_1(preds_data) => preds.push(PredicateConjunction::from_pairs(preds_data, path)?),
+                    }
+                    Ok((preds, attrs))
+                })?;
+            let attrs = FnAttr::parse(pre_attrs, &attrs);
+            Ok(Self { preds, attrs })
         } else {
-            Ok(Vec::new())
+            let preds = Vec::new();
+            let attrs = FnAttr::parse(pre_attrs, &[]);
+            Ok(Self { preds, attrs })
         }
     }
 }

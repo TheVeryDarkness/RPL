@@ -168,7 +168,6 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                 .fns
                 .values()
                 .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
-                .filter(move |fn_pat| fn_pat.predicates.iter().all(|pred| pred(self.tcx, def_id)))
                 .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
                 .flat_map(move |(fn_pat, attr_map)| {
                     // FIXME: sometimes we need to check function name
@@ -277,7 +276,6 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
             .fns
             .iter()
             .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
-            .filter(move |fn_pat| fn_pat.predicates.iter().all(|pred| pred(self.tcx, def_id)))
             .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
             .flat_map(move |(fn_pat, attr_map)| {
                 // FIXME: check constraints::attributes, i.e. pre-match filtering
@@ -366,7 +364,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         }
     }
 
-    #[instrument(level = "debug", skip(self, fn_pat, body, matched), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = fn_pat.constraints.len()), ret)]
+    #[instrument(level = "debug", skip(self, fn_pat, body, matched), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = ?fn_pat.constraints), ret)]
     fn check_constraints(
         &self,
         name: Symbol,
@@ -382,10 +380,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
             matched,
             &fn_pat.symbol_table.meta_vars,
         );
-        fn_pat
-            .constraints
-            .iter()
-            .all(|constraint| evaluator.evaluate_constraint(constraint))
+        evaluator.evaluate_constraint(&fn_pat.constraints)
     }
 }
 

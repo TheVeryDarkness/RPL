@@ -1,5 +1,5 @@
+use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{MatchedMap, Spanned};
-use rpl_meta::check::ExtraSpan;
 use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Const, Local, PlaceRef};
@@ -39,8 +39,8 @@ pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
-    /// Labels and attributes.
-    pub extra: Vec<(Symbol, NormalizedSpanned)>,
+    /// Labels and attributes. Sorted by label.
+    extra: Vec<(Symbol, NormalizedSpanned)>,
 }
 
 impl<'tcx> NormalizedMatched<'tcx> {

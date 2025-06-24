@@ -1,9 +1,10 @@
-use parser::pairs;
+use rpl_parser::pairs;
 use rustc_hir::{self as hir};
 
 /// See [`hir::Safety`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Safety {
+    #[default]
     Safe,
     Unsafe,
     Any,
