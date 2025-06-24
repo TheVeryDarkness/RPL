@@ -34,12 +34,12 @@ impl MatchedMap {
     pub fn new(
         target: &NonLocalMetaVars<'_>,
         source: &NonLocalMetaVars<'_>,
-        configuration: &pairs::MetaVariableAssignList<'_>,
+        configuration: Option<&pairs::MetaVariableAssignsSeparatedByComma<'_>>,
     ) -> Self {
         let mut vars: HashMap<Symbol, Symbol> = HashMap::new();
         let mut labels: HashMap<Symbol, Symbol> = HashMap::new();
 
-        if let Some(configuration) = configuration.MetaVariableAssignsSeparatedByComma() {
+        if let Some(configuration) = configuration {
             let assigns = collect_elems_separated_by_comma!(configuration);
             for assign in assigns {
                 match &**assign {

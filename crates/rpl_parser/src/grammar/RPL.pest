@@ -894,7 +894,7 @@ RustItemWithConstraint  = {
 RustItemsWithConstraint = { LeftBrace ~ (RustItemWithConstraint)+ ~ RightBrace }
 
 PatternConfiguration = {
-    Identifier ~ MetaVariableAssignList
+    Identifier ~ MetaVariableAssignList?
 }
 
 PatternExpression = {

@@ -454,7 +454,13 @@ impl<'pcx> Pattern<'pcx> {
     ) -> (Symbol, &'pcx PatternItem<'pcx>, MatchedMap) {
         let name = Ident::from(pat_cfg.Identifier()).name;
         let item = *self.util_block.get(&name).unwrap();
-        let map = MatchedMap::new(meta, item.meta(), pat_cfg.MetaVariableAssignList());
+        let map = MatchedMap::new(
+            meta,
+            item.meta(),
+            pat_cfg
+                .MetaVariableAssignList()
+                .and_then(|list| list.MetaVariableAssignsSeparatedByComma()),
+        );
         (name, item, map)
     }
 

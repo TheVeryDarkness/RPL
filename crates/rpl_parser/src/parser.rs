@@ -8973,7 +8973,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#PatternConfiguration , "Corresponds to expression: `(Identifier ~ MetaVariableAssignList)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#PatternConfiguration , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MetaVariableAssignList :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#PatternConfiguration , "Corresponds to expression: `(Identifier ~ MetaVariableAssignList?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#PatternConfiguration , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MetaVariableAssignList :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#PatternConfiguration<'i, INHERITED> {
             #[doc = "A helper function to access [`Identifier`]."]
             #[allow(non_snake_case)]
@@ -8988,11 +8988,15 @@ pub mod rules_impl {
             #[allow(non_snake_case)]
             pub fn r#MetaVariableAssignList<'s>(
                 &'s self,
-            ) -> &'s super::super::rules::r#MetaVariableAssignList<'i, INHERITED> {
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MetaVariableAssignList<'i, INHERITED>>
+            {
                 let res = &*self.content;
                 {
                     let res = &res.content.1.matched;
-                    res
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
                 }
             }
         }
