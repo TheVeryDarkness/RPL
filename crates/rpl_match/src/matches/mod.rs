@@ -504,38 +504,45 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         }
         self.matched.set(matched);
     }
-    fn ty_var_free(&self) -> bool {
-        self.matching.ty_vars.iter().all(|c| c.get().is_none())
+    fn assert_ty_var_free(&self) {
+        #[cfg(feature = "strict")]
+        debug_assert!(self.matching.ty_vars.iter().all(|c| c.get().is_none()));
     }
-    fn const_var_free(&self) -> bool {
-        self.matching.const_vars.iter().all(|c| c.get().is_none())
+    fn assert_const_var_free(&self) {
+        #[cfg(feature = "strict")]
+        debug_assert!(self.matching.const_vars.iter().all(|c| c.get().is_none()));
     }
-    fn place_var_free(&self) -> bool {
-        self.matching.place_vars.iter().all(|c| c.get().is_none())
+    fn assert_place_var_free(&self) {
+        #[cfg(feature = "strict")]
+        debug_assert!(self.matching.place_vars.iter().all(|c| c.get().is_none()));
     }
-    fn local_free(&self) -> bool {
-        self.matching.locals.iter().all(|c| c.get().is_none())
+    fn assert_local_free(&self) {
+        #[cfg(feature = "strict")]
+        debug_assert!(self.matching.locals.iter().all(|c| c.get().is_none()));
     }
-    fn stmt_free(&self) -> bool {
-        self.matching
-            .mir_statements
-            .iter()
-            .all(|s| s.matched.iter().all(|c| c.get().is_none()))
+    fn assert_stmt_free(&self) {
+        #[cfg(feature = "strict")]
+        debug_assert!(
+            self.matching
+                .mir_statements
+                .iter()
+                .all(|s| s.matched.iter().all(|c| c.get().is_none()))
+        );
     }
     // Recursively traverse all candidates of type variables, local variables, and statements, and then
     // match the graph.
     #[instrument(level = "info", skip(self))]
     fn match_candidates(&self) {
         let loc_pats = self.loc_pats().collect::<Vec<_>>();
-        debug_assert!(self.ty_var_free());
+        self.assert_ty_var_free();
         self.match_ty_var_candidates(pat::TyVarIdx::ZERO, &loc_pats);
-        debug_assert!(self.ty_var_free());
+        self.assert_ty_var_free();
     }
     fn match_ty_var_candidates(&self, ty_var: pat::TyVarIdx, loc_pats: &[pat::Location]) {
         if ty_var == self.cx.fn_pat.meta.ty_vars.next_index() {
-            debug_assert!(self.const_var_free());
+            self.assert_const_var_free();
             self.match_const_var_candidates(pat::ConstVarIdx::ZERO, loc_pats);
-            debug_assert!(self.const_var_free());
+            self.assert_const_var_free();
             return;
         }
         for &cand in &self.matching[ty_var].candidates {
@@ -550,9 +557,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_const_var_candidates(&self, const_var: pat::ConstVarIdx, loc_pats: &[pat::Location]) {
         if const_var == self.cx.fn_pat.meta.const_vars.next_index() {
-            debug_assert!(self.place_var_free());
+            self.assert_place_var_free();
             self.match_place_var_candidates(pat::PlaceVarIdx::ZERO, loc_pats);
-            debug_assert!(self.place_var_free());
+            self.assert_place_var_free();
             return;
         }
         for &cand in &self.matching[const_var].candidates {
@@ -567,9 +574,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_place_var_candidates(&self, place_var: pat::PlaceVarIdx, loc_pats: &[pat::Location]) {
         if place_var == self.cx.fn_pat.meta.place_vars.next_index() {
-            debug_assert!(self.local_free());
+            self.assert_local_free();
             self.match_local_candidates(pat::Local::ZERO, loc_pats);
-            debug_assert!(self.local_free());
+            self.assert_local_free();
             return;
         }
         for &cand in &self.matching[place_var].candidates {
@@ -584,9 +591,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_local_candidates(&self, local: pat::Local, loc_pats: &[pat::Location]) {
         if local == self.cx.mir_pat.locals.next_index() {
-            debug_assert!(self.stmt_free());
+            self.assert_stmt_free();
             self.match_stmt_candidates(loc_pats);
-            debug_assert!(self.stmt_free());
+            self.assert_stmt_free();
             return;
         }
         for cand in self.matching[local].candidates.iter() {

@@ -1,5 +1,6 @@
 [workspace]
-members = ["crates/*", "./"]
+members = ["./crates/rpl_*", "./crates/lintcheck"]
+exclude = ["./target/lintcheck/sources/"]
 
 [workspace.package]
 version = "0.1.0"
