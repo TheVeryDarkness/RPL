@@ -1,8 +1,9 @@
-use serde::Deserialize;
 use std::error::Error;
 use std::fmt::Write;
 use std::fs;
 use std::path::PathBuf;
+
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 struct Page {

@@ -23,9 +23,6 @@ mod output;
 mod popular_crates;
 mod recursive;
 
-use crate::config::{Commands, LintcheckConfig, OutputFormat};
-use crate::recursive::LintcheckServer;
-
 use std::env::consts::EXE_SUFFIX;
 use std::io::{self};
 use std::path::{Path, PathBuf};
@@ -37,6 +34,9 @@ use cargo_metadata::Message;
 use input::read_crates;
 use output::{RPLCheckOutput, RPLWarning, RustcIce};
 use rayon::prelude::*;
+
+use crate::config::{Commands, LintcheckConfig, OutputFormat};
+use crate::recursive::LintcheckServer;
 
 #[must_use]
 pub fn target_dir() -> String {

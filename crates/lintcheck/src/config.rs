@@ -1,6 +1,7 @@
-use clap::{Parser, Subcommand, ValueEnum};
 use std::num::NonZero;
 use std::path::PathBuf;
+
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Parser, Clone, Debug)]

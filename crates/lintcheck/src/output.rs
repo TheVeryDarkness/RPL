@@ -1,10 +1,11 @@
-use cargo_metadata::diagnostic::{Diagnostic, DiagnosticSpan};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{self, Write as _};
 use std::fs;
 use std::path::Path;
 use std::process::ExitStatus;
+
+use cargo_metadata::diagnostic::{Diagnostic, DiagnosticSpan};
+use serde::{Deserialize, Serialize};
 
 use crate::config::{LintcheckConfig, OutputFormat};
 

@@ -3,9 +3,6 @@
 //! [`LintcheckServer`] to ask if it should be skipped, and if not sends the stderr of running
 //! RPL on the crate to the server
 
-use crate::RPLWarning;
-use crate::input::RecursiveOptions;
-
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -16,6 +13,9 @@ use cargo_metadata::diagnostic::Diagnostic;
 use crossbeam_channel::{Receiver, Sender};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use crate::RPLWarning;
+use crate::input::RecursiveOptions;
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub(crate) struct DriverInfo {
