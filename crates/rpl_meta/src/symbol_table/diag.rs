@@ -130,7 +130,7 @@ impl<'i> DiagSymbolTable<'i> {
             }
         }
 
-        let level = level.unwrap_or(Level::Forbid);
+        let level = level.unwrap_or(Level::Deny);
         let name = if let Some(name) = name {
             ARENA.alloc_str(&name)
         } else {
@@ -175,8 +175,12 @@ impl<'i> DiagSymbolTable<'i> {
 
     pub fn get(&self, name: &str) -> Option<&'static Lint> {
         self.lints
-            .binary_search_by(|lint| lint.name.cmp(name))
+            .binary_search_by(|lint| lint.name.strip_prefix("rpl::").unwrap_or(lint.name).cmp(name))
             .ok()
             .map(|idx| self.lints[idx])
+    }
+
+    pub fn lints(&self) -> &[&'static Lint] {
+        &self.lints
     }
 }

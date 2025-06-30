@@ -72,7 +72,7 @@ pub fn parse_and_collect<'mcx>(
             },
             Err(err) => {
                 handler(&RPLMetaError::from(err));
-                continue;
+                break;
             },
         }
         // Seems unnecessary.

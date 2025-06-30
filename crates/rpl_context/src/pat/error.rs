@@ -515,9 +515,14 @@ impl<'i> DynamicErrorBuilder<'i> {
             .ok_or_else(|| ParseError::MissingName(SpanWrapper::new(item.span, path)))?
             .span
             .as_str();
-        let lint = table
-            .get(name)
-            .ok_or_else(|| ParseError::InvalidKey(name, SpanWrapper::new(item.span, path)))?;
+        let lint = table.get(name).unwrap_or_else(|| {
+            panic!(
+                "Lint `{}` not found in the symbol table:\n    symbol table: {:?}\n    locals: {:?}",
+                name,
+                table.lints(),
+                locals
+            )
+        });
         let builder = DynamicErrorBuilder {
             primary,
             labels,
