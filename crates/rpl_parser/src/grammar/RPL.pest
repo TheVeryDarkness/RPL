@@ -938,7 +938,7 @@ diagMessageText = @{
 }
 
 diagMessageInner = ${
-    (diagMessageArg | diagMessageText)+
+    (diagMessageArg | diagMessageText)*
 }
 
 diagMessage = ${
