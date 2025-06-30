@@ -6,6 +6,7 @@ use rpl_meta::cli::collect_file_from_string_args;
 // use rpl_middle::ty::RplConfig;
 use rustc_interface::interface;
 use rustc_middle::ty::TyCtxt;
+use rustc_session::EarlyDiagCtxt;
 use rustc_session::parse::ParseSess;
 use rustc_span::Symbol;
 
@@ -74,11 +75,31 @@ impl RplCallbacks {
     }
 }
 
+/// Arena for [`MetaContext`] to use, initialized lazily.
+/// This is used to avoid having to pass the arena around everywhere.
+/// It is initialized in [`after_analysis`] of [`RplCallbacks`].
+/// The arena is used to allocate the [`MetaContext`] and its data structures.
+/// It is also used to allocate the `patterns_and_paths` in [`after_analysis`].
+/// This is necessary because [`MetaContext`] needs to be allocated in a single arena
+/// to avoid lifetime issues with the data structures it contains.
+/// The `patterns_and_paths` are allocated in the same arena to ensure that they
+/// have the same lifetime as the [`MetaContext`].
+///
+/// [`after_analysis`]: rustc_driver::Callbacks::after_analysis
+/// [`MetaContext`]: rpl_meta::context::MetaContext
+static MCTX_ARENA: OnceLock<rpl_meta::arena::Arena<'_>> = OnceLock::new();
+/// The [`MetaContext`] for RPL, initialized lazily.
+///
+/// [`MetaContext`]: rpl_meta::context::MetaContext
+static MCTX: OnceLock<rpl_meta::context::MetaContext<'_>> = OnceLock::new();
+
 impl rustc_driver::Callbacks for RplCallbacks {
     // JUSTIFICATION: necessary in RPL driver to set `mir_opt_level`
     #[allow(rustc::bad_opt_access)]
     fn config(&mut self, config: &mut interface::Config) {
-        // let previous = config.register_lints.take();
+        let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
+        let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
+
         let rpl_args_var = self.rpl_args_var.take();
         config.psess_created = Some(Box::new(move |psess| {
             track_rpl_args(psess, &rpl_args_var);
@@ -86,7 +107,21 @@ impl rustc_driver::Callbacks for RplCallbacks {
         }));
         config.locale_resources = crate::default_locale_resources();
 
-        /*
+        // let dcx = compiler.sess.dcx();
+        let mut error_counter = 0;
+        let mctx = MCTX.get_or_init(|| {
+            rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
+                error_counter += 1;
+                eprintln!("{error_counter}. {error}"); //FIXME: this would mess up when running on a workspace with multiple crates
+                // let _ = dcx.emit_err(error.clone());
+            })
+        });
+        // dcx.abort_if_errors();
+        if error_counter > 0 {
+            EarlyDiagCtxt::new(config.opts.error_format).early_fatal(ErrorFound);
+        }
+
+        let previous = config.register_lints.take();
         config.register_lints = Some(Box::new(move |sess, lint_store| {
             // technically we're ~guaranteed that this is none but might as well call anything that
             // is there already. Certainly it can't hurt.
@@ -94,9 +129,8 @@ impl rustc_driver::Callbacks for RplCallbacks {
                 (previous)(sess, lint_store);
             }
 
-            rpl_driver::register_lints(lint_store);
+            // register_lints(lint_store);
         }));
-        */
 
         config.override_queries = Some(|_sess, providers| {
             rpl_driver::provide(providers);
@@ -131,24 +165,9 @@ impl rustc_driver::Callbacks for RplCallbacks {
         config.opts.unstable_opts.flatten_format_args = false;
     }
     fn after_analysis(&mut self, _: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
-        static MCTX_ARENA: OnceLock<rpl_meta::arena::Arena<'_>> = OnceLock::new();
-        static MCTX: OnceLock<rpl_meta::context::MetaContext<'_>> = OnceLock::new();
-        let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
-        let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
-        // let dcx = compiler.sess.dcx();
-        let mut error_counter = 0;
-        let mctx = MCTX.get_or_init(|| {
-            rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
-                error_counter += 1;
-                eprintln!("{error_counter}. {error}"); //FIXME: this would mess up when running on a workspace with multiple crates
-                // let _ = dcx.emit_err(error.clone());
-            })
+        PatternCtxt::entered(|pcx| {
+            rpl_driver::check_crate(tcx, pcx, MCTX.get().expect("rustc_driver::Callbacks::after_analysis called without calling rustc_driver::Callbacks::config first"))
         });
-        // dcx.abort_if_errors();
-        if error_counter > 0 {
-            tcx.dcx().emit_fatal(ErrorFound);
-        }
-        PatternCtxt::entered(|pcx| rpl_driver::check_crate(tcx, pcx, mctx));
         rustc_driver::Compilation::Continue
     }
 }

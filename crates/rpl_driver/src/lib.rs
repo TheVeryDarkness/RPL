@@ -16,6 +16,7 @@ extern crate either;
 
 rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 
+use std::borrow::Cow;
 use std::convert::identity;
 
 use either::Either;
@@ -63,6 +64,12 @@ declare_tool_lint! {
 #[derive(Diagnostic, LintDiagnostic)]
 #[diag(rpl_driver_error_found_with_pattern)]
 pub struct ErrorFound;
+
+impl From<ErrorFound> for rustc_errors::DiagMessage {
+    fn from(_: ErrorFound) -> Self {
+        Self::Str(Cow::Borrowed("An error was found with input RPL pattern(s)"))
+    }
+}
 
 pub fn provide(providers: &mut Providers) {
     providers.registered_tools = registered_tools;
