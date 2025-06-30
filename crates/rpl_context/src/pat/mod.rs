@@ -535,6 +535,7 @@ impl<'pcx> Pattern<'pcx> {
     pub fn add_diag(
         &mut self,
         diag: WithPath<'pcx, &'pcx pairs::diagBlock<'_>>,
+        diag_symbol_tables: &'pcx rpl_meta::symbol_table::DiagSymbolTables<'_>,
         symbol_tables: &'pcx FxHashMap<Symbol, rpl_meta::symbol_table::SymbolTable<'_>>,
     ) {
         let mut items = FxHashMap::default();
@@ -556,6 +557,9 @@ impl<'pcx> Pattern<'pcx> {
                     &symbol_table.meta_vars,
                     pat_item.consts(),
                     &labels.collect(),
+                    diag_symbol_tables
+                        .get(&diag_name)
+                        .unwrap_or_else(|| panic!("No diagnostic symbol table found for {diag_name}")),
                 )
                 .unwrap_or_else(|err| panic!("{err}"));
                 let prev = self.diag_block.insert(*name, diag);

@@ -7,11 +7,10 @@
 //     clippy::manual_assert,
 //     clippy::missing_panics_doc
 // )]
-use std::sync::LazyLock;
 
 use derive_more::{Debug, Display};
 use rpl_meta::collect_elems_separated_by_comma;
-use rpl_meta::symbol_table::{MetaVariableType, NonLocalMetaSymTab, WithPath};
+use rpl_meta::symbol_table::{DiagSymbolTable, MetaVariableType, NonLocalMetaSymTab, WithPath};
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
@@ -22,7 +21,6 @@ use rustc_lint::{Level, Lint};
 use rustc_middle::mir::Body;
 use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
-use sync_arena::declare_arena;
 use thiserror::Error;
 
 use super::Matched;
@@ -360,14 +358,6 @@ pub(crate) struct DynamicErrorBuilder<'i> {
     lint: &'static Lint,
 }
 
-declare_arena!(
-    [
-        [] _phantom: &'tcx (),
-    ]
-);
-
-static ARENA: LazyLock<Arena<'static>> = LazyLock::new(Arena::default);
-
 #[derive(Debug, Display, Error)]
 pub enum ParseError<'i> {
     #[display("Primary message not found:\n{_0}")]
@@ -451,11 +441,16 @@ fn parse_suggestion<'i>(
 impl<'i> DynamicErrorBuilder<'i> {
     // FIXME: this function has a lot of `unwrap` calls, which can panic if the input is malformed.
     /// Create a [`DynamicErrorBuilder`] from a [`pairs::diagBlockItem`].
+    ///
+    /// # Note
+    ///
+    /// See [`rpl_meta::symbol_table::DiagSymbolTable`] for earlier passes.
     pub(super) fn from_item(
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
         meta_vars: &NonLocalMetaSymTab,
         consts: &FxHashMap<Symbol, &'i str>,
         locals: &FxHashSet<Symbol>,
+        table: &DiagSymbolTable,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
         let (_, _, _, diags, _, _) = item.get_matched();
@@ -464,7 +459,6 @@ impl<'i> DynamicErrorBuilder<'i> {
         let mut notes = Vec::new();
         let mut helps = Vec::new();
         let mut suggestions = Vec::new();
-        let mut level = Level::Deny;
         let mut name = None;
 
         for diag in collect_elems_separated_by_comma!(diags) {
@@ -505,20 +499,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                     }
                     name = Some(message);
                 },
-                "level" => {
-                    let message = message.span.as_str();
-                    level = match message {
-                        "allow" => Level::Allow,
-                        "warn" => Level::Warn,
-                        "deny" => Level::Deny,
-                        "forbid" => Level::Forbid,
-                        _ => Err(ParseError::UnrecognizedEnum(
-                            "level",
-                            message,
-                            SpanWrapper::new(diag.span, path),
-                        ))?,
-                    };
-                },
+                "level" => (),
                 "suggestion" => {
                     let args = args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?;
                     let (code, span, applicability) = parse_suggestion(path, args)?;
@@ -534,17 +515,16 @@ impl<'i> DynamicErrorBuilder<'i> {
             .ok_or_else(|| ParseError::MissingName(SpanWrapper::new(item.span, path)))?
             .span
             .as_str();
+        let lint = table
+            .get(name)
+            .ok_or_else(|| ParseError::InvalidKey(name, SpanWrapper::new(item.span, path)))?;
         let builder = DynamicErrorBuilder {
             primary,
             labels,
             notes,
             helps,
             suggestions,
-            lint: ARENA.alloc(Lint {
-                name: ARENA.alloc_str(&format!("rpl::{name}")),
-                default_level: level,
-                ..Lint::default_fields_for_macro()
-            }),
+            lint,
         };
         Ok(builder)
     }
