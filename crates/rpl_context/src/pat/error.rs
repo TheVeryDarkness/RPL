@@ -523,6 +523,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                 locals
             )
         });
+        // trace!(?primary, ?labels, ?notes, ?helps, ?suggestions);
         let builder = DynamicErrorBuilder {
             primary,
             labels,
