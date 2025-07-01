@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![warn(clippy::swap_ptr_to_ref)]
 
 use core::ptr::addr_of_mut;

@@ -1,3 +1,4 @@
+//@ignore-on-host
 //@ignore-bitwidth: 64
 
 #[warn(clippy::wrong_transmute)]

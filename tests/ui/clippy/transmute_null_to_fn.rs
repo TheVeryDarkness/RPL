@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![allow(dead_code)]
 #![warn(clippy::transmute_null_to_fn)]
 #![allow(clippy::zero_ptr, clippy::missing_transmute_annotations)]

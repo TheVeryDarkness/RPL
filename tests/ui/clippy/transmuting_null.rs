@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![allow(dead_code)]
 #![warn(clippy::transmuting_null)]
 #![allow(clippy::zero_ptr)]

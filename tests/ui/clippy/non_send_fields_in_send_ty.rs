@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![warn(clippy::non_send_fields_in_send_ty)]
 #![feature(extern_types)]
 

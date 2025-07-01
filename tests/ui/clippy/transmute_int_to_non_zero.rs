@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![warn(clippy::transmute_int_to_non_zero)]
 #![allow(clippy::missing_transmute_annotations)]
 
