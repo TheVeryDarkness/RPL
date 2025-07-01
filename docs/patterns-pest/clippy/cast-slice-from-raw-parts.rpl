@@ -1,0 +1,28 @@
+pattern cast-slice-from-raw-parts
+
+patt {
+    #[diag = "cast_slice_from_raw_parts"]
+    #[const(mut = "const ")]
+    cast_slice_from_raw_parts_const[$T: type] =
+        fn _ () {
+            let $slice: &[$T] = std::slice::from_raw_parts<'_, $T>(_, _);
+            'cast:
+            let $ptr: *const [$T] = &raw const(*$slice);
+        }
+    #[diag = "cast_slice_from_raw_parts"]
+    #[const(mut = "mut ")]
+    cast_slice_from_raw_parts_mut[$T: type] =
+        fn _ () {
+            let $slice: &mut [$T] = std::slice::from_raw_parts_mut<'_, $T>(_, _);
+            'cast:
+            let $ptr: *mut [$T] = &raw mut(*$slice);
+        }
+}
+
+diag {
+    cast_slice_from_raw_parts = {
+        primary(cast) = "casting the result of `from_raw_parts` to *{$mut}[{$T}]",
+        name          = "cast_slice_from_raw_parts",
+        level         = "warn",
+    }
+}
