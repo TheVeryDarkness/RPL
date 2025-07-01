@@ -35,7 +35,7 @@ use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
 use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
-use rustc_middle::hir::nested_filter::All;
+use rustc_middle::hir::nested_filter;
 use rustc_middle::mir;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
@@ -83,19 +83,21 @@ fn registered_tools(tcx: TyCtxt<'_>, (): ()) -> RegisteredTools {
 
 pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>, mctx: &'mcx MetaContext<'mcx>) {
     pcx.add_parsed_patterns(mctx);
-    _ = tcx.hir_crate_items(()).par_items(|item_id| {
-        check_item(tcx, pcx, item_id);
-        Ok(())
-    });
+    // _ = tcx.hir_crate_items(()).par_items(|item_id| {
+    //     check_item(tcx, pcx, item_id);
+    //     Ok(())
+    // });
+    let mut check_ctxt = CheckFnCtxt { tcx, pcx };
+    tcx.hir().walk_toplevel_module(&mut check_ctxt);
     rpl_utils::visit_crate(tcx);
 }
 
-pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item_id: hir::ItemId) {
-    let item = tcx.hir().item(item_id);
-    // let def_id = item_id.owner_id.def_id;
-    let mut check_ctxt = CheckFnCtxt { tcx, pcx };
-    check_ctxt.visit_item(item);
-}
+// pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item_id: hir::ItemId) {
+//     let item = tcx.hir().item(item_id);
+//     // let def_id = item_id.owner_id.def_id;
+//     let mut check_ctxt = CheckFnCtxt { tcx, pcx };
+//     check_ctxt.visit_item(item);
+// }
 
 /// Used for finding pattern matches in given Rust crate.
 struct CheckFnCtxt<'pcx, 'tcx> {
@@ -104,7 +106,7 @@ struct CheckFnCtxt<'pcx, 'tcx> {
 }
 
 impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
-    type NestedFilter = All;
+    type NestedFilter = nested_filter::All;
     fn nested_visit_map(&mut self) -> Self::Map {
         self.tcx.hir()
     }
@@ -112,11 +114,18 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     #[instrument(level = "debug", skip_all, fields(item_id = ?item.owner_id.def_id))]
     fn visit_item(&mut self, item: &'tcx hir::Item<'tcx>) -> Self::Result {
         match item.kind {
-            hir::ItemKind::Trait(hir::IsAuto::No, hir::Safety::Safe, ..) | hir::ItemKind::Fn { .. } => {},
+            // hir::ItemKind::Trait(hir::IsAuto::No, hir::Safety::Safe, ..) | hir::ItemKind::Fn { .. } => {},
             hir::ItemKind::Impl(impl_) => self.check_impl(impl_),
+            // hir::ItemKind::Fn { sig, .. } => self.check_fn(
+            //     Some(item.ident),
+            //     &sig.decl,
+            //     Some(sig.header),
+            //     sig.decl.implicit_self.has_implicit_self(),
+            //     item.owner_id.def_id,
+            // ),
             // hir::ItemKind::Struct(struct_, generics) => self.check_struct(item.owner_id.def_id, struct_, generics),
             // hir::ItemKind::Enum(enum_, generics) => self.check_enum(item.owner_id.def_id, enum_, generics),
-            _ => return,
+            _ => {},
         }
         intravisit::walk_item(self, item);
     }
@@ -248,7 +257,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     fn impl_matched_pat_item<'a>(
         &self,
         name: Symbol,
-        pat_op: &'pcx PatternItem<'pcx>,
+        pat_item: &'pcx PatternItem<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
         has_self: bool,
@@ -256,7 +265,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        match pat_op {
+        match pat_item {
             PatternItem::RustItems(rust_items) => {
                 Either::Left(self.impl_matched(name, rust_items, def_id, header, has_self, body, mir_cfg, mir_ddg))
             },
@@ -353,7 +362,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     fn fn_matched_pat_item<'a>(
         &self,
         name: Symbol,
-        pat_op: &'pcx PatternItem<'pcx>,
+        pat_item: &'pcx PatternItem<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
         has_self: bool,
@@ -361,7 +370,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        match pat_op {
+        match pat_item {
             PatternItem::RustItems(rust_items) => {
                 Either::Left(self.fn_matched(name, rust_items, def_id, header, has_self, body, mir_cfg, mir_ddg))
             },
