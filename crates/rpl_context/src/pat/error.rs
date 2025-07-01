@@ -413,7 +413,7 @@ fn parse_suggestion<'i>(
                 "code" => code = Some(message.diagMessageInner()),
                 "span" => span = Some(message.diagMessageInner().span.as_str()),
                 "applicability" => {
-                    let msg = message.span.as_str();
+                    let msg = message.diagMessageInner().span.as_str();
                     applicability = Some(match msg {
                         "machine_applicable" => Applicability::MachineApplicable,
                         "maybe_incorrect" => Applicability::MaybeIncorrect,
