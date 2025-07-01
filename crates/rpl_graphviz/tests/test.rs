@@ -64,7 +64,11 @@ macro_rules! test_case {
                 let mut errors = Vec::new();
                 let path = Path::new(file!());
                 MCTX.set_active_path(Some(path));
-                let symbol_tables = SymbolTable::collect_symbol_tables(&MCTX, &imports, std::iter::once(pat_item), &mut errors);
+                let symbol_tables = SymbolTable::collect_symbol_tables(
+                    &MCTX,
+                    &imports,
+                    std::iter::once(pat_item), &mut errors
+                );
                 if !errors.is_empty() {
                     for error in &errors {
                         eprintln!("{error}");
@@ -297,11 +301,11 @@ test_case! {
 //                 let mut $vec: VecT = Vec::with_capacity(copy $len);
 //                 let mut $ref_to_vec: RefMutVecT = &mut $vec;
 //                 let mut $ptr_to_vec: PtrMutT = Vec::as_mut_ptr(move $ref_to_vec);
-//                 let mut $slice: RefMutSliceT = std::slice::from_raw_parts_mut(copy $ptr_to_vec, copy $len);
-//                 // let mut enumerate: EnumerateRangeT = <RangeT as std::iter::Iterator>::enumerate(move iter);
-//                 let mut $enumerate: EnumerateRangeT = RangeT::enumerate(move $iter);
-//                 let mut $ref_mut_enumerate: RefMutEnumerateRangeT = &mut $enumerate;
-//                 let $next: OptionUsizeT;
+//                 let mut $slice: RefMutSliceT = std::slice::from_raw_parts_mut(copy $ptr_to_vec,
+// copy $len);                 // let mut enumerate: EnumerateRangeT = <RangeT as
+// std::iter::Iterator>::enumerate(move iter);                 let mut $enumerate: EnumerateRangeT =
+// RangeT::enumerate(move $iter);                 let mut $ref_mut_enumerate: RefMutEnumerateRangeT
+// = &mut $enumerate;                 let $next: OptionUsizeT;
 //                 let $cmp: isize;
 //                 let $first: usize;
 //                 let $second_t: $T;
@@ -416,7 +420,7 @@ test_case! {
     }
 }
 
-test_case!{
+test_case! {
     fn unchecked_ptr_offset_base() {
         let pattern = quote!{
             p[$T: type] = {
@@ -431,7 +435,7 @@ test_case!{
     }
 }
 
-test_case!{
+test_case! {
     fn unchecked_ptr_offset_lt() {
         let pattern = quote!{
             p[$T: type, $U: type] = {
@@ -448,7 +452,7 @@ test_case!{
     }
 }
 
-test_case!{
+test_case! {
     fn unchecked_ptr_offset_le() {
         let pattern = quote!{
             p[$T: type, $U: type] = {
@@ -465,7 +469,7 @@ test_case!{
     }
 }
 
-test_case!{
+test_case! {
     fn alloc_cast_write() {
         let pattern = quote!{
             p[$T:type] = fn _() {
@@ -479,7 +483,7 @@ test_case!{
     }
 }
 
-test_case!{
+test_case! {
     fn alloc_check_cast_write() {
         let pattern = quote!{
             p[$T:type] = fn _() {
@@ -500,7 +504,7 @@ test_case!{
     }
 }
 
-test_case!{
+test_case! {
     fn alloc_cast_check_write() {
         let pattern = quote!{
             p[$T:type] = fn _() {
