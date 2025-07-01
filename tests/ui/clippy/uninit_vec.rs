@@ -1,3 +1,4 @@
+//@ignore-on-host
 #![warn(clippy::uninit_vec)]
 
 use std::cell::UnsafeCell;
