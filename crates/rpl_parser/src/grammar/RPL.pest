@@ -355,7 +355,7 @@ Region = {
 }
 
 QSelf = {
-    LessThan ~ Type ~ kw_as ~ (Identifier | MetaVariable) ~ GreaterThan
+    LessThan ~ Type ~ kw_as ~ Path ~ GreaterThan
 }
 
 Path = {

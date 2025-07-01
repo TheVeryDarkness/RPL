@@ -3191,7 +3191,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#QSelf , "Corresponds to expression: `(LessThan ~ Type ~ kw_as ~ (Identifier | MetaVariable) ~ GreaterThan)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#QSelf , super :: super :: generics :: Seq5 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LessThan :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_as :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Choice2 :: < super :: super :: rules :: r#Identifier :: < 'i , INHERITED > , super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#GreaterThan :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#QSelf , "Corresponds to expression: `(LessThan ~ Type ~ kw_as ~ Path ~ GreaterThan)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#QSelf , super :: super :: generics :: Seq5 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LessThan :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_as :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#GreaterThan :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#QSelf<'i, INHERITED> {
             #[doc = "A helper function to access [`GreaterThan`]."]
             #[allow(non_snake_case)]
@@ -3200,20 +3200,6 @@ pub mod rules_impl {
                 {
                     let res = &res.content.4.matched;
                     res
-                }
-            }
-            #[doc = "A helper function to access [`Identifier`]."]
-            #[allow(non_snake_case)]
-            pub fn r#Identifier<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Identifier<'i, INHERITED>> {
-                let res = &*self.content;
-                {
-                    let res = &res.content.3.matched;
-                    {
-                        let res = res._0().map(|res| res);
-                        res
-                    }
                 }
             }
             #[doc = "A helper function to access [`LessThan`]."]
@@ -3225,18 +3211,13 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`MetaVariable`]."]
+            #[doc = "A helper function to access [`Path`]."]
             #[allow(non_snake_case)]
-            pub fn r#MetaVariable<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MetaVariable<'i, INHERITED>> {
+            pub fn r#Path<'s>(&'s self) -> &'s super::super::rules::r#Path<'i, INHERITED> {
                 let res = &*self.content;
                 {
                     let res = &res.content.3.matched;
-                    {
-                        let res = res._1().map(|res| res);
-                        res
-                    }
+                    res
                 }
             }
             #[doc = "A helper function to access [`Type`]."]

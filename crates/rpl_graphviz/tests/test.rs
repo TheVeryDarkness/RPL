@@ -279,64 +279,64 @@ test_case! {
     }
 }
 
-// test_case! {
-//     fn cve_2021_29941_2() {
-//         let pattern = quote!{
-//             p[$T:type] = fn _ () {
-//                 // type ExactSizeIterT = impl std::iter::ExactSizeIterator<Item = $T>;
-//                 // let's use a std::ops::Range<$T> instead temporarily
-//                 type RangeT = std::ops::Range<$T>;
-//                 type Vec = std::vec::Vec;
-//                 type VecT = std::vec::Vec<$T>;
-//                 type RefMutVecT = &mut std::vec::Vec<$T>;
-//                 type PtrMutT = *mut $T;
-//                 type RefMutSliceT = &mut [$T];
-//                 type EnumerateRangeT = std::iter::Enumerate<RangeT>;
-//                 type RefMutEnumerateRangeT = &mut std::iter::Enumerate<RangeT>;
-//                 type OptionUsizeT = std::option::Option<(usize, $T)>;
+test_case! {
+    fn cve_2021_29941_2() {
+        let pattern = quote!{
+            p[$T:type] = fn _ () {
+                // type ExactSizeIterT = impl std::iter::ExactSizeIterator<Item = $T>;
+                // let's use a std::ops::Range<$T> instead temporarily
+                type RangeT = std::ops::Range<$T>;
+                type Vec = std::vec::Vec;
+                type VecT = std::vec::Vec<$T>;
+                type RefMutVecT = &mut std::vec::Vec<$T>;
+                type PtrMutT = *mut $T;
+                type RefMutSliceT = &mut [$T];
+                type EnumerateRangeT = std::iter::Enumerate<RangeT>;
+                type RefMutEnumerateRangeT = &mut std::iter::Enumerate<RangeT>;
+                type OptionUsizeT = std::option::Option<(usize, $T)>;
 
-//                 let $iter: RangeT = _;
-//                 // let len: usize = <RangeT as std::iter::ExactSizeIterator>::len(move iter);
-//                 let $len: usize = RangeT::len(move $iter);
-//                 let mut $vec: VecT = Vec::with_capacity(copy $len);
-//                 let mut $ref_to_vec: RefMutVecT = &mut $vec;
-//                 let mut $ptr_to_vec: PtrMutT = Vec::as_mut_ptr(move $ref_to_vec);
-//                 let mut $slice: RefMutSliceT = std::slice::from_raw_parts_mut(copy $ptr_to_vec,
-// copy $len);                 // let mut enumerate: EnumerateRangeT = <RangeT as
-// std::iter::Iterator>::enumerate(move iter);                 let mut $enumerate: EnumerateRangeT =
-// RangeT::enumerate(move $iter);                 let mut $ref_mut_enumerate: RefMutEnumerateRangeT
-// = &mut $enumerate;                 let $next: OptionUsizeT;
-//                 let $cmp: isize;
-//                 let $first: usize;
-//                 let $second_t: $T;
-//                 let $second_usize: usize;
-//                 let $_tmp: ();
-//                 loop {
-//                     // next = <EnumerateRangeT as std::iter::Iterator>::next(move enumerate);
-//                     $next = EnumerateRangeT::next(move $ref_mut_enumerate);
-//                     // in `cmp = discriminant(copy next);`
-//                     // which discriminant should be used?
-//                     // $cmp = balabala::discriminant(copy $next);
-//                     $cmp = discriminant($next);
-//                     switchInt(move $cmp) {
-//                         // true or 1 here?
-//                         true => {
-//                             $first = copy ($next as Some).0;
-//                             $second_t = copy ($next as Some).1;
-//                             $second_usize = copy $second_t as usize (IntToInt);
-//                             (*$slice)[$second_usize] = copy $first as $T (IntToInt);
-//                         }
-//                         _ => break,
-//                     }
-//                 }
-//                 // variable shadowing?
-//                 // There cannot be two mutable references to `vec` in the same scope
-//                 $ref_to_vec = &mut $vec;
-//                 $_tmp = Vec::set_len(move $ref_to_vec, copy $len);
-//             }
-//         }.to_string();
-//     }
-// }
+                let $iter: RangeT = _;
+                // let len: usize = <RangeT as std::iter::ExactSizeIterator>::len(move iter);
+                let $len: usize = RangeT::len(move $iter);
+                let mut $vec: VecT = Vec::with_capacity(copy $len);
+                let mut $ref_to_vec: RefMutVecT = &mut $vec;
+                let mut $ptr_to_vec: PtrMutT = Vec::as_mut_ptr(move $ref_to_vec);
+                let mut $slice: RefMutSliceT = std::slice::from_raw_parts_mut(copy $ptr_to_vec, copy $len);
+                // let mut $enumerate: EnumerateRangeT = <RangeT as std::iter::Iterator>::enumerate(move $iter);
+                let mut $enumerate: EnumerateRangeT = RangeT::enumerate(move $iter);
+                let mut $ref_mut_enumerate: RefMutEnumerateRangeT = &mut $enumerate;
+                let $next: OptionUsizeT;
+                let $cmp: isize;
+                let $first: usize;
+                let $second_t: $T;
+                let $second_usize: usize;
+                let $_tmp: ();
+                loop {
+                    // next = <EnumerateRangeT as std::iter::Iterator>::next(move enumerate);
+                    $next = EnumerateRangeT::next(move $ref_mut_enumerate);
+                    // in `cmp = discriminant(copy next);`
+                    // which discriminant should be used?
+                    // $cmp = balabala::discriminant(copy $next);
+                    $cmp = discriminant($next);
+                    switchInt(move $cmp) {
+                        // true or 1 here?
+                        true => {
+                            $first = copy ($next as Some).0;
+                            $second_t = copy ($next as Some).1;
+                            $second_usize = copy $second_t as usize (IntToInt);
+                            (*$slice)[$second_usize] = copy $first as $T (IntToInt);
+                        }
+                        _ => break,
+                    }
+                }
+                // variable shadowing?
+                // There cannot be two mutable references to `vec` in the same scope
+                $ref_to_vec = &mut $vec;
+                $_tmp = Vec::set_len(move $ref_to_vec, copy $len);
+            }
+        }.to_string();
+    }
+}
 
 test_case! {
     fn cve_2021_29941() {
