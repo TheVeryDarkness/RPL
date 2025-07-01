@@ -1,5 +1,5 @@
 #![allow(deprecated, invalid_value, clippy::uninit_assumed_init)]
-#![warn(clippy::mem_replace_with_uninit)]
+//@compile-flags: -Z inline-mir=false
 //@no-rustfix
 use std::mem;
 
@@ -8,6 +8,7 @@ fn might_panic<X>(x: X) -> X {
     x
 }
 
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     let mut v = vec![0i32; 4];
     // the following is UB if `might_panic` panics
