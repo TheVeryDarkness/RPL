@@ -656,7 +656,8 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                             .mir_ddg
                             .get_dep(loc.block, loc.statement_index, dep_loc.block, dep_loc.statement_index);
                     trace!(?dep_loc, ?local, ?dep_local);
-                    dep_local.is_none_or(|dep_local| dep_local == local)
+                    dep_local == Some(local)
+                    // dep_local.is_none_or(|dep_local| dep_local == local)
                 },
             );
             debug!(?loc_pat, ?loc, ?matched, "match_stmt_deps");
