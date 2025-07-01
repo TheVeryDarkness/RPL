@@ -1,4 +1,4 @@
-//@ignore-on-host
+//@compile-flags: -Z inline-mir=false
 #![feature(stmt_expr_attributes)]
 #![allow(clippy::let_unit_value, invalid_value)]
 
