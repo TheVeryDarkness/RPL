@@ -24,6 +24,12 @@ pub fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx
         .all(|trait_def| matches!(trait_def.safety, hir::Safety::Safe))
 }
 
+/// Check if ty is [`Copy`].
+#[instrument(level = "debug", skip(tcx), ret)]
+pub fn is_copy<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
+    tcx.type_is_copy_modulo_regions(typing_env, ty)
+}
+
 /// Check if ty is not unpin.
 #[instrument(level = "debug", skip(tcx), ret)]
 #[allow(unused_variables)]
