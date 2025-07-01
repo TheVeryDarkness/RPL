@@ -35,7 +35,7 @@ use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
 use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
-use rustc_middle::hir::nested_filter::OnlyBodies;
+use rustc_middle::hir::nested_filter::All;
 use rustc_middle::mir;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
@@ -104,7 +104,7 @@ struct CheckFnCtxt<'pcx, 'tcx> {
 }
 
 impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
-    type NestedFilter = OnlyBodies;
+    type NestedFilter = All;
     fn nested_visit_map(&mut self) -> Self::Map {
         self.tcx.hir()
     }
@@ -410,44 +410,18 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                             let source_map = self.tcx.sess.source_map();
                             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                                 for (&name, pat_item) in &pattern.patt_block {
-                                    match pat_item {
-                                        PatternItem::RustItems(rpl_rust_items) => {
-                                            for matched in self.impl_matched(
-                                                name,
-                                                rpl_rust_items,
-                                                def_id,
-                                                header,
-                                                has_self,
-                                                body,
-                                                &mir_cfg,
-                                                &mir_ddg,
-                                            ) {
-                                                let error = pattern
-                                                    .get_diag(name, source_map, None, body, decl, &matched)
-                                                    .unwrap_or_else(identity);
-                                                self.tcx.emit_node_span_lint(
-                                                    error.lint(),
-                                                    self.tcx.local_def_id_to_hir_id(def_id),
-                                                    error.primary_span(),
-                                                    error,
-                                                );
-                                            }
-                                        },
-                                        PatternItem::RPLPatternOperation(pat_op) => {
-                                            for matched in self.impl_matched_pat_op(
-                                                name, pat_op, def_id, header, has_self, body, &mir_cfg, &mir_ddg,
-                                            ) {
-                                                let error = pattern
-                                                    .get_diag(name, source_map, None, body, decl, &matched)
-                                                    .unwrap_or_else(identity);
-                                                self.tcx.emit_node_span_lint(
-                                                    error.lint(),
-                                                    self.tcx.local_def_id_to_hir_id(def_id),
-                                                    error.primary_span(),
-                                                    error,
-                                                );
-                                            }
-                                        },
+                                    for matched in self.impl_matched_pat_item(
+                                        name, pat_item, def_id, header, has_self, body, &mir_cfg, &mir_ddg,
+                                    ) {
+                                        let error = pattern
+                                            .get_diag(name, source_map, None, body, decl, &matched)
+                                            .unwrap_or_else(identity);
+                                        self.tcx.emit_node_span_lint(
+                                            error.lint(),
+                                            self.tcx.local_def_id_to_hir_id(def_id),
+                                            error.primary_span(),
+                                            error,
+                                        );
                                     }
                                 }
                             });
@@ -475,44 +449,18 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
             let source_map = self.tcx.sess.source_map();
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, pat_item) in &pattern.patt_block {
-                    match pat_item {
-                        PatternItem::RustItems(rpl_rust_items) => {
-                            for matched in self.fn_matched(
-                                name,
-                                rpl_rust_items,
-                                def_id,
-                                header,
-                                has_self,
-                                body,
-                                &mir_cfg,
-                                &mir_ddg,
-                            ) {
-                                let error = pattern
-                                    .get_diag(name, source_map, fn_name, body, decl, &matched)
-                                    .unwrap_or_else(identity);
-                                self.tcx.emit_node_span_lint(
-                                    error.lint(),
-                                    self.tcx.local_def_id_to_hir_id(def_id),
-                                    error.primary_span(),
-                                    error,
-                                );
-                            }
-                        },
-                        PatternItem::RPLPatternOperation(pat_op) => {
-                            for matched in
-                                self.fn_matched_pat_op(name, pat_op, def_id, header, has_self, body, &mir_cfg, &mir_ddg)
-                            {
-                                let error = pattern
-                                    .get_diag(name, source_map, fn_name, body, decl, &matched)
-                                    .unwrap_or_else(identity);
-                                self.tcx.emit_node_span_lint(
-                                    error.lint(),
-                                    self.tcx.local_def_id_to_hir_id(def_id),
-                                    error.primary_span(),
-                                    error,
-                                );
-                            }
-                        },
+                    for matched in
+                        self.fn_matched_pat_item(name, pat_item, def_id, header, has_self, body, &mir_cfg, &mir_ddg)
+                    {
+                        let error = pattern
+                            .get_diag(name, source_map, fn_name, body, decl, &matched)
+                            .unwrap_or_else(identity);
+                        self.tcx.emit_node_span_lint(
+                            error.lint(),
+                            self.tcx.local_def_id_to_hir_id(def_id),
+                            error.primary_span(),
+                            error,
+                        );
                     }
                 }
             });
