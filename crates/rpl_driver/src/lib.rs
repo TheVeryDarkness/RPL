@@ -35,7 +35,7 @@ use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
 use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
-use rustc_middle::hir::nested_filter::{All, OnlyBodies};
+use rustc_middle::hir::nested_filter::OnlyBodies;
 use rustc_middle::mir;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
