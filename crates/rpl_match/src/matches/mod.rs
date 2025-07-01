@@ -330,6 +330,10 @@ impl StatementMatch {
         }
     }
 
+    pub fn span(self, body: &mir::Body<'_>) -> Span {
+        self.source_info(body).span
+    }
+
     pub fn span_no_inline(self, body: &mir::Body<'_>) -> Span {
         let source_info = self.source_info(body);
         let mut scope = source_info.scope;

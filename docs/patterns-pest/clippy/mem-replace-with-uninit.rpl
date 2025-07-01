@@ -44,12 +44,12 @@ patt {
 
 diag {
     mem_replace_with_uninit = {
-        primary(replace)                                                                                     = "replacing with `{$value}`",
-        suggestion(code = "std::ptr::read({$with})", span = "replace", applicability = "machine_applicable") = "consider using",
+        primary(replace)                                                                                  = "replacing with `{$value}`",
+        suggestion(code = "std::ptr::read({$with})", span = "replace", applicability = "maybe_incorrect") = "consider using",
         // help(replace) = "?",
         // help(with) = "!",
         // help(uninitialized) = "~",
-        name                                                                                                 = "mem_replace_with_uninit",
-        level                                                                                                = "warn",
+        name                                                                                              = "mem_replace_with_uninit",
+        level                                                                                             = "warn",
     }
 }

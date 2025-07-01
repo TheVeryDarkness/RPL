@@ -429,7 +429,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                     error.lint(),
                                                     self.tcx.local_def_id_to_hir_id(def_id),
                                                     error.primary_span(),
-                                                    *error,
+                                                    error,
                                                 );
                                             }
                                         },
@@ -444,7 +444,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                                     error.lint(),
                                                     self.tcx.local_def_id_to_hir_id(def_id),
                                                     error.primary_span(),
-                                                    *error,
+                                                    error,
                                                 );
                                             }
                                         },
@@ -494,7 +494,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                     error.lint(),
                                     self.tcx.local_def_id_to_hir_id(def_id),
                                     error.primary_span(),
-                                    *error,
+                                    error,
                                 );
                             }
                         },
@@ -509,7 +509,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                                     error.lint(),
                                     self.tcx.local_def_id_to_hir_id(def_id),
                                     error.primary_span(),
-                                    *error,
+                                    error,
                                 );
                             }
                         },

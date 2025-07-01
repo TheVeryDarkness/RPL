@@ -77,33 +77,6 @@ impl LintDiagnostic<'_, ()> for Box<DynamicError> {
     }
 }
 
-impl LintDiagnostic<'_, ()> for DynamicError {
-    fn decorate_lint(self, diag: &mut rustc_errors::Diag<'_, ()>) {
-        let primary_message = self.primary.0;
-        diag.primary_message(primary_message);
-        for (label, span) in self.labels {
-            diag.span_label(span, label);
-        }
-        for (help, span_help) in self.helps {
-            if let Some(span_help) = span_help {
-                diag.span_help(span_help, help);
-            } else {
-                diag.help(help);
-            }
-        }
-        for (note, span_note) in self.notes {
-            if let Some(span_note) = span_note {
-                diag.span_note(span_note, note);
-            } else {
-                diag.note(note);
-            }
-        }
-        for (suggestion, code, span, applicability) in self.suggestions {
-            diag.span_suggestion(span, suggestion, code, applicability);
-        }
-    }
-}
-
 const LINT: Lint = Lint {
     name: "RPL::DYNAMIC",
     desc: "dynamic RPL pattern",
