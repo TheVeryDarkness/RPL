@@ -128,6 +128,12 @@ error_type!(
                 "Impl already declared. \n{span}",
             321 PredicateError(PredicateError<'i>)
                 "{0}",
+            322 InvalidFieldIndex {
+                index: &'i str,
+                source: String,
+                span: SpanWrapper<'i>,
+            }
+                "Invalid field index `{index}` ({source}). \n{span}",
             /* 4xx for diagnostic errors */
             400 MissingPropertyInDiag {
                 property: &'static str,

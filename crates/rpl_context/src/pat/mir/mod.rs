@@ -153,13 +153,15 @@ pub enum PlaceElem<'pcx> {
 }
 
 impl PlaceElem<'_> {
+    /// See `rpl_meta::check::CheckFnCtxt::check_mir_place_field`.
     pub fn from_field(field: &pairs::MirPlaceField) -> Self {
         let (_, field) = field.get_matched();
         match field {
             Choice3::_0(ident) => PlaceElem::FieldPat(Symbol::intern(ident.span.as_str())),
             Choice3::_1(ident) => PlaceElem::Field(FieldAcc::from(Symbol::intern(ident.span.as_str()))),
             Choice3::_2(index) => {
-                let index = index.span.as_str().parse::<u32>().expect("invalid field index");
+                let index = index.span.as_str().trim();
+                let index = index.parse::<u32>().expect("invalid field index");
                 PlaceElem::Field(FieldAcc::from(index))
             },
         }
