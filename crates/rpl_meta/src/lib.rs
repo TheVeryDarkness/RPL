@@ -80,7 +80,7 @@ pub fn parse_and_collect<'mcx>(
     }
 
     let mut lints = mctx.collect_lints().collect_vec();
-    lints.sort_by(|a, b| a.name.cmp(&b.name));
+    lints.sort_by(|a, b| a.name.cmp(b.name));
     //FIXME: show warnings if two lints share the same name but have different configs.
     lints.dedup_by(|a, b| a.name == b.name);
     mctx.lints = lints;
