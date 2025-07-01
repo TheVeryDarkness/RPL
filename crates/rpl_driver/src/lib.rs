@@ -35,7 +35,7 @@ use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
 use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
-use rustc_middle::hir::nested_filter::All;
+use rustc_middle::hir::nested_filter::{All, OnlyBodies};
 use rustc_middle::mir;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
@@ -104,7 +104,7 @@ struct CheckFnCtxt<'pcx, 'tcx> {
 }
 
 impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
-    type NestedFilter = All;
+    type NestedFilter = OnlyBodies;
     fn nested_visit_map(&mut self) -> Self::Map {
         self.tcx.hir()
     }
