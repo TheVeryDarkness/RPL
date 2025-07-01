@@ -1,4 +1,4 @@
-#![warn(clippy::from_raw_with_void_ptr)]
+//@compile-flags: -Z inline-mir=false
 #![allow(clippy::unnecessary_cast)]
 
 use std::ffi::c_void;

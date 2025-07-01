@@ -1,4 +1,4 @@
-#![warn(clippy::cast_slice_from_raw_parts)]
+//@compile-flags: -Z inline-mir=false -Z mir-opt-level=0
 
 #[allow(unused_imports, unused_unsafe)]
 fn main() {
