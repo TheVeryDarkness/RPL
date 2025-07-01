@@ -13,7 +13,7 @@ use rustc_span::{Span, Symbol};
 use super::non_local_meta_vars::{ConstVarIdx, PlaceVarIdx, TyVarIdx};
 use crate::pat::NonLocalMetaVars;
 
-pub trait Matched<'tcx> : fmt::Debug {
+pub trait Matched<'tcx>: fmt::Debug {
     fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span;
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
