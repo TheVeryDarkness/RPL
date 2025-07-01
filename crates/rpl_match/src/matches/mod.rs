@@ -68,6 +68,7 @@ impl Matched<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
