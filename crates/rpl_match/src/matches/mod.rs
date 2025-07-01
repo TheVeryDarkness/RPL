@@ -651,10 +651,12 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             let matched = self.match_stmt_deps(
                 self.cx.pat_ddg.deps(loc_pat.block, loc_pat.statement_index),
                 |dep_loc, local| {
-                    self.cx
-                        .mir_ddg
-                        .get_dep(loc.block, loc.statement_index, dep_loc.block, dep_loc.statement_index)
-                        == Some(local)
+                    let dep_local =
+                        self.cx
+                            .mir_ddg
+                            .get_dep(loc.block, loc.statement_index, dep_loc.block, dep_loc.statement_index);
+                    trace!(?dep_loc, ?local, ?dep_local);
+                    dep_local.is_none_or(|dep_local| dep_local == local)
                 },
             );
             debug!(?loc_pat, ?loc, ?matched, "match_stmt_deps");
@@ -807,6 +809,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     ///   |                   |
     /// rdep_loc_pat -----> rdep_loc
     /// ```
+    #[instrument(level = "trace", skip(self, pat_deps, match_dep_local), ret)]
     fn match_stmt_deps(
         &self,
         mut pat_deps: impl Iterator<Item = (impl IntoLocation<Location = pat::Location>, pat::Local)>,
@@ -818,7 +821,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             let dep_stmt = self.matching[dep_loc_pat].force_get_matched();
             let matched = match dep_stmt {
                 StatementMatch::Arg(l) => l == local,
-                StatementMatch::Location(dep_loc) => match_dep_local(dep_loc, local),
+                StatementMatch::Location(dep_loc) => {
+                    trace!(?dep_loc_pat, ?dep_loc, ?local_pat, ?local, "match_dep_local");
+                    match_dep_local(dep_loc, local)
+                },
             };
             debug!(
                 matched,
