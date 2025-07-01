@@ -87,6 +87,12 @@ impl<'pcx> PatternItem<'pcx> {
             PatternItem::RPLPatternOperation(op) => op.table_head(),
         }
     }
+    pub fn expect_rust_items(&self) -> &RustItems<'pcx> {
+        match self {
+            PatternItem::RustItems(items) => &items,
+            PatternItem::RPLPatternOperation(_) => panic!("Expected RustItems, found PatternOperation"),
+        }
+    }
 }
 
 pub struct RustItems<'pcx> {

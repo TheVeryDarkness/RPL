@@ -1578,10 +1578,14 @@ name = "rpl_graphviz"
 version = "0.1.0"
 dependencies = [
  "gsgdt",
+ "pest_typed",
  "pretty_assertions",
+ "quote",
  "rpl_context",
  "rpl_match",
+ "rpl_meta",
  "rpl_mir_graph",
+ "rpl_parser",
 ]
 
 [[package]]
