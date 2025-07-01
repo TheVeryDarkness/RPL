@@ -39,6 +39,7 @@ pub enum PredicateError<'i> {
 // Add it to the list below.
 pub const ALL_PREDICATES: &[&str] = &[
     // single_ty_preds
+    "can_be_uninit",
     "is_all_safe_trait",
     "is_integral",
     "is_copy",
@@ -78,6 +79,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
     type Error = PredicateError<'i>;
     fn try_from(span: SpanWrapper<'i>) -> Result<Self, Self::Error> {
         Ok(match span.inner().as_str() {
+            "can_be_uninit" => Self::Ty(can_be_uninit),
             "is_all_safe_trait" => Self::Ty(is_all_safe_trait),
             "is_integral" => Self::Ty(is_integral),
             "is_copy" => Self::Ty(is_copy),
