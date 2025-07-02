@@ -93,20 +93,6 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             //
             // However, it may produce false positives, as the offset and the length may be constrained by a
             // compilation-time constant.
-            let pattern_1 = pattern_unchecked_ptr_offset_(self.pcx);
-            let pattern_2 = pattern_checked_ptr_offset_lt(self.pcx);
-            let matches_2 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_2.pattern, pattern_2.fn_pat).check();
-            let pattern_3 = pattern_checked_ptr_offset_le(self.pcx);
-            let matches_3 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_3.pattern, pattern_3.fn_pat).check();
-            let pattern_4 = pattern_checked_ptr_offset_gt(self.pcx);
-            let matches_4 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_4.pattern, pattern_4.fn_pat).check();
-            let pattern_5 = pattern_checked_ptr_offset_ge(self.pcx);
-            let matches_5 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_5.pattern, pattern_5.fn_pat).check();
-            let pattern_6 = pattern_checked_ptr_offset_rem(self.pcx);
-            let matches_6 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_6.pattern, pattern_6.fn_pat).check();
-            let pattern_7 = pattern_checked_ptr_offset_const(self.pcx);
-            let matches_7 = CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_7.pattern, pattern_7.fn_pat).check();
-
             fn collect_matched(
                 matched: &Matched<'_>,
                 ptr: Location,
@@ -120,66 +106,146 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                 trace!(ptr = ?ptr_, offset = ?offset_, pattern.ptr = ?ptr, pattern.offset = ?offset, ?span_ptr, ?span_offset, "checked offset found");
                 (ptr_, offset_)
             }
-            let locations: BTreeSet<_> = matches_2
-                .iter()
-                .map(|matches| collect_matched(matches, pattern_2.ptr, pattern_2.offset, body))
-                .chain(
-                    matches_3
-                        .iter()
-                        .map(|matches| collect_matched(matches, pattern_3.ptr, pattern_3.offset, body)),
-                )
-                .chain(
-                    matches_4
-                        .iter()
-                        .map(|matches| collect_matched(matches, pattern_4.ptr, pattern_4.offset, body)),
-                )
-                .chain(
-                    matches_5
-                        .iter()
-                        .map(|matches| collect_matched(matches, pattern_5.ptr, pattern_5.offset, body)),
-                )
-                .chain(
-                    matches_6
-                        .iter()
-                        .map(|matches| collect_matched(matches, pattern_6.ptr, pattern_6.offset, body)),
-                )
-                .chain(matches_7.iter().filter_map(|matches| {
-                    let const_size = matches[pattern_7.const_size.idx];
-                    let const_size = const_size
-                        .try_to_scalar_int()
-                        .unwrap_or_else(|| bug!("{const_size} is not a scalar int"))
-                        .to_target_usize(self.tcx);
-                    let const_offset = matches[pattern_7.const_offset.idx];
-                    let const_offset = const_offset
-                        .try_to_scalar_int()
-                        .unwrap_or_else(|| bug!("{const_offset} is not a scalar int"))
-                        .to_target_usize(self.tcx);
-                    if const_offset < const_size {
-                        Some(collect_matched(matches, pattern_7.ptr, pattern_7.offset, body))
-                    } else {
-                        // The offset is out of bounds, so this is not a valid negative case
-                        None
-                    }
-                }))
-                .collect();
+            fn collect_checked<'m, 'tcx, 'pcx>(
+                positive: (&'m [Matched<'tcx>], PatternUncheckedPtrOffsetGeneral<'pcx>),
+                negative_general: &[(&'m [Matched<'tcx>], PatternUncheckedPtrOffsetGeneral<'pcx>)],
+                negative_const: &[(&'m [Matched<'tcx>], PatternUncheckedPtrOffsetConst<'pcx>)],
+                def_id: LocalDefId,
+                body: &Body<'tcx>,
+                tcx: TyCtxt<'tcx>,
+            ) {
+                let locations: BTreeSet<_> = negative_general
+                    .into_iter()
+                    .flat_map(|(matches, pattern)| {
+                        matches
+                            .iter()
+                            .map(move |matches| collect_matched(matches, pattern.ptr, pattern.offset, body))
+                    })
+                    .chain(negative_const.into_iter().flat_map(|(matches, pattern)| {
+                        matches.iter().filter_map(move |matches| {
+                            let const_size = matches[pattern.const_size.idx];
+                            let const_size = const_size
+                                .try_to_scalar_int()
+                                .unwrap_or_else(|| bug!("{const_size} is not a scalar int"))
+                                .to_target_usize(tcx);
+                            let const_offset = matches[pattern.const_offset.idx];
+                            let const_offset = const_offset
+                                .try_to_scalar_int()
+                                .unwrap_or_else(|| bug!("{const_offset} is not a scalar int"))
+                                .to_target_usize(tcx);
+                            if const_offset < const_size {
+                                Some(collect_matched(matches, pattern.ptr, pattern.offset, body))
+                            } else {
+                                // The offset is out of bounds, so this is not a valid negative case
+                                None
+                            }
+                        })
+                    }))
+                    .collect();
 
-            for matches in CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_1.pattern, pattern_1.fn_pat).check() {
-                let ptr = matches[pattern_1.ptr];
-                let offset = matches[pattern_1.offset];
-                if locations.contains(&(ptr, offset)) {
-                    // The offset is checked, so don't emit an error
-                    continue;
+                let (matches_1, pattern_1) = positive;
+                for matches in matches_1 {
+                    let ptr = matches[pattern_1.ptr];
+                    let offset = matches[pattern_1.offset];
+                    if locations.contains(&(ptr, offset)) {
+                        // The offset is checked, so don't emit an error
+                        continue;
+                    }
+                    let span_ptr = ptr.span_no_inline(body);
+                    let span_offset = offset.span_no_inline(body);
+                    debug!(?ptr, ?offset, ?pattern_1.ptr, ?pattern_1.offset, ?span_ptr, ?span_offset, "unchecked offset found");
+                    let ptr = span_ptr;
+                    let offset = span_offset;
+                    tcx.emit_node_span_lint(
+                        UNCHECKED_POINTER_OFFSET,
+                        tcx.local_def_id_to_hir_id(def_id),
+                        offset,
+                        crate::errors::UncheckedPtrOffset { ptr, offset },
+                    );
                 }
-                let span_ptr = ptr.span_no_inline(body);
-                let span_offset = offset.span_no_inline(body);
-                debug!(?ptr, ?offset, ?pattern.ptr, ?pattern.offset, ?span_ptr, ?span_offset, "unchecked offset found");
-                let ptr = span_ptr;
-                let offset = span_offset;
-                self.tcx.emit_node_span_lint(
-                    UNCHECKED_POINTER_OFFSET,
-                    self.tcx.local_def_id_to_hir_id(def_id),
-                    offset,
-                    crate::errors::UncheckedPtrOffset { ptr, offset },
+            }
+            {
+                let pattern_1 = pattern_unchecked_ptr_offset_(self.pcx);
+                let matches_1 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_1.pattern, pattern_1.fn_pat).check();
+                let pattern_2 = pattern_checked_ptr_offset_lt(self.pcx);
+                let matches_2 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_2.pattern, pattern_2.fn_pat).check();
+                let pattern_3 = pattern_checked_ptr_offset_le(self.pcx);
+                let matches_3 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_3.pattern, pattern_3.fn_pat).check();
+                let pattern_4 = pattern_checked_ptr_offset_gt(self.pcx);
+                let matches_4 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_4.pattern, pattern_4.fn_pat).check();
+                let pattern_5 = pattern_checked_ptr_offset_ge(self.pcx);
+                let matches_5 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_5.pattern, pattern_5.fn_pat).check();
+                let pattern_6 = pattern_checked_ptr_offset_rem(self.pcx);
+                let matches_6 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_6.pattern, pattern_6.fn_pat).check();
+                let pattern_7 = pattern_checked_ptr_offset_slice_len(self.pcx);
+                let matches_7 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_7.pattern, pattern_7.fn_pat).check();
+                let pattern_8 = pattern_checked_ptr_offset_const(self.pcx);
+                let matches_8 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_8.pattern, pattern_8.fn_pat).check();
+
+                collect_checked(
+                    (&matches_1, pattern_1),
+                    &[
+                        (&matches_2, pattern_2),
+                        (&matches_3, pattern_3),
+                        (&matches_4, pattern_4),
+                        (&matches_5, pattern_5),
+                        (&matches_6, pattern_6),
+                        (&matches_7, pattern_7),
+                    ],
+                    &[(&matches_8, pattern_8)],
+                    def_id,
+                    body,
+                    self.tcx,
+                );
+            }
+            {
+                let pattern_1 = pattern_unchecked_mut_ptr_offset_(self.pcx);
+                let matches_1 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_1.pattern, pattern_1.fn_pat).check();
+                let pattern_2 = pattern_checked_mut_ptr_offset_lt(self.pcx);
+                let matches_2 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_2.pattern, pattern_2.fn_pat).check();
+                let pattern_3 = pattern_checked_mut_ptr_offset_le(self.pcx);
+                let matches_3 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_3.pattern, pattern_3.fn_pat).check();
+                let pattern_4 = pattern_checked_mut_ptr_offset_gt(self.pcx);
+                let matches_4 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_4.pattern, pattern_4.fn_pat).check();
+                let pattern_5 = pattern_checked_mut_ptr_offset_ge(self.pcx);
+                let matches_5 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_5.pattern, pattern_5.fn_pat).check();
+                let pattern_6 = pattern_checked_mut_ptr_offset_rem(self.pcx);
+                let matches_6 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_6.pattern, pattern_6.fn_pat).check();
+                let pattern_7 = pattern_checked_mut_ptr_offset_slice_len(self.pcx);
+                let matches_7 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_7.pattern, pattern_7.fn_pat).check();
+                let pattern_8 = pattern_checked_mut_ptr_offset_const(self.pcx);
+                let matches_8 =
+                    CheckMirCtxt::new(self.tcx, self.pcx, body, pattern_8.pattern, pattern_8.fn_pat).check();
+
+                collect_checked(
+                    (&matches_1, pattern_1),
+                    &[
+                        (&matches_2, pattern_2),
+                        (&matches_3, pattern_3),
+                        (&matches_4, pattern_4),
+                        (&matches_5, pattern_5),
+                        (&matches_6, pattern_6),
+                        (&matches_7, pattern_7),
+                    ],
+                    &[(&matches_8, pattern_8)],
+                    def_id,
+                    body,
+                    self.tcx,
                 );
             }
         }
@@ -253,28 +319,45 @@ struct PatternUncheckedPtrOffsetGeneral<'pcx> {
     offset: pat::Location,
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_unchecked_ptr_offset_(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
-        #[meta($T:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, _);
+macro_rules! template {
+    ($name:ident -> $ret:ident { $($fields:ident),* $(,)? } {$($inner:tt)*}) => {
+        #[rpl_macros::pattern_def]
+        fn $name(pcx: PatCtxt<'_>) -> $ret<'_> {
+            $(
+                let $fields;
+            )*
+            let pattern = rpl! {
+                $($inner)*
+            };
+            let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
+
+            $ret { pattern, fn_pat, $($fields),* }
         }
     };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
-
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
-    }
 }
+
+// #[rpl_macros::pattern_def]
+// fn pattern_unchecked_ptr_offset_(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
+//     let ptr;
+//     let offset;
+//     let pattern = rpl! {
+//         #[meta($T:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, _);
+//         }
+//     };
+//     let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
+
+//     PatternUncheckedPtrOffsetGeneral {
+//         pattern,
+//         fn_pat,
+//         ptr,
+//         offset,
+//     }
+// }
 
 // macro_rules! pattern_checked_ptr_offset {
 //     ($name:ident, $($cmp_expr:tt)*) => {
@@ -305,11 +388,20 @@ fn pattern_unchecked_ptr_offset_(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetG
 //     };
 // }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_lt(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
+template! {
+    pattern_unchecked_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty)]
+        fn $pattern(..) -> _ = mir! {
+            #[export(ptr)]
+            let $ptr: *const $T = _;
+            #[export(offset)]
+            let $ptr_1: *const $T = Offset(copy $ptr, _);
+        }
+    }
+}
+
+template! {
+    pattern_checked_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
         #[meta($T:ty, $U:ty)]
         fn $pattern(..) -> _ = mir! {
             let $index: $U = _;
@@ -319,22 +411,11 @@ fn pattern_checked_ptr_offset_lt(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetG
             #[export(offset)]
             let $ptr_1: *const $T = Offset(copy $ptr, _);
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
-
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
     }
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_le(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
+template! {
+    pattern_checked_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
         #[meta($T:ty, $U:ty)]
         fn $pattern(..) -> _ = mir! {
             let $index: $U = _;
@@ -344,22 +425,11 @@ fn pattern_checked_ptr_offset_le(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetG
             #[export(offset)]
             let $ptr_1: *const $T = Offset(copy $ptr, _);
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
-
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
     }
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_gt(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
+template! {
+    pattern_checked_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
         #[meta($T:ty, $U:ty)]
         fn $pattern(..) -> _ = mir! {
             let $index: $U = _;
@@ -369,22 +439,11 @@ fn pattern_checked_ptr_offset_gt(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetG
             #[export(offset)]
             let $ptr_1: *const $T = Offset(copy $ptr, _);
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
-
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
     }
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_ge(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
+template! {
+    pattern_checked_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
         #[meta($T:ty, $U:ty)]
         fn $pattern(..) -> _ = mir! {
             let $index: $U = _;
@@ -394,22 +453,11 @@ fn pattern_checked_ptr_offset_ge(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetG
             #[export(offset)]
             let $ptr_1: *const $T = Offset(copy $ptr, _);
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
-
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
     }
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_rem(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetGeneral<'_> {
-    let ptr;
-    let offset;
-    let pattern = rpl! {
+template! {
+    pattern_checked_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
         #[meta($T:ty, $U:ty)]
         fn $pattern(..) -> _ = mir! {
             #[export(ptr)]
@@ -418,14 +466,103 @@ fn pattern_checked_ptr_offset_rem(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffset
             #[export(offset)]
             let $ptr_1: *const $T = Offset(copy $ptr, copy $index);
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
+    }
+}
 
-    PatternUncheckedPtrOffsetGeneral {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
+template! {
+    pattern_checked_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $slice_ptr: *const [$T] = _; // _5
+            #[export(ptr)]
+            let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _3
+            let $index: $U = PtrMetadata(_); // _4
+            #[export(offset)]
+            let $ptr_1: *const $T = Offset(copy $ptr, _); // _0
+        }
+    }
+}
+
+template! {
+    pattern_unchecked_mut_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty)]
+        fn $pattern(..) -> _ = mir! {
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _);
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $index: $U = _;
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            let $cmp: bool = Lt(copy $index, _);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _);
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $index: $U = _;
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            let $cmp: bool = Le(copy $index, _);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _);
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $index: $U = _;
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            let $cmp: bool = Gt(_, copy $index);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _);
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $index: $U = _;
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            let $cmp: bool = Ge(_, copy $index);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _);
+            let $value: &$T = &(*$ptr_1);
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            #[export(ptr)]
+            let $ptr: *mut $T = _;
+            let $index: $U = Rem(_, _);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
+            let $value: &$T = &(*$ptr_1);
+        }
     }
 }
 
@@ -438,13 +575,8 @@ struct PatternUncheckedPtrOffsetConst<'pcx> {
     const_offset: pat::ConstVar<'pcx>,
 }
 
-#[rpl_macros::pattern_def]
-fn pattern_checked_ptr_offset_const(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffsetConst<'_> {
-    let ptr;
-    let offset;
-    let const_size;
-    let const_offset;
-    let pattern = rpl! {
+template! {
+    pattern_checked_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
         #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
         fn $pattern(..) -> _ = mir! {
             let $array: &[$T; $size] = _; // _1
@@ -456,15 +588,34 @@ fn pattern_checked_ptr_offset_const(pcx: PatCtxt<'_>) -> PatternUncheckedPtrOffs
             let $ptr_1: *const $T = Offset(copy $ptr, const $offset); // _4 bb0[4]
             let $value: &$T = &(*$ptr_1); // _0 bb0[5]
         }
-    };
-    let fn_pat = pattern.fns.get_fn_pat(Symbol::intern("pattern")).unwrap();
+    }
+}
 
-    PatternUncheckedPtrOffsetConst {
-        pattern,
-        fn_pat,
-        ptr,
-        offset,
-        const_size,
-        const_offset,
+template! {
+    pattern_checked_mut_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+        #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+        fn $pattern(..) -> _ = mir! {
+            let $array: &mut [$T; $size] = _; // _1
+            let $slice_ref: &mut [$T] = copy $array as &mut [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+            let $slice_ptr: *mut [$T] = &raw mut (*$slice_ref); // _5 bb0[1]
+            #[export(ptr)]
+            let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr); // _2 bb0[2]
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, _); // _4 bb0[4]
+        }
+    }
+}
+
+template! {
+    pattern_checked_mut_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+        #[meta($T:ty, $U:ty)]
+        fn $pattern(..) -> _ = mir! {
+            let $slice_ptr: *mut [$T] = _;
+            #[export(ptr)]
+            let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr);
+            let $index: $U = PtrMetadata(_);
+            #[export(offset)]
+            let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
+        }
     }
 }
