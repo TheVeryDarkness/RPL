@@ -89,7 +89,7 @@ impl<'pcx> PatternItem<'pcx> {
     }
     pub fn expect_rust_items(&self) -> &RustItems<'pcx> {
         match self {
-            PatternItem::RustItems(items) => &items,
+            PatternItem::RustItems(items) => items,
             PatternItem::RPLPatternOperation(_) => panic!("Expected RustItems, found PatternOperation"),
         }
     }
