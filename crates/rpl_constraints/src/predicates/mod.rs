@@ -10,6 +10,7 @@ use rustc_span::Symbol;
 // Try to keep all predicate signatures consistent in it.
 mod multiple_consts;
 mod multiple_tys;
+mod single_const;
 mod single_fn;
 mod single_ty;
 mod translate;
@@ -18,6 +19,7 @@ mod ty_const;
 
 pub use multiple_consts::*;
 pub use multiple_tys::*;
+pub use single_const::*;
 pub use single_fn::*;
 pub use single_ty::*;
 use thiserror::Error;
@@ -60,6 +62,8 @@ pub const ALL_PREDICATES: &[&str] = &[
     "requires_monomorphization",
     // ty_const_preds
     "maybe_misaligned",
+    // single_const_preds
+    "is_null_ptr",
     // multiple_consts_preds
     "usize_lt",
 ];
@@ -72,6 +76,7 @@ pub enum PredicateKind {
     MultipleTys(MultipleTysPredsFnPtr),
     Fn(SingleFnPredsFnPtr),
     TyConst(TyConstPredsFnPtr),
+    SingleConst(SingleConstPredsFnPtr),
     MultipleConsts(MultipleConstsPredsFnPtr),
 }
 
@@ -84,6 +89,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "is_integral" => Self::Ty(is_integral),
             "is_copy" => Self::Ty(is_copy),
             "is_not_unpin" => Self::Ty(is_not_unpin),
+            "is_null_ptr" => Self::SingleConst(is_null_ptr),
             "is_sync" => Self::Ty(is_sync),
             "is_primitive" => Self::Ty(is_primitive),
             "is_ptr" => Self::Ty(is_ptr),
