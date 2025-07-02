@@ -20,7 +20,7 @@ use crate::mir::{CheckMirCtxt, pat};
 
 pub mod artifact;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Matched<'tcx> {
     pub basic_blocks: IndexVec<pat::BasicBlock, MatchedBlock>,
     pub locals: IndexVec<pat::Local, mir::Local>,

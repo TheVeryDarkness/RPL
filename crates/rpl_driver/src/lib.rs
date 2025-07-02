@@ -380,7 +380,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         }
     }
 
-    #[instrument(level = "debug", skip(self, fn_pat, body, matched), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = ?fn_pat.constraints), ret)]
+    #[instrument(level = "debug", skip(self, fn_pat, body), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = ?fn_pat.constraints), ret)]
     fn check_constraints(
         &self,
         name: Symbol,
