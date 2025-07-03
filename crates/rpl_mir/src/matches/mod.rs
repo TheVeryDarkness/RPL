@@ -2,14 +2,14 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
-use rpl_match::CountedMatch;
+use rpl_match::{Const, CountedMatch};
 use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::{MutatingUseContext, PlaceContext};
-use rustc_middle::mir::{self, Const, HasLocalDecls, PlaceRef};
+use rustc_middle::mir::{self, HasLocalDecls, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::Span;
 
@@ -290,6 +290,18 @@ impl StatementMatch {
         }
         source_info.span
     }
+
+    pub fn is_arg(self, body: &mir::Body<'_>) -> bool {
+        match self {
+            StatementMatch::Arg(local) => local_is_arg(local, body),
+            StatementMatch::Location(_) => false,
+        }
+    }
+}
+
+#[inline]
+pub fn local_is_arg(local: mir::Local, body: &mir::Body<'_>) -> bool {
+    local.as_usize() > 0 && local.as_usize() < body.arg_count + 1
 }
 
 struct MatchCtxt<'a, 'pcx, 'tcx> {
@@ -955,8 +967,8 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         self.matching[ty_var].matched.r#match(ty)
     }
     #[instrument(level = "debug", skip(self), ret)]
-    fn match_const_var(&self, const_var: pat::ConstVarIdx, ty: Const<'tcx>) -> bool {
-        self.matching[const_var].matched.r#match(ty)
+    fn match_const_var(&self, const_var: pat::ConstVarIdx, konst: Const<'tcx>) -> bool {
+        self.matching[const_var].matched.r#match(konst)
     }
     #[instrument(level = "debug", skip(self), ret)]
     fn match_place_var(&self, place_var: pat::PlaceVarIdx, place: PlaceRef<'tcx>) -> bool {

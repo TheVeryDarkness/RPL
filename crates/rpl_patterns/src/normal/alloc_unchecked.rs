@@ -1,3 +1,4 @@
+use rpl_match::Const;
 use rustc_hir as hir;
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor};
@@ -7,7 +8,7 @@ use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::{Span, Symbol};
 
 use rpl_context::{PatCtxt, pat};
-use rpl_mir::CheckMirCtxt;
+use rpl_mir::{CheckMirCtxt, local_is_arg};
 
 use crate::lints::{ALLOC_MAYBE_ZERO, MISALIGNED_POINTER, USE_AFTER_REALLOC};
 
@@ -121,7 +122,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                         // debug!("{:?} {}", size_arg, body.arg_count);
 
                         // Check if `size` is an argument.
-                        if size_arg.as_usize() < 1 + body.arg_count {
+                        if local_is_arg(size_arg, body) {
                             let size = body.local_decls[size_arg].source_info.span;
                             self.tcx.emit_node_span_lint(
                                 ALLOC_MAYBE_ZERO,
@@ -189,12 +190,7 @@ fn alloc_misaligned_cast(pcx: PatCtxt<'_>) -> Pattern2<'_> {
 }
 
 #[instrument(level = "debug", skip(tcx), ret)]
-fn maybe_misaligned<'tcx>(
-    tcx: ty::TyCtxt<'tcx>,
-    body: &mir::Body<'tcx>,
-    ty: Ty<'tcx>,
-    alignment: mir::Const<'tcx>,
-) -> bool {
+fn maybe_misaligned<'tcx>(tcx: ty::TyCtxt<'tcx>, body: &mir::Body<'tcx>, ty: Ty<'tcx>, alignment: Const<'tcx>) -> bool {
     let typing_env = ty::TypingEnv::post_analysis(tcx, body.source.def_id());
     match ty.kind() {
         // Param types can be anything, and we don't know the alignment.
@@ -204,7 +200,9 @@ fn maybe_misaligned<'tcx>(
         ty::TyKind::Foreign(_) => true,
         _ => {
             let layout = tcx.layout_of(typing_env.as_query_input(ty)).unwrap();
-            alignment.eval_target_usize(tcx, typing_env) < layout.align.abi.bytes()
+            alignment
+                .try_eval_target_usize(tcx, typing_env)
+                .is_none_or(|alignment| alignment < layout.align.abi.bytes())
         },
     }
 }

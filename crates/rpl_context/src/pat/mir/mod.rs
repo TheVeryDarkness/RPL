@@ -341,6 +341,7 @@ pub enum TerminatorKind<'pcx> {
     PatEnd,
 }
 
+/// See [`mir::Rvalue`].
 pub enum Rvalue<'pcx> {
     Any,
     Use(Operand<'pcx>),

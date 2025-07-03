@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::iter::zip;
 
+use derive_more::derive::{Debug, Display};
 use either::Either;
 use rpl_context::{PatCtxt, pat};
 use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
@@ -9,19 +10,50 @@ use rustc_hir::def_id::{DefId, LOCAL_CRATE};
 use rustc_hir::definitions::DefPathData;
 use rustc_index::IndexVec;
 use rustc_middle::mir;
-use rustc_middle::ty::{self, TyCtxt, ValTreeKind};
+use rustc_middle::ty::{self, TyCtxt, TypingEnv, ValTreeKind};
 use rustc_span::Symbol;
 use rustc_span::symbol::kw;
 
 use crate::resolve::{self, PatItemKind, lang_item_res, ty_res};
 use crate::{AdtMatch, MatchAdtCtxt};
 
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Const<'tcx> {
+    #[debug("{_0:?}")]
+    #[display("{_0}")]
+    MIR(mir::Const<'tcx>),
+    #[debug("{_0:?}")]
+    #[display("{_0}")]
+    Param(ty::ParamConst),
+}
+
+impl<'tcx> Const<'tcx> {
+    pub fn try_eval_target_usize(self, tcx: TyCtxt<'tcx>, typing_env: TypingEnv<'tcx>) -> Option<u64> {
+        match self {
+            Self::MIR(konst) => Some(konst.eval_target_usize(tcx, typing_env)),
+            Self::Param(_) => None,
+        }
+    }
+    /// Returns if `self` may be greater than or equal to `other`.
+    #[instrument(level = "info", skip(tcx, typing_env), ret)]
+    pub fn maybe_ge(self, other: Self, tcx: TyCtxt<'tcx>, typing_env: TypingEnv<'tcx>) -> bool {
+        match (self, other) {
+            (Self::MIR(konst1), Self::MIR(konst2)) => {
+                let val1 = konst1.eval_target_usize(tcx, typing_env);
+                let val2 = konst2.eval_target_usize(tcx, typing_env);
+                val1 > val2
+            },
+            (_, _) => true,
+        }
+    }
+}
+
 pub struct MatchTyCtxt<'pcx, 'tcx> {
     pub tcx: TyCtxt<'tcx>,
     pub pcx: PatCtxt<'pcx>,
     pub pat: &'pcx pat::Pattern<'pcx>,
     pub typing_env: ty::TypingEnv<'tcx>,
-    pub const_vars: IndexVec<pat::ConstVarIdx, RefCell<FxIndexSet<mir::Const<'tcx>>>>,
+    pub const_vars: IndexVec<pat::ConstVarIdx, RefCell<FxIndexSet<Const<'tcx>>>>,
     pub ty_vars: IndexVec<pat::TyVarIdx, RefCell<FxIndexSet<ty::Ty<'tcx>>>>,
     pub adt_matches: RefCell<FxHashMap<Symbol, FxHashMap<DefId, AdtMatch<'tcx>>>>,
 }
@@ -212,22 +244,32 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
     #[instrument(level = "trace", skip(self), ret)]
     pub fn match_ty_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: ty::Const<'tcx>) -> bool {
         //FIXME: handle more cases of `ty::ConstKind`
-        if let ty::ConstKind::Value(value) = konst.kind()
-            && self.match_ty(const_var.ty, value.ty)
-        {
-            let const_value = self.tcx.valtree_to_const_val(konst.to_value());
-            self.const_vars[const_var.idx]
-                .borrow_mut()
-                .insert(mir::Const::from_value(const_value, value.ty));
-            return true;
+        match konst.kind() {
+            ty::ConstKind::Param(param) => {
+                let ty = param.find_ty_from_env(self.typing_env.param_env);
+                self.match_ty(const_var.ty, ty) && {
+                    // We can't convert a const generic param into a `mir::Const`
+                    self.const_vars[const_var.idx].borrow_mut().insert(Const::Param(param));
+                    true
+                }
+            },
+            ty::ConstKind::Value(value) => {
+                self.match_ty(const_var.ty, value.ty) && {
+                    let const_value = self.tcx.valtree_to_const_val(value);
+                    self.const_vars[const_var.idx]
+                        .borrow_mut()
+                        .insert(Const::MIR(mir::Const::from_value(const_value, value.ty)));
+                    true
+                }
+            },
+            _ => false,
         }
-        false
     }
 
     #[instrument(level = "trace", skip(self), ret)]
     pub fn match_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: mir::Const<'tcx>) -> bool {
         if self.match_ty(const_var.ty, konst.ty()) {
-            self.const_vars[const_var.idx].borrow_mut().insert(konst);
+            self.const_vars[const_var.idx].borrow_mut().insert(Const::MIR(konst));
             return true;
         }
         false

@@ -53,7 +53,7 @@ use rustc_middle::ty::{GenericArgsRef, TyCtxt};
 use rustc_middle::{mir, ty};
 use rustc_span::Symbol;
 
-pub use matches::{Matched, StatementMatch};
+pub use matches::{Matched, StatementMatch, local_is_arg};
 pub use rpl_context::pat;
 
 pub struct CheckMirCtxt<'a, 'pcx, 'tcx> {
