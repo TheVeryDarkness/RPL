@@ -326,6 +326,20 @@ pub struct UncheckedPtrOffset {
     pub ptr: Span,
 }
 
+// for cve_2020_35887
+#[derive(LintDiagnostic)]
+#[diag(rpl_patterns_unchecked_ptr_public_offset)]
+#[help]
+#[note]
+pub struct UncheckedPtrPublicOffset {
+    #[label(rpl_patterns_offset_label)]
+    pub offset: Span,
+    #[label(rpl_patterns_ptr_label)]
+    pub ptr: Span,
+    #[label(rpl_patterns_len_label)]
+    pub len: Span,
+}
+
 // for cve_2024_27284
 #[derive(LintDiagnostic)]
 #[diag(rpl_patterns_cassandra_iter_next_ptr_passed_to_cass_iter_get)]

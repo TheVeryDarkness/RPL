@@ -118,6 +118,13 @@ rpl_patterns_unchecked_ptr_offset = it is an undefined behavior to offset a poin
     .help = check whether it's in bound before offsetting
     .note = See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
 
+rpl_patterns_unchecked_ptr_public_offset = it may be an undefined behavior to offset a pointer using a passed-in integer
+    .offset_label = offset here
+    .ptr_label = pointer used here
+    .len_label = length passed in here
+    .help = check whether it's in bound before offsetting
+    .note = See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
+
 rpl_patterns_unchecked_allocated_pointer = it is an undefined behavior to dereference a null pointer, and `std::alloc::alloc` may return a null pointer
     .alloc_label = pointer created here
     .write_label = pointer used here

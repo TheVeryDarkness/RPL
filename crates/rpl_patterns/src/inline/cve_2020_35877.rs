@@ -192,51 +192,37 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                     );
                 }
             }
-            {
-
-                collect_checked(
-                    pattern_unchecked_ptr_offset_(self.pcx),
-                    pattern_unchecked_ptr_offset_deref(self.pcx),
-                    pattern_checked_ptr_offset_vec_len(self.pcx),
-                    &[
-                        pattern_checked_ptr_offset_lt(self.pcx),
-                        pattern_checked_ptr_offset_le(self.pcx),
-                        pattern_checked_ptr_offset_gt(self.pcx),
-                        pattern_checked_ptr_offset_ge(self.pcx),
-                        pattern_checked_ptr_offset_rem(self.pcx),
-                        pattern_checked_ptr_offset_slice_len(self.pcx),
-                    ],
-                    &[
-                        pattern_checked_ptr_offset_const(self.pcx),
-pattern_checked_ptr_offset_copy_const(self.pcx)
-                    ],
-                    def_id,
-                    body,
-                    self.tcx,
-                    self.pcx,
-                    typing_env,
-                );
+            macro_rules! collect_checked {
+                ($module:ident) => {
+                    collect_checked(
+                        $module::pattern_unchecked_ptr_offset_(self.pcx),
+                        $module::pattern_unchecked_ptr_offset_deref(self.pcx),
+                        $module::pattern_checked_ptr_offset_vec_len(self.pcx),
+                        &[
+                            $module::pattern_checked_ptr_offset_lt(self.pcx),
+                            $module::pattern_checked_ptr_offset_le(self.pcx),
+                            $module::pattern_checked_ptr_offset_gt(self.pcx),
+                            $module::pattern_checked_ptr_offset_ge(self.pcx),
+                            $module::pattern_checked_ptr_offset_rem(self.pcx),
+                            $module::pattern_checked_ptr_offset_slice_len(self.pcx),
+                        ],
+                        &[
+                            $module::pattern_checked_ptr_offset_const(self.pcx),
+                            $module::pattern_checked_ptr_offset_copy_const(self.pcx),
+                        ],
+                        def_id,
+                        body,
+                        self.tcx,
+                        self.pcx,
+                        typing_env,
+                    );
+                };
             }
-            {
-                collect_checked(
-                    pattern_unchecked_mut_ptr_offset_(self.pcx),
-                    pattern_unchecked_mut_ptr_offset_deref(self.pcx),
-                    pattern_checked_mut_ptr_offset_vec_len(self.pcx),
-                    &[pattern_checked_mut_ptr_offset_lt(self.pcx),
-                    pattern_checked_mut_ptr_offset_le(self.pcx),
-                    pattern_checked_mut_ptr_offset_gt(self.pcx),
-                    pattern_checked_mut_ptr_offset_ge(self.pcx),
-                    pattern_checked_mut_ptr_offset_rem(self.pcx),
-                    pattern_checked_mut_ptr_offset_slice_len(self.pcx),
-                    ],
-                    &[pattern_checked_mut_ptr_offset_const(self.pcx),pattern_checked_mut_ptr_offset_copy_const(self.pcx)],
-                    def_id,
-                    body,
-                    self.tcx,
-                    self.pcx,
-                    typing_env,
-                );
-            }
+            
+            collect_checked!(mut_offset);
+            collect_checked!(const_offset);
+            collect_checked!(mut_arith_offset);
+            collect_checked!(const_arith_offset);
         }
         intravisit::walk_fn(self, kind, decl, body_id, def_id);
     }
@@ -312,7 +298,7 @@ macro_rules! template {
     ($name:ident -> $ret:ident { $($fields:ident),* $(,)? } {$($inner:tt)*}) => {
         #[rpl_macros::pattern_def]
         #[instrument(level = "trace", skip(pcx))]
-        fn $name(pcx: PatCtxt<'_>) -> $ret<'_> {
+        pub(crate) fn $name(pcx: PatCtxt<'_>) -> $ret<'_> {
             $(
                 let $fields;
             )*
@@ -326,31 +312,31 @@ macro_rules! template {
     };
 }
 
-template! {
-    pattern_unchecked_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $ptr_1: *const $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_unchecked_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $ptr_1: *const $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_unchecked_mut_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_unchecked_mut_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
 struct PatternUncheckedPtrOffsetDeref<'pcx> {
     pattern: &'pcx pat::Pattern<'pcx>,
@@ -360,210 +346,210 @@ struct PatternUncheckedPtrOffsetDeref<'pcx> {
     deref: pat::Location,
 }
 
-template! {
-    pattern_unchecked_ptr_offset_deref -> PatternUncheckedPtrOffsetDeref { ptr, offset, deref } {
-        #[meta($T:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, _);
-            #[export(deref)]
-            let $value: &$T = &(*$ptr_1); // _0 bb0[5]
-        }
-    }
-}
+// template! {
+//     pattern_unchecked_ptr_offset_deref -> PatternUncheckedPtrOffsetDeref { ptr, offset, deref } {
+//         #[meta($T:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, _);
+//             #[export(deref)]
+//             let $value: &$T = &(*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
 
-template! {
-    pattern_unchecked_mut_ptr_offset_deref -> PatternUncheckedPtrOffsetDeref { ptr, offset, deref } {
-        #[meta($T:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            #[export(offset)]
-            let $ptr_1: *mut $T = Offset(copy $ptr, _);
-            #[export(deref)]
-            let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
-        }
-    }
-}
+// template! {
+//     pattern_unchecked_mut_ptr_offset_deref -> PatternUncheckedPtrOffsetDeref { ptr, offset, deref } {
+//         #[meta($T:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             #[export(offset)]
+//             let $ptr_1: *mut $T = Offset(copy $ptr, _);
+//             #[export(deref)]
+//             let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U;
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $cmp: bool = Lt(copy $index, _);
-            let $ptr_1: *const $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U;
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $cmp: bool = Lt(copy $index, _);
+//             let $ptr_1: *const $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U = _;
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $cmp: bool = Lt(copy $index, _);
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U = _;
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $cmp: bool = Lt(copy $index, _);
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U;
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $cmp: bool = Le(copy $index, _);
-            let $ptr_1: *const $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U;
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $cmp: bool = Le(copy $index, _);
+//             let $ptr_1: *const $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U = _;
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $cmp: bool = Le(copy $index, _);
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U = _;
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $cmp: bool = Le(copy $index, _);
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U;
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $cmp: bool = Gt(_, copy $index);
-            let $ptr_1: *const $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U;
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $cmp: bool = Gt(_, copy $index);
+//             let $ptr_1: *const $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U = _;
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $cmp: bool = Gt(_, copy $index);
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U = _;
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $cmp: bool = Gt(_, copy $index);
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U;
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $cmp: bool = Ge(_, copy $index);
-            let $ptr_1: *const $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U;
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $cmp: bool = Ge(_, copy $index);
+//             let $ptr_1: *const $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $index: $U = _;
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $cmp: bool = Ge(_, copy $index);
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, _);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $index: $U = _;
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $cmp: bool = Ge(_, copy $index);
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, _);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *const $T = _;
-            let $index: $U;
-            let $ptr_1: *const $T;
-            $index = Rem(_, _);
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, copy $index);
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *const $T = _;
+//             let $index: $U;
+//             let $ptr_1: *const $T;
+//             $index = Rem(_, _);
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, copy $index);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            let $index: $U = Rem(_, _);
-            let $ptr_1: *mut $T;
-            #[export(offset)]
-            $ptr_1 = Offset(copy $ptr, copy $index);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             let $index: $U = Rem(_, _);
+//             let $ptr_1: *mut $T;
+//             #[export(offset)]
+//             $ptr_1 = Offset(copy $ptr, copy $index);
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $slice_ptr: *const [$T] = _; // _5
-            #[export(ptr)]
-            let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _3
-            let $index: $U = PtrMetadata(_); // _4
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, copy $index); //copy $offset_0
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $slice_ptr: *const [$T] = _; // _5
+//             #[export(ptr)]
+//             let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _3
+//             let $index: $U = PtrMetadata(_); // _4
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, copy $index); //copy $offset_0
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
-        #[meta($T:ty, $U:ty)]
-        fn $pattern(..) -> _ = mir! {
-            let $slice_ptr: *mut [$T] = _;
-            #[export(ptr)]
-            let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr);
-            let $index: $U = PtrMetadata(_);
-            #[export(offset)]
-            let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+//         #[meta($T:ty, $U:ty)]
+//         fn $pattern(..) -> _ = mir! {
+//             let $slice_ptr: *mut [$T] = _;
+//             #[export(ptr)]
+//             let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr);
+//             let $index: $U = PtrMetadata(_);
+//             #[export(offset)]
+//             let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
+//         }
+//     }
+// }
 
 struct PatternUncheckedPtrOffsetLen<'pcx> {
     pattern: &'pcx pat::Pattern<'pcx>,
@@ -573,29 +559,29 @@ struct PatternUncheckedPtrOffsetLen<'pcx> {
     index: pat::PlaceVar<'pcx>,
 }
 
-template! {
-    pattern_checked_ptr_offset_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
-        #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *const $T = _; // _3
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, copy $index); //copy $offset_0
-        }
-    }
-}
+// template! {
+//     pattern_checked_ptr_offset_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
+//         #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *const $T = _; // _3
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, copy $index); //copy $offset_0
+//         }
+//     }
+// }
 
-template! {
-    pattern_checked_mut_ptr_offset_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
-        #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
-        fn $pattern(..) -> _ = mir! {
-            #[export(ptr)]
-            let $ptr: *mut $T = _;
-            #[export(offset)]
-            let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
-        }
-    }
-}
+// template! {
+//     pattern_checked_mut_ptr_offset_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
+//         #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
+//         fn $pattern(..) -> _ = mir! {
+//             #[export(ptr)]
+//             let $ptr: *mut $T = _;
+//             #[export(offset)]
+//             let $ptr_1: *mut $T = Offset(copy $ptr, copy $index);
+//         }
+//     }
+// }
 
 struct PatternUncheckedPtrOffsetConst<'pcx> {
     pattern: &'pcx pat::Pattern<'pcx>,
@@ -606,68 +592,254 @@ struct PatternUncheckedPtrOffsetConst<'pcx> {
     const_offset: pat::ConstVar<'pcx>,
 }
 
-template! {
-    pattern_checked_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
-        #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
-        fn $pattern(..) -> _ = mir! {
-            let $array: &[$T; $size]; // _1
-            let $slice_ref: &[$T] = copy $array as &[$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
-            let $slice_ptr: *const [$T] = &raw const (*$slice_ref); // _5 bb0[1]
-            #[export(ptr)]
-            let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _2 bb0[2]
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, const $offset); // _4 bb0[4]
-            // let $value: &$T = &(*$ptr_1); // _0 bb0[5]
+// template! {
+//     pattern_checked_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+//         #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+//         fn $pattern(..) -> _ = mir! {
+//             let $array: &[$T; $size]; // _1
+//             let $slice_ref: &[$T] = copy $array as &[$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+//             let $slice_ptr: *const [$T] = &raw const (*$slice_ref); // _5 bb0[1]
+//             #[export(ptr)]
+//             let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _2 bb0[2]
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, const $offset); // _4 bb0[4]
+//             // let $value: &$T = &(*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
+
+// template! {
+//     pattern_checked_mut_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+//         #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+//         fn $pattern(..) -> _ = mir! {
+//             let $array: &mut [$T; $size]; // _1
+//             let $slice_ref: &mut [$T] = copy $array as &mut [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+//             let $slice_ptr: *mut [$T] = &raw mut (*$slice_ref); // _5 bb0[1]
+//             #[export(ptr)]
+//             let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr); // _2 bb0[2]
+//             #[export(offset)]
+//             let $ptr_1: *mut $T = Offset(copy $ptr, const $offset); // _4 bb0[4]
+//             // let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
+
+// template! {
+//     pattern_checked_ptr_offset_copy_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+//         #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+//         fn $pattern(..) -> _ = mir! {
+//             let $array: &[$T; $size]; // _1
+//             let $slice_ref: &[$T] = copy $array as &[$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+//             let $slice_ptr: *const [$T] = &raw const (*$slice_ref); // _5 bb0[1]
+//             #[export(ptr)]
+//             let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _2 bb0[2]
+//             let $offset_local: usize = const $offset;
+//             #[export(offset)]
+//             let $ptr_1: *const $T = Offset(copy $ptr, copy $offset_local); // _4 bb0[4]
+//             // let $value: &$T = &(*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
+
+// template! {
+//     pattern_checked_mut_ptr_offset_copy_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+//         #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+//         fn $pattern(..) -> _ = mir! {
+//             let $array: &mut [$T; $size]; // _1
+//             let $slice_ref: &mut [$T] = copy $array as &mut [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+//             let $slice_ptr: *mut [$T] = &raw mut (*$slice_ref); // _5 bb0[1]
+//             #[export(ptr)]
+//             let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr); // _2 bb0[2]
+//             let $offset_local: usize = const $offset;
+//             #[export(offset)]
+//             let $ptr_1: *mut $T = Offset(copy $ptr, copy $offset_local); // _4 bb0[4]
+//             // let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
+//         }
+//     }
+// }
+
+macro_rules! pattern_templates {
+    ({$($ref_mtbl:tt)?} {$ptr_mtbl:tt} {$($offset_operand:tt)*}) => {
+        template! {
+            pattern_unchecked_ptr_offset_ -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $ptr_1: *$ptr_mtbl $T;
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                }
+            }
         }
-    }
+
+        template! {
+            pattern_unchecked_ptr_offset_deref -> PatternUncheckedPtrOffsetDeref { ptr, offset, deref } {
+                #[meta($T:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, _);
+                    #[export(deref)]
+                    let $value: &$($ref_mtbl)? $T = &$($ref_mtbl)? (*$ptr_1); // _0 bb0[5]
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_lt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $index: $U;
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $cmp: bool = Lt(copy $index, _);
+                    let $ptr_1: *$ptr_mtbl $T;
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_le -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $index: $U;
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $cmp: bool = Le(copy $index, _);
+                    let $ptr_1: *$ptr_mtbl $T;
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_gt -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $index: $U;
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $cmp: bool = Gt(_, copy $index);
+                    let $ptr_1: *$ptr_mtbl $T;
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_ge -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $index: $U;
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $cmp: bool = Ge(_, copy $index);
+                    let $ptr_1: *$ptr_mtbl $T;
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_rem -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _;
+                    let $index: $U;
+                    let $ptr_1: *$ptr_mtbl $T;
+                    $index = Rem(_, _);
+                    #[export(offset)]
+                    $ptr_1 = $($offset_operand)*(copy $ptr, copy $index);
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $slice_ptr: *$ptr_mtbl [$T] = _; // _5
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = move $slice_ptr as *$ptr_mtbl $T (PtrToPtr); // _3
+                    let $index: $U = PtrMetadata(_); // _4
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index); //copy $offset_0
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
+                #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
+                fn $pattern(..) -> _ = mir! {
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _; // _3
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index); //copy $offset_0
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+                #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+                fn $pattern(..) -> _ = mir! {
+                    let $array: &$($ref_mtbl)? [$T; $size]; // _1
+                    let $slice_ref: &$($ref_mtbl)? [$T] = copy $array as &$($ref_mtbl)? [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+                    let $slice_ptr: *$ptr_mtbl [$T] = &raw $ptr_mtbl (*$slice_ref); // _5 bb0[1]
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = move $slice_ptr as *$ptr_mtbl $T (PtrToPtr); // _2 bb0[2]
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, const $offset); // _4 bb0[4]
+                    // let $value: &$($ref_mtbl)? $T = &$($ref_mtbl)? (*$ptr_1); // _0 bb0[5]
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_copy_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
+                #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
+                fn $pattern(..) -> _ = mir! {
+                    let $array: &$($ref_mtbl)? [$T; $size]; // _1
+                    let $slice_ref: &$($ref_mtbl)? [$T] = copy $array as &$($ref_mtbl)? [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
+                    let $slice_ptr: *$ptr_mtbl [$T] = &raw $ptr_mtbl (*$slice_ref); // _5 bb0[1]
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = move $slice_ptr as *$ptr_mtbl $T (PtrToPtr); // _2 bb0[2]
+                    let $offset_local: usize = const $offset;
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $offset_local); // _4 bb0[4]
+                    // let $value: &$($ref_mtbl)? $T = &$($ref_mtbl)? (*$ptr_1); // _0 bb0[5]
+                }
+            }
+        }
+    };
 }
 
-template! {
-    pattern_checked_mut_ptr_offset_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
-        #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
-        fn $pattern(..) -> _ = mir! {
-            let $array: &mut [$T; $size]; // _1
-            let $slice_ref: &mut [$T] = copy $array as &mut [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
-            let $slice_ptr: *mut [$T] = &raw mut (*$slice_ref); // _5 bb0[1]
-            #[export(ptr)]
-            let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr); // _2 bb0[2]
-            #[export(offset)]
-            let $ptr_1: *mut $T = Offset(copy $ptr, const $offset); // _4 bb0[4]
-            // let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
-        }
-    }
+mod mut_offset{
+    use super::*;
+    pattern_templates!({mut} {mut} {Offset});
 }
 
-template! {
-    pattern_checked_ptr_offset_copy_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
-        #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
-        fn $pattern(..) -> _ = mir! {
-            let $array: &[$T; $size]; // _1
-            let $slice_ref: &[$T] = copy $array as &[$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
-            let $slice_ptr: *const [$T] = &raw const (*$slice_ref); // _5 bb0[1]
-            #[export(ptr)]
-            let $ptr: *const $T = move $slice_ptr as *const $T (PtrToPtr); // _2 bb0[2]
-            let $offset_local: usize = const $offset;
-            #[export(offset)]
-            let $ptr_1: *const $T = Offset(copy $ptr, copy $offset_local); // _4 bb0[4]
-            // let $value: &$T = &(*$ptr_1); // _0 bb0[5]
-        }
-    }
+mod const_offset{
+    use super::*;
+    pattern_templates!({} {const} {Offset});
 }
 
-template! {
-    pattern_checked_mut_ptr_offset_copy_const -> PatternUncheckedPtrOffsetConst { ptr, offset, const_size, const_offset } {
-        #[meta($T:ty, #[export(const_size)] $size: const(usize), #[export(const_offset)] $offset: const(usize))]
-        fn $pattern(..) -> _ = mir! {
-            let $array: &mut [$T; $size]; // _1
-            let $slice_ref: &mut [$T] = copy $array as &mut [$T] (PointerCoercion(Unsize, Implicit)); // _3 bb0[0]
-            let $slice_ptr: *mut [$T] = &raw mut (*$slice_ref); // _5 bb0[1]
-            #[export(ptr)]
-            let $ptr: *mut $T = move $slice_ptr as *mut $T (PtrToPtr); // _2 bb0[2]
-            let $offset_local: usize = const $offset;
-            #[export(offset)]
-            let $ptr_1: *mut $T = Offset(copy $ptr, copy $offset_local); // _4 bb0[4]
-            // let $value: &mut $T = &mut (*$ptr_1); // _0 bb0[5]
-        }
-    }
+mod mut_arith_offset{
+    use super::*;
+    pattern_templates!({mut} {mut} {std::intrinsics::arith_offset});
 }
+
+mod const_arith_offset{
+    use super::*;
+    pattern_templates!({} {const} {std::intrinsics::arith_offset});
+}
+
