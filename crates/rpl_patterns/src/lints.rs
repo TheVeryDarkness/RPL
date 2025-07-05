@@ -12,6 +12,7 @@ macro_rules! declare_rpl_lint {
         )*
         pub(crate) fn all_lints() -> &'static [&'static Lint] {
             static ALL_LINTS: &[&Lint] = &[
+                &crate::errors::LINT,
                 $(
                     $NAME,
                 )*

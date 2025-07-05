@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use rustc_errors::{IntoDiagArg, LintDiagnostic};
-use rustc_lint::Lint;
+use rustc_lint::{Level, Lint};
 use rustc_macros::LintDiagnostic;
 use rustc_middle::ty::{self, Ty};
 use rustc_span::{Span, Symbol};
@@ -472,16 +472,18 @@ impl LintDiagnostic<'_, ()> for DynamicError {
     }
 }
 
+pub(crate) static LINT: Lint = Lint {
+    name: "RPL::DYNAMIC",
+    desc: "dynamic RPL pattern",
+    default_level: Level::Deny,
+    ..Lint::default_fields_for_macro()
+};
+
 impl DynamicError {
     pub(crate) const fn primary_span(&self) -> Span {
         self.primary.1
     }
     pub(crate) const fn lint(&self) -> &'static Lint {
-        const LINT: Lint = Lint {
-            name: "RPL::DYNAMIC",
-            desc: "dynamic RPL pattern",
-            ..Lint::default_fields_for_macro()
-        };
         &LINT
     }
     // const fn attr_error(span: Span) -> DynamicError {
