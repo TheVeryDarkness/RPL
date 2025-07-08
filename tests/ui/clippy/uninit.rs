@@ -23,7 +23,8 @@ fn main() {
     let _: (MaybeUninit<usize>, MaybeUninit<bool>) = unsafe { MaybeUninit::uninit().assume_init() };
 
     // This is OK, because all constituent types are uninit-compatible.
-    let _: (MaybeUninit<usize>, [MaybeUninit<bool>; 2]) = unsafe { MaybeUninit::uninit().assume_init() };
+    let _: (MaybeUninit<usize>, [MaybeUninit<bool>; 2]) =
+        unsafe { MaybeUninit::uninit().assume_init() };
 
     // This is OK, because our own MaybeUninit is just as fine as the one from core.
     let _: MyOwnMaybeUninit = unsafe { MaybeUninit::uninit().assume_init() };
