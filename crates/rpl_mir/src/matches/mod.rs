@@ -308,6 +308,7 @@ impl StatementMatch {
 }
 
 #[inline]
+#[instrument(level = "trace", skip(body), ret)]
 pub fn local_is_arg(local: mir::Local, body: &mir::Body<'_>) -> bool {
     local.as_usize() > 0 && local.as_usize() < body.arg_count + 1
 }

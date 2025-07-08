@@ -3,7 +3,7 @@ use itertools::Itertools;
 use rpl_context::PatCtxt;
 use rpl_match::TryCmpAs;
 use rpl_mir::pat::Location;
-use rpl_mir::{local_is_arg, pat, CheckMirCtxt, StatementMatch };
+use rpl_mir::{pat, CheckMirCtxt, StatementMatch };
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir};
@@ -101,7 +101,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             fn collect_checked<'m, 'tcx, 'pcx>(
                 positive: PatternUncheckedPtrOffsetGeneral<'pcx>,
                 positive_deref: PatternUncheckedPtrOffsetDeref<'pcx>,
-                negative_len: PatternUncheckedPtrOffsetLen<'pcx>,
+                negative_len: &[PatternUncheckedPtrOffsetLen<'pcx>],
                 negative_general: &[PatternUncheckedPtrOffsetGeneral<'pcx>],
                 negative_const: &[PatternUncheckedPtrOffsetConst<'pcx>],
                 def_id: LocalDefId,
@@ -121,63 +121,73 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                                 let offset = matches[pattern.offset];
                                 let span_ptr = ptr.span_no_inline(body);
                                 let span_offset = offset.span_no_inline(body);
-                                trace!(?ptr, ?offset, ?pattern.ptr, ?pattern.offset, ?span_ptr, ?span_offset, "checked offset found");
+                                trace!(?def_id, ?ptr, ?offset, ?pattern.ptr, ?pattern.offset, ?span_ptr, ?span_offset, "possible checked offset found");
                                 (ptr, offset)
                             }).collect_vec()
                     }).collect();
-                        for matches in CheckMirCtxt::new(tcx, pcx, body, negative_len.pattern, negative_len.fn_pat).check(){
-                                let ptr = matches[negative_len.ptr];
-                                let offset = matches[negative_len.offset];
-                                let span_ptr = ptr.span_no_inline(body);
-                                let span_offset = offset.span_no_inline(body);
-                                trace!(?ptr, ?offset, pattern.ptr = ?negative_len.ptr, pattern.offset = ?negative_len.offset, ?span_ptr, ?span_offset, "offset len found");
-                                if matches[negative_len.index.idx].as_local().is_none_or(|local| !local_is_arg(local, body)) {
-                                    negative_inside.insert((ptr,offset));
-                                }
-                        }
-                    // Offset pass the end of the allocated object
-                    let mut negative_at_end: BTreeSet<_> = BTreeSet::new();
-                 for pattern in negative_const {
-                        let matches=CheckMirCtxt::new(tcx, pcx, body, pattern.pattern, pattern.fn_pat).check();
-                        for matches in matches{
-                            let const_size = matches[pattern.const_size.idx];
-                            let const_offset = matches[pattern.const_offset.idx];
-                                let ptr = matches[pattern.ptr];
-                                let offset = matches[pattern.offset];
-                                let span_ptr = ptr.span_no_inline(body);
-                                let span_offset = offset.span_no_inline(body);
-                                trace!(?ptr, ?offset, ?pattern.ptr, ?pattern.offset, ?span_ptr, ?span_offset, "offset const found");
-                            let cmp = const_offset.try_cmp_as(const_size, tcx, typing_env);
-                            match cmp {
-                                Some(Ordering::Less) => {negative_inside.insert((ptr,offset));},
-                                Some(Ordering::Equal) => {negative_at_end.insert((ptr,offset));},
-                                // The offset is out of bounds, so this is not a valid negative case
-                                _ => (),
-                            }
+                for negative_len in negative_len {
+                    for matches in CheckMirCtxt::new(tcx, pcx, body, negative_len.pattern, negative_len.fn_pat).check(){
+                        let ptr = matches[negative_len.ptr];
+                        let offset = matches[negative_len.offset];
+                        let index = matches[negative_len.index.idx];
+                        let span_ptr = ptr.span_no_inline(body);
+                        let span_offset = offset.span_no_inline(body);
+                        trace!(?def_id, ?ptr, ?offset, ?index, pattern.ptr = ?negative_len.ptr, pattern.offset = ?negative_len.offset, pattern.index = ?negative_len.index, ?span_ptr, ?span_offset, "possible offset len found");
+                        if index.as_local().is_none() {
+                            trace!(?def_id, ?ptr, ?offset, ?index, pattern.ptr = ?negative_len.ptr, pattern.offset = ?negative_len.offset, pattern.index = ?negative_len.index, ?span_ptr, ?span_offset, "offset len found");
+                            negative_inside.insert((ptr,offset));
                         }
                     }
+                }
+                // Offset pass the end of the allocated object
+                let mut negative_at_end: BTreeSet<_> = BTreeSet::new();
+                for pattern in negative_const {
+                    let matches = CheckMirCtxt::new(tcx, pcx, body, pattern.pattern, pattern.fn_pat).check();
+                    for matches in matches {
+                        let const_size = matches[pattern.const_size.idx];
+                        let const_offset = matches[pattern.const_offset.idx];
+                            let ptr = matches[pattern.ptr];
+                            let offset = matches[pattern.offset];
+                            let span_ptr = ptr.span_no_inline(body);
+                            let span_offset = offset.span_no_inline(body);
+                            trace!(?ptr, ?offset, ?pattern.ptr, ?pattern.offset, ?span_ptr, ?span_offset, "offset const found");
+                        let cmp = const_offset.try_cmp_as(const_size, tcx, typing_env);
+                        match cmp {
+                            Some(Ordering::Less) => {negative_inside.insert((ptr,offset));},
+                            Some(Ordering::Equal) => {negative_at_end.insert((ptr,offset));},
+                            // The offset is out of bounds, so this is not a valid negative case
+                            _ => (),
+                        }
+                    }
+                }
                 let mut positives: BTreeMap<(StatementMatch, StatementMatch), Option<StatementMatch>>= BTreeMap::new();
 
-                 for matches in CheckMirCtxt::new(tcx, pcx, body, positive.pattern, positive.fn_pat).check(){
+                for matches in CheckMirCtxt::new(tcx, pcx, body, positive.pattern, positive.fn_pat).check(){
                     let ptr = matches[positive.ptr];
                     let offset = matches[positive.offset];
+                    trace!(?def_id, ?ptr, ?offset, "offset found");
                     if !negative_inside.contains(&(ptr, offset)) {
                         positives.insert((ptr,offset), None);
                     } else {
+                        debug!(?def_id, ?ptr, ?offset, "checked offset found");
                         // The offset is checked, so don't emit an error
                     }
                 }
 
-                 for matches in CheckMirCtxt::new(tcx, pcx, body, positive_deref.pattern, positive_deref.fn_pat).check(){
+                for matches in CheckMirCtxt::new(tcx, pcx, body, positive_deref.pattern, positive_deref.fn_pat).check(){
                     let ptr = matches[positive_deref.ptr];
                     let offset = matches[positive_deref.offset];
                     let deref = matches[positive_deref.deref];
+                    trace!(?def_id, ?ptr, ?offset, "deref offset found");
                     if !negative_inside.contains(&(ptr, offset)) && !negative_at_end.contains(&(ptr, offset)) {
                         positives.insert((ptr,offset), Some(deref));
                     } else {
+                        debug!(?def_id, ?ptr, ?offset, ?deref, "checked deref offset found");
                         // The offset is checked, so don't emit an error
                     }
                 }
+
+                trace!(?def_id, ?positives, ?negative_inside, ?negative_at_end, "positives and negatives collected");
 
                 for ((ptr,offset), _) in positives {
                     let span_ptr = ptr.span_no_inline(body);
@@ -194,10 +204,14 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             }
             macro_rules! collect_checked {
                 ($module:ident) => {
+                    trace!(?def_id, "collecting checked offsets for {}", stringify!($module));
                     collect_checked(
                         $module::pattern_unchecked_ptr_offset_(self.pcx),
                         $module::pattern_unchecked_ptr_offset_deref(self.pcx),
-                        $module::pattern_checked_ptr_offset_vec_len(self.pcx),
+                        &[
+                            $module::pattern_checked_ptr_offset_vec_len(self.pcx),
+                            $module::pattern_checked_ptr_offset_copy_vec_len(self.pcx),
+                        ],
                         &[
                             $module::pattern_checked_ptr_offset_lt(self.pcx),
                             $module::pattern_checked_ptr_offset_le(self.pcx),
@@ -205,6 +219,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
                             $module::pattern_checked_ptr_offset_ge(self.pcx),
                             $module::pattern_checked_ptr_offset_rem(self.pcx),
                             $module::pattern_checked_ptr_offset_slice_len(self.pcx),
+                            $module::pattern_checked_ptr_offset_slice_len_mut(self.pcx),
                         ],
                         &[
                             $module::pattern_checked_ptr_offset_const(self.pcx),
@@ -223,6 +238,8 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             collect_checked!(const_offset);
             collect_checked!(mut_arith_offset);
             collect_checked!(const_arith_offset);
+            collect_checked!(mut_wrapping_offset);
+            collect_checked!(const_wrapping_offset);
         }
         intravisit::walk_fn(self, kind, decl, body_id, def_id);
     }
@@ -297,7 +314,7 @@ struct PatternUncheckedPtrOffsetGeneral<'pcx> {
 macro_rules! template {
     ($name:ident -> $ret:ident { $($fields:ident),* $(,)? } {$($inner:tt)*}) => {
         #[rpl_macros::pattern_def]
-        #[instrument(level = "trace", skip(pcx))]
+        // #[instrument(level = "trace", skip(pcx))]
         pub(crate) fn $name(pcx: PatCtxt<'_>) -> $ret<'_> {
             $(
                 let $fields;
@@ -666,9 +683,9 @@ macro_rules! pattern_templates {
                 fn $pattern(..) -> _ = mir! {
                     #[export(ptr)]
                     let $ptr: *$ptr_mtbl $T = _;
-                    let $ptr_1: *$ptr_mtbl $T;
                     #[export(offset)]
-                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, _);
+                    // let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(_, _);
                 }
             }
         }
@@ -697,7 +714,7 @@ macro_rules! pattern_templates {
                     let $cmp: bool = Lt(copy $index, _);
                     let $ptr_1: *$ptr_mtbl $T;
                     #[export(offset)]
-                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                    $ptr_1 = $($offset_operand)*(copy $ptr, copy $index);
                 }
             }
         }
@@ -712,7 +729,7 @@ macro_rules! pattern_templates {
                     let $cmp: bool = Le(copy $index, _);
                     let $ptr_1: *$ptr_mtbl $T;
                     #[export(offset)]
-                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                    $ptr_1 = $($offset_operand)*(copy $ptr, copy $index);
                 }
             }
         }
@@ -727,7 +744,7 @@ macro_rules! pattern_templates {
                     let $cmp: bool = Gt(_, copy $index);
                     let $ptr_1: *$ptr_mtbl $T;
                     #[export(offset)]
-                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                    $ptr_1 = $($offset_operand)*(copy $ptr, copy $index);
                 }
             }
         }
@@ -742,7 +759,7 @@ macro_rules! pattern_templates {
                     let $cmp: bool = Ge(_, copy $index);
                     let $ptr_1: *$ptr_mtbl $T;
                     #[export(offset)]
-                    $ptr_1 = $($offset_operand)*(copy $ptr, _);
+                    $ptr_1 = $($offset_operand)*(copy $ptr, copy $index);
                 }
             }
         }
@@ -766,12 +783,26 @@ macro_rules! pattern_templates {
             pattern_checked_ptr_offset_slice_len -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
                 #[meta($T:ty, $U:ty)]
                 fn $pattern(..) -> _ = mir! {
-                    let $slice_ptr: *$ptr_mtbl [$T] = _; // _5
+                    let $slice_ptr: *$ptr_mtbl [$T] = _; // _18
                     #[export(ptr)]
-                    let $ptr: *$ptr_mtbl $T = move $slice_ptr as *$ptr_mtbl $T (PtrToPtr); // _3
-                    let $index: $U = PtrMetadata(_); // _4
+                    let $ptr: *$ptr_mtbl $T = move $slice_ptr as *$ptr_mtbl $T (PtrToPtr); // _17
+                    let $index: $U = PtrMetadata(_); // _13
                     #[export(offset)]
-                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index); //copy $offset_0
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index); // _16
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_slice_len_mut -> PatternUncheckedPtrOffsetGeneral { ptr, offset } {
+                #[meta($T:ty, $U:ty)]
+                fn $pattern(..) -> _ = mir! {
+                    let $slice_ptr: *$ptr_mtbl [$T] = _; // _18
+                    #[export(ptr)]
+                    let $ptr: *mut $T = copy $slice_ptr as *mut $T (PtrToPtr); // _17
+                    let $index: $U = PtrMetadata(_); // _13
+                    #[export(offset)]
+                    let $ptr_1: *mut $T = $($offset_operand)*(copy $ptr, copy $index); // _16
                 }
             }
         }
@@ -784,6 +815,19 @@ macro_rules! pattern_templates {
                     let $ptr: *$ptr_mtbl $T = _; // _3
                     #[export(offset)]
                     let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index); //copy $offset_0
+                }
+            }
+        }
+
+        template! {
+            pattern_checked_ptr_offset_copy_vec_len -> PatternUncheckedPtrOffsetLen { ptr, offset, index } {
+                #[meta($T:ty, $U:ty, #[export(index)] $index: place($U))]
+                fn $pattern(..) -> _ = mir! {
+                    #[export(ptr)]
+                    let $ptr: *$ptr_mtbl $T = _; // _3
+                    let $index_local: $U = copy $index;
+                    #[export(offset)]
+                    let $ptr_1: *$ptr_mtbl $T = $($offset_operand)*(copy $ptr, copy $index_local); //copy $offset_0
                 }
             }
         }
@@ -835,11 +879,20 @@ mod const_offset{
 
 mod mut_arith_offset{
     use super::*;
-    pattern_templates!({mut} {mut} {std::intrinsics::arith_offset});
+    pattern_templates!({mut} {mut} {std::intrinsics::arith_offset::<_>});
 }
 
 mod const_arith_offset{
     use super::*;
-    pattern_templates!({} {const} {std::intrinsics::arith_offset});
+    pattern_templates!({} {const} {std::intrinsics::arith_offset::<_>});
 }
 
+mod mut_wrapping_offset{
+    use super::*;
+    pattern_templates!({mut} {mut} {mut_ptr::wrapping_offset});
+}
+
+mod const_wrapping_offset{
+    use super::*;
+    pattern_templates!({} {const} {const_ptr::wrapping_offset});
+}

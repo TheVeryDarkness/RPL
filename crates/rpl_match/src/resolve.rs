@@ -167,6 +167,7 @@ pub fn lang_item_res<'pcx>(pcx: PatCtxt<'pcx>, tcx: TyCtxt<'_>, item: LangItem) 
 /// This function is expensive and should be used sparingly.
 #[instrument(level = "trace", skip(tcx), ret)]
 pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<Res> {
+    let full_path = path;
     let (base, path) = match path {
         [primitive] => {
             return vec![PrimTy::from_name(*primitive).map_or(Res::Err, Res::PrimTy)];
@@ -191,7 +192,11 @@ pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<
 
     // trace!(?crates);
 
-    def_path_res_with_base(tcx, crates, path, kind)
+    let results = def_path_res_with_base(tcx, crates, path, kind);
+    if results.is_empty() {
+        info!(?full_path, "no results found for path");
+    }
+    results
 }
 
 /// Resolves a def path like `vec::Vec` with the base `std`.
@@ -199,7 +204,12 @@ pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<
 /// This is lighter than [`def_path_res`], and should be called with [`find_crates`] looking up
 /// items from the same crate repeatedly, although should still be used sparingly.
 // #[instrument(level = "trace", skip(tcx), ret)]
-pub fn def_path_res_with_base(tcx: TyCtxt<'_>, mut base: Vec<Res>, mut path: &[Symbol], kind: PatItemKind) -> Vec<Res> {
+pub(crate) fn def_path_res_with_base(
+    tcx: TyCtxt<'_>,
+    mut base: Vec<Res>,
+    mut path: &[Symbol],
+    kind: PatItemKind,
+) -> Vec<Res> {
     while let [segment, rest @ ..] = path {
         path = rest;
         // let segment = Symbol::intern(segment);
