@@ -23,6 +23,29 @@ LL |         p = p.add(index);
    = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
 
 error: it is an undefined behavior to offset a pointer using an unchecked integer
+  --> tests/ui/cve_2020_35877/minimal.rs:57:14
+   |
+LL |     for i in slice {
+   |              ^^^^^
+   |              |
+   |              offset here
+   |              pointer used here
+   |
+   = help: check whether it's in bound before offsetting
+   = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
+
+error: it is an undefined behavior to offset a pointer using an unchecked integer
+  --> tests/ui/cve_2020_35877/minimal.rs:89:15
+   |
+LL |         p = p.add(index);
+   |             - ^^^^^^^^^^ offset here
+   |             |
+   |             pointer used here
+   |
+   = help: check whether it's in bound before offsetting
+   = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
+
+error: it is an undefined behavior to offset a pointer using an unchecked integer
   --> tests/ui/cve_2020_35877/minimal.rs:188:20
    |
 LL |     let ptr = slice.as_ptr();
@@ -75,5 +98,5 @@ LL |     unsafe { p.add(1) }
    = help: check whether it's in bound before offsetting
    = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
 
-error: aborting due to 7 previous errors
+error: aborting due to 9 previous errors
 
