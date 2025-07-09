@@ -1,7 +1,6 @@
 //! Check if the pattern statement matches MIR statement,
 //! A.K.A. if we're using building blocks with the right color.
 
-use rustc_abi::FieldIdx;
 use rustc_middle::{mir, ty};
 
 use crate::matches::MatchCtxt;
@@ -100,20 +99,22 @@ impl<'a, 'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'a, 'pcx, 'tcx> {
         self.matching.const_vars[const_var.idx].force_get_matched() == konst
     }
 
-    #[expect(unused_variables)]
     fn match_adt_matches(&self, pat: rustc_span::Symbol, adt_match: crate::AdtMatch<'tcx>) -> bool {
-        todo!()
+        self.cx
+            .ty
+            .adt_matches
+            .borrow()
+            .get(&pat)
+            .is_some_and(|matches| matches.contains_key(&adt_match.adt.did()))
     }
 
-    #[expect(unused_variables)]
-    fn for_variant_and_match(
-        &self,
-        adt_pat: rustc_span::Symbol,
-        adt: rustc_middle::ty::AdtDef<'tcx>,
-        // variant_idx_pat: Option<Symbol>,
-        // variant_idx: Option<VariantIdx>,
-        f: impl FnOnce(&pat::Variant<'pcx>, &crate::Candidates<FieldIdx>, &'tcx ty::VariantDef),
-    ) {
-        todo!()
+    fn adt_matched(&self, adt_pat: rustc_span::Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&crate::AdtMatch<'tcx>)) {
+        self.cx
+            .ty
+            .adt_matches
+            .borrow()
+            .get(&adt_pat)
+            .and_then(|matches| matches.get(&adt.did()))
+            .map(|adt_match| f(adt_match));
     }
 }

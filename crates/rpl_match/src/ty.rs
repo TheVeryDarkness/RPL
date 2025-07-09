@@ -99,40 +99,12 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchTyCtxt<'pcx, 'tcx> {
         true
     }
 
-    fn for_variant_and_match(
-        &self,
-        adt_pat: Symbol,
-        adt: ty::AdtDef<'tcx>,
-        // variant_idx_pat: Option<Symbol>,
-        // variant_idx: Option<VariantIdx>,
-        f: impl FnOnce(&pat::Variant<'pcx>, &Candidates<FieldIdx>, &'tcx ty::VariantDef),
-    ) {
+    fn adt_matched(&self, adt_pat: Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&AdtMatch<'tcx>)) {
         let adt_matches = self.adt_matches.borrow();
-        let Some(adt_match) = adt_matches
+        adt_matches
             .get(&adt_pat)
             .and_then(|adt_match| adt_match.get(&adt.did()))
-        else {
-            return;
-        };
-        let adt_pat = self
-            .pat()
-            .get_adt(adt_pat)
-            .unwrap_or_else(|| panic!("AdtPat `${adt_pat}` not found"));
-        if adt_pat.is_enum() {
-            todo!()
-            // let (variant_pat, variant_index) =
-            //     adt_pat.variant_and_index(variant_idx_pat.expect("variant_idx_pat is None"));
-            // let variant = adt.variant(variant_idx.expect("variant_idx is None"));
-            // let variant_match = adt_match.expect_enum().candidates[variant_index]
-            //     .matched()
-            //     .expect("variant not matched");
-            // (variant_pat, variant_match, variant)
-        } else {
-            let variant_pat = adt_pat.non_enum_variant();
-            let variant_match = &adt_match.expect_struct().candidates;
-            let variant = adt.non_enum_variant();
-            f(variant_pat, variant_match, variant);
-        }
+            .map(f);
     }
 }
 
@@ -469,6 +441,8 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
         }
     }
 
+    fn adt_matched(&self, adt_pat: Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&AdtMatch<'tcx>));
+
     fn for_variant_and_match(
         &self,
         adt_pat: Symbol,
@@ -476,5 +450,27 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
         // variant_idx_pat: Option<Symbol>,
         // variant_idx: Option<VariantIdx>,
         f: impl FnOnce(&pat::Variant<'pcx>, &Candidates<FieldIdx>, &'tcx ty::VariantDef),
-    );
+    ) {
+        self.adt_matched(adt_pat, adt, |adt_match| {
+            let adt_pat = self
+                .pat()
+                .get_adt(adt_pat)
+                .unwrap_or_else(|| panic!("AdtPat `${adt_pat}` not found"));
+            if adt_pat.is_enum() {
+                todo!()
+                // let (variant_pat, variant_index) =
+                //     adt_pat.variant_and_index(variant_idx_pat.expect("variant_idx_pat is None"));
+                // let variant = adt.variant(variant_idx.expect("variant_idx is None"));
+                // let variant_match = adt_match.expect_enum().candidates[variant_index]
+                //     .matched()
+                //     .expect("variant not matched");
+                // (variant_pat, variant_match, variant)
+            } else {
+                let variant_pat = adt_pat.non_enum_variant();
+                let variant_match = &adt_match.expect_struct().candidates;
+                let variant = adt.non_enum_variant();
+                f(variant_pat, variant_match, variant);
+            }
+        })
+    }
 }
