@@ -1422,12 +1422,12 @@ impl<'tcx> ConstVarMatches<'tcx> {
         self.candidates.is_empty()
     }
 
-    // // After `match_const_var_candidates`, all const variables are supposed to be matched,
-    // // so we can assume that `self.matched` is `Some`.
-    // #[track_caller]
-    // fn force_get_matched(&self) -> Const<'tcx> {
-    //     self.matched.get().expect("bug: const variable not matched")
-    // }
+    // After `match_const_var_candidates`, all const variables are supposed to be matched,
+    // so we can assume that `self.matched` is `Some`.
+    #[track_caller]
+    fn force_get_matched(&self) -> Const<'tcx> {
+        self.matched.get().expect("bug: const variable not matched")
+    }
 }
 
 #[derive(Default, Debug)]
@@ -1451,12 +1451,12 @@ impl<'tcx> PlaceVarMatches<'tcx> {
         self.candidates.is_empty()
     }
 
-    // // After `match_place_var_candidates`, all place variables are supposed to be matched,
-    // // so we can assume that `self.matched` is `Some`.
-    // #[track_caller]
-    // fn force_get_matched(&self) -> PlaceRef<'tcx> {
-    //     self.matched.get().expect("bug: place variable not matched")
-    // }
+    // After `match_place_var_candidates`, all place variables are supposed to be matched,
+    // so we can assume that `self.matched` is `Some`.
+    #[track_caller]
+    fn force_get_matched(&self) -> PlaceRef<'tcx> {
+        self.matched.get().expect("bug: place variable not matched")
+    }
 }
 
 trait IntoLocation: Copy {

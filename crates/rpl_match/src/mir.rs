@@ -305,9 +305,6 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
         matched
     }
 
-    fn get_place_ty_from_local(&self, local: pat::Local) -> pat::PlaceTy<'pcx> {
-        pat::PlaceTy::from_ty(self.mir_pat.locals[local])
-    }
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.place.places[var])
         // pat::PlaceTy::from_ty(var.ty)

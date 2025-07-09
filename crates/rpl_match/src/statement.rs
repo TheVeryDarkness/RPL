@@ -49,8 +49,10 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx>;
 
     fn pat_cfg(&self) -> &PatControlFlowGraph;
+    #[expect(dead_code)]
     fn pat_ddg(&self) -> &PatDataDepGraph;
     fn mir_cfg(&self) -> &MirControlFlowGraph;
+    #[expect(dead_code)]
     fn mir_ddg(&self) -> &MirDataDepGraph;
 
     fn pat(&self) -> &'pcx pat::RustItems<'pcx>;
@@ -765,7 +767,9 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             });
     }
 
-    fn get_place_ty_from_local(&self, local: pat::Local) -> pat::PlaceTy<'pcx>;
+    fn get_place_ty_from_local(&self, local: pat::Local) -> pat::PlaceTy<'pcx> {
+        pat::PlaceTy::from_ty(self.mir_pat().locals[local])
+    }
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx>;
 
     fn get_place_ty_from_base(&self, base: pat::PlaceBase) -> pat::PlaceTy<'pcx> {
