@@ -8,6 +8,7 @@ use rustc_index::{Idx, IndexSlice, IndexVec};
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Symbol;
 
+use crate::ty::MatchTy as _;
 use crate::{CountedMatch, MatchTyCtxt};
 
 pub struct MatchAdtCtxt<'a, 'pcx, 'tcx> {

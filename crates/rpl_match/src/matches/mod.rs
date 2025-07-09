@@ -10,15 +10,18 @@ use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_hir::FnDecl;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
-use rustc_middle::mir::visit::{MutatingUseContext, PlaceContext};
-use rustc_middle::mir::{self, Const, HasLocalDecls, PlaceRef};
+use rustc_middle::mir::visit::PlaceContext;
+use rustc_middle::mir::{self, Const, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
 use crate::CountedMatch;
 use crate::mir::{CheckMirCtxt, pat};
+use crate::statement::MatchStatement as _;
+use crate::ty::MatchTy as _;
 
 pub mod artifact;
+mod color;
 
 #[derive(Debug)]
 pub struct Matched<'tcx> {
@@ -885,7 +888,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     /// - `false` if the statement is not matched. Nothing should be changed.
     #[instrument(level = "debug", skip(self), ret)]
     fn match_stmt(&self, loc_pat: pat::Location, stmt_match: StatementMatch) -> bool {
-        self.match_stmt_locals(loc_pat, stmt_match)
+        self.match_stmt_inner(loc_pat, stmt_match)
             && if let StatementMatch::Location(loc) = stmt_match {
                 let bb = &self.matching.mir_statements[loc.block];
                 bb.r#match(loc_pat, loc)
@@ -923,49 +926,72 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         //     _ => false,
         // }
     }
-    /// Check if the statement accesses the local variable matched by `local_pat` in the expected
-    /// way.
+
+    /// Check if `loc_pat` has the same structure as `stmt_match`.
     #[instrument(level = "debug", skip(self), ret)]
-    fn match_stmt_locals(&self, loc_pat: pat::Location, stmt_match: StatementMatch) -> bool {
-        let accesses_pat = self.cx.pat_ddg[loc_pat.block].accesses(loc_pat.statement_index);
-        let accesses = match stmt_match {
-            StatementMatch::Arg(local) => &[(local, PlaceContext::MutatingUse(MutatingUseContext::Store))],
-            StatementMatch::Location(loc) => self.cx.mir_ddg[loc.block].accesses(loc.statement_index),
-        };
-        if loc_pat.statement_index < self.cx.mir_pat[loc_pat.block].statements.len()
-            && let pat::StatementKind::Assign(
-                pat::Place {
-                    base: pat::PlaceBase::Local(local_pat),
-                    projection: [],
-                },
-                pat::Rvalue::Any,
-            ) = self.cx.mir_pat[loc_pat.block].statements[loc_pat.statement_index]
-        {
-            return accesses
-                .iter()
-                .find(|&&(_, access)| access.is_place_assignment())
-                // .is_some_and(|&(local, _)| self.match_local(local_pat, local));
-                .is_some_and(|&(local, _)| self.matching[local_pat].force_get_matched() == local);
+    fn match_stmt_inner(&self, loc_pat: pat::Location, stmt_match: StatementMatch) -> bool {
+        let pat_block = &self.cx.fn_pat.expect_body()[loc_pat.block];
+        debug_assert!(loc_pat.statement_index <= pat_block.statements.len());
+        match stmt_match {
+            StatementMatch::Arg(arg) => {
+                if loc_pat.statement_index == pat_block.statements.len() {
+                    // An argument does not match the end of a basic block in the pattern.
+                    false
+                } else {
+                    let pat_stmt = &pat_block.statements[loc_pat.statement_index];
+                    match pat_stmt {
+                        pat::StatementKind::Assign(place, value) => {
+                            place
+                                .as_local()
+                                .is_some_and(|local_pat| self.matching.locals[local_pat].force_get_matched() == arg)
+                                && matches!(value, pat::Rvalue::Any)
+                        },
+                    }
+                }
+            },
+            StatementMatch::Location(loc) => self.match_statement_or_terminator(loc_pat, loc),
         }
+        // let accesses_pat = self.cx.pat_ddg[loc_pat.block].accesses(loc_pat.statement_index);
+        // let accesses = match stmt_match {
+        //     StatementMatch::Arg(local) => &[(local,
+        // PlaceContext::MutatingUse(MutatingUseContext::Store))],
+        //     StatementMatch::Location(loc) =>
+        // self.cx.mir_ddg[loc.block].accesses(loc.statement_index), };
+        // if loc_pat.statement_index < self.cx.mir_pat[loc_pat.block].statements.len()
+        //     && let pat::StatementKind::Assign(
+        //         pat::Place {
+        //             base: pat::PlaceBase::Local(local_pat),
+        //             projection: [],
+        //         },
+        //         pat::Rvalue::Any,
+        //     ) = self.cx.mir_pat[loc_pat.block].statements[loc_pat.statement_index]
+        // {
+        //     return accesses
+        //         .iter()
+        //         .find(|&&(_, access)| access.is_place_assignment())
+        //         // .is_some_and(|&(local, _)| self.match_local(local_pat, local));
+        //         .is_some_and(|&(local, _)| self.matching[local_pat].force_get_matched() ==
+        // local); }
         // let mut iter = accesses.iter();
-        accesses_pat.iter().all(|&(local_pat, access_pat)| {
-            debug!(?local_pat, ?access_pat);
-            let matched_loc = self.matching[local_pat].force_get_matched();
-            let tcx = self.cx.ty.tcx;
-            let ty = self.cx.body.local_decls()[matched_loc].ty;
-            let is_copy = tcx.type_is_copy_modulo_regions(self.cx.ty.typing_env, ty);
-            accesses
-                .iter()
-                .inspect(|&(local, access)| debug!(?local, ?access))
-                .any(|&(local, access)| {
-                    Self::place_context_compatible(access, access_pat, is_copy) && matched_loc == local
-                })
-            // .find(|&&(_, access)| Self::place_context_compatible(access, access_pat, is_copy))
-            // .is_some_and(|&(local, _)| self.match_local(local_pat, local))
-            // .is_some_and(|&(local, _)| matched_loc == local)
-            // .any(|&(local, _)| self.matching[local_pat].force_get_matched() == local)
-        })
+        // accesses_pat.iter().all(|&(local_pat, access_pat)| {
+        //     debug!(?local_pat, ?access_pat);
+        //     let matched_loc = self.matching[local_pat].force_get_matched();
+        //     let tcx = self.cx.ty.tcx;
+        //     let ty = self.cx.body.local_decls()[matched_loc].ty;
+        //     let is_copy = tcx.type_is_copy_modulo_regions(self.cx.ty.typing_env, ty);
+        //     accesses
+        //         .iter()
+        //         .inspect(|&(local, access)| debug!(?local, ?access))
+        //         .any(|&(local, access)| {
+        //             Self::place_context_compatible(access, access_pat, is_copy) && matched_loc ==
+        // local         })
+        //     // .find(|&&(_, access)| Self::place_context_compatible(access, access_pat, is_copy))
+        //     // .is_some_and(|&(local, _)| self.match_local(local_pat, local))
+        //     // .is_some_and(|&(local, _)| matched_loc == local)
+        //     // .any(|&(local, _)| self.matching[local_pat].force_get_matched() == local)
+        // })
     }
+
     /// Match a local variable in the pattern graph with a local variable in the MIR graph.
     ///
     /// # Returns
@@ -1400,7 +1426,7 @@ impl<'tcx> ConstVarMatches<'tcx> {
     // // so we can assume that `self.matched` is `Some`.
     // #[track_caller]
     // fn force_get_matched(&self) -> Const<'tcx> {
-    //     self.matched.get().expect("bug: type variable not matched")
+    //     self.matched.get().expect("bug: const variable not matched")
     // }
 }
 
@@ -1429,7 +1455,7 @@ impl<'tcx> PlaceVarMatches<'tcx> {
     // // so we can assume that `self.matched` is `Some`.
     // #[track_caller]
     // fn force_get_matched(&self) -> PlaceRef<'tcx> {
-    //     self.matched.get().expect("bug: type variable not matched")
+    //     self.matched.get().expect("bug: place variable not matched")
     // }
 }
 
