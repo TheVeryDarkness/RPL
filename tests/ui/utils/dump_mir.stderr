@@ -2,16 +2,16 @@ note: MIR of `test`
   --> tests/ui/utils/dump_mir.rs:9:1
    |
 LL |   #[rpl::dump_mir(dump_cfg, dump_ddg)]
-   |   ------------------------------------ MIR dumpped because of this attribute
+   |   ------------------------------------ MIR dumped because of this attribute
 ...
 LL | / fn test() {
 ...  |
 LL | | }
    | |_^
    |
-   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir` for dumpped MIR
-   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir.cfg.dot` for dumpped control flow graph
-   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir.ddg.dot` for dumpped data dependency graph
+   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir` for dumped MIR
+   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir.cfg.dot` for dumped control flow graph
+   = note: see `./mir_dump/dump_mir.test.-------.dump_mir..mir.ddg.dot` for dumped data dependency graph
 note: locals and scopes in this MIR
   --> tests/ui/utils/dump_mir.rs:9:1
    |
@@ -200,7 +200,7 @@ note: MIR of `critical`
   --> tests/ui/utils/dump_mir.rs:42:1
    |
 LL |   #[rpl::dump_mir(dump_cfg, dump_ddg)]
-   |   ------------------------------------ MIR dumpped because of this attribute
+   |   ------------------------------------ MIR dumped because of this attribute
 ...
 LL | / fn critical(i: i16, j: i16) -> Result<i16, ()> {
 ...  |
@@ -208,9 +208,9 @@ LL | |     Ok(result)
 LL | | }
    | |_^
    |
-   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir` for dumpped MIR
-   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir.cfg.dot` for dumpped control flow graph
-   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir.ddg.dot` for dumpped data dependency graph
+   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir` for dumped MIR
+   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir.cfg.dot` for dumped control flow graph
+   = note: see `./mir_dump/dump_mir.critical.-------.dump_mir..mir.ddg.dot` for dumped data dependency graph
 note: locals and scopes in this MIR
   --> tests/ui/utils/dump_mir.rs:42:1
    |
@@ -313,14 +313,14 @@ note: MIR of `std::alloc::alloc`
   --> tests/ui/utils/dump_mir.rs:69:13
    |
 LL |     #[rpl::dump_mir(dump_cfg, dump_ddg)]
-   |     ------------------------------------ MIR dumpped because of this attribute
+   |     ------------------------------------ MIR dumped because of this attribute
 ...
 LL |     let _ = std::alloc::alloc;
    |             ^^^^^^^^^^^^^^^^^
    |
-   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir` for dumpped MIR
-   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir.cfg.dot` for dumpped control flow graph
-   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir.ddg.dot` for dumpped data dependency graph
+   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir` for dumped MIR
+   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir.cfg.dot` for dumped control flow graph
+   = note: see `./mir_dump/alloc.alloc-alloc.-------.dump_mir..mir.ddg.dot` for dumped data dependency graph
 note: locals and scopes in this MIR
   --> $SRC_DIR/alloc/src/alloc.rs:90:1
    |
@@ -623,14 +623,14 @@ note: MIR of `main::{closure#0}`
   --> tests/ui/utils/dump_mir.rs:86:13
    |
 LL |     #[rpl::dump_mir(dump_cfg, dump_ddg)]
-   |     ------------------------------------ MIR dumpped because of this attribute
+   |     ------------------------------------ MIR dumped because of this attribute
 ...
 LL |     let _ = |x: i32| x + 1;
    |             ^^^^^^^^^^^^^^
    |
-   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir` for dumpped MIR
-   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir.cfg.dot` for dumpped control flow graph
-   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir.ddg.dot` for dumpped data dependency graph
+   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir` for dumped MIR
+   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir.cfg.dot` for dumped control flow graph
+   = note: see `./mir_dump/dump_mir.main-{closure#0}.-------.dump_mir..mir.ddg.dot` for dumped data dependency graph
 note: locals and scopes in this MIR
   --> tests/ui/utils/dump_mir.rs:86:13
    |
@@ -656,14 +656,14 @@ note: MIR of `<std::result::IntoIter<T> as std::iter::Iterator>::next`
   --> tests/ui/utils/dump_mir.rs:98:13
    |
 LL |     #[rpl::dump_mir(dump_cfg, dump_ddg)]
-   |     ------------------------------------ MIR dumpped because of this attribute
+   |     ------------------------------------ MIR dumped because of this attribute
 ...
 LL |     let _ = <std::result::IntoIter<&str> as std::iter::Iterator>::next;
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir` for dumpped MIR
-   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir.cfg.dot` for dumpped control flow graph
-   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir.ddg.dot` for dumpped data dependency graph
+   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir` for dumped MIR
+   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir.cfg.dot` for dumped control flow graph
+   = note: see `./mir_dump/core.result-{impl#20}-next.-------.dump_mir..mir.ddg.dot` for dumped data dependency graph
 note: locals and scopes in this MIR
   --> $SRC_DIR/core/src/result.rs:1908:5
    |

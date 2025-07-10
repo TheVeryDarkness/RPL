@@ -50,7 +50,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:9:5
    |
 LL | #[rpl::dump_hir]
-   | ---------------- HIR dumpped because of this attribute
+   | ---------------- HIR dumped because of this attribute
 ...
 LL | use std::sync::Arc;
    |     ^^^^^^^^^^^^^^
@@ -79,7 +79,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:15:1
    |
 LL | #[rpl::dump_hir]
-   | ---------------- HIR dumpped because of this attribute
+   | ---------------- HIR dumped because of this attribute
 ...
 LL | mod m {
    | ^^^^^
@@ -117,7 +117,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:24:1
    |
 LL | #[rpl::dump_hir]
-   | ---------------- HIR dumpped because of this attribute
+   | ---------------- HIR dumped because of this attribute
 ...
 LL | trait Foo {
    | ^^^^^^^^^
@@ -175,7 +175,7 @@ note: TraitItem(
   --> tests/ui/utils/dump_hir.rs:30:5
    |
 LL |     #[rpl::dump_hir]
-   |     ---------------- HIR dumpped because of this attribute
+   |     ---------------- HIR dumped because of this attribute
 ...
 LL |     const N: usize;
    |     ^^^^^^^^^^^^^^
@@ -251,7 +251,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:37:1
    |
 LL | #[rpl::dump_hir]
-   | ---------------- HIR dumpped because of this attribute
+   | ---------------- HIR dumped because of this attribute
 ...
 LL | impl Foo for () {
    | ^^^^^^^^^^^^^^^
@@ -310,7 +310,7 @@ note: ImplItem(
   --> tests/ui/utils/dump_hir.rs:43:5
    |
 LL |     #[rpl::dump_hir]
-   |     ---------------- HIR dumpped because of this attribute
+   |     ---------------- HIR dumped because of this attribute
 ...
 LL |     const N: usize = 0_usize;
    |     ^^^^^^^^^^^^^^
@@ -359,7 +359,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:50:1
    |
 LL | #[rpl::dump_hir]
-   | ---------------- HIR dumpped because of this attribute
+   | ---------------- HIR dumped because of this attribute
 ...
 LL | fn main() {
    | ^^^^^^^^^
@@ -466,7 +466,7 @@ note: Stmt(
   --> tests/ui/utils/dump_hir.rs:56:5
    |
 LL |     #[rpl::dump_hir]
-   |     ---------------- HIR dumpped because of this attribute
+   |     ---------------- HIR dumped because of this attribute
 ...
 LL |     let x = Arc::new(0_usize);
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -515,7 +515,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:62:5
    |
 LL |     #[rpl::dump_hir]
-   |     ---------------- HIR dumpped because of this attribute
+   |     ---------------- HIR dumped because of this attribute
 ...
 LL |     fn foo() {
    |     ^^^^^^^^
@@ -540,7 +540,7 @@ note: Expr(
   --> tests/ui/utils/dump_hir.rs:68:9
    |
 LL |         #[rpl::dump_hir]
-   |         ---------------- HIR dumpped because of this attribute
+   |         ---------------- HIR dumped because of this attribute
 ...
 LL |         {}
    |         ^^
@@ -606,7 +606,7 @@ note: Expr(
   --> tests/ui/utils/dump_hir.rs:75:5
    |
 LL |       #[rpl::dump_hir]
-   |       ---------------- HIR dumpped because of this attribute
+   |       ---------------- HIR dumped because of this attribute
 ...
 LL | /     if true {
 LL | |
@@ -707,7 +707,7 @@ note: Expr(
   --> tests/ui/utils/dump_hir.rs:84:5
    |
 LL |       #[rpl::dump_hir]
-   |       ---------------- HIR dumpped because of this attribute
+   |       ---------------- HIR dumped because of this attribute
 ...
 LL | /     std::thread::spawn(move || {
 LL | |
@@ -887,7 +887,7 @@ note: Item(
   --> tests/ui/utils/dump_hir.rs:93:5
    |
 LL |     #[rpl::dump_hir]
-   |     ---------------- HIR dumpped because of this attribute
+   |     ---------------- HIR dumped because of this attribute
 ...
 LL |     macro_rules! mac {
    |     ^^^^^^^^^^^^^^^^
