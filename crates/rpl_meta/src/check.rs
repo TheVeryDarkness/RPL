@@ -245,6 +245,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
         let (_, _, _, _, _, params, _, ret) = fn_sig.get_matched();
         if let Some(params) = params {
             let params = collect_elems_separated_by_comma!(params).collect::<Vec<_>>();
+            debug!(params = ?params.len(), "checking params");
             for param in params {
                 self.check_fn_param(mctx, param);
             }
@@ -283,7 +284,8 @@ impl<'i> CheckFnCtxt<'i, '_> {
         self.fn_def.add_param(mctx, ident, ty, self.errors);
         self.check_type(mctx, ty);
         self.fn_def
-            .add_local(mctx, None, ident, ty, LocalSpecial::None, self.errors);
+            .add_local(mctx, None, ident, ty, LocalSpecial::Arg, self.errors);
+        debug!(ident = ?ident.name, "checking normal param");
     }
 
     fn check_fn_body(&mut self, mctx: &MetaContext<'i>, fn_body: &'i pairs::FnBody<'i>) {

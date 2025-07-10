@@ -7,7 +7,7 @@ use rpl_meta::symbol_table::{LocalSpecial, WithPath};
 use rpl_parser::SpanWrapper;
 use rpl_parser::generics::{Choice5, Choice6, Choice12};
 use rustc_abi::FieldIdx;
-use rustc_data_structures::fx::FxIndexMap;
+use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_hir::Target;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{self, CoercionSource};
@@ -72,6 +72,7 @@ impl Location {
 pub struct FnPatternBody<'pcx> {
     pub self_idx: Option<Local>,
     pub return_idx: Option<Local>,
+    pub params_idx: FxHashSet<Local>,
     pub locals: IndexVec<Local, Ty<'pcx>>,
     pub basic_blocks: IndexVec<BasicBlock, BasicBlockData<'pcx>>,
     pub labels: LabelMap,
@@ -1153,6 +1154,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             locals: IndexVec::new(),
             return_idx: None,
             self_idx: None,
+            params_idx: FxHashSet::default(),
             basic_blocks: IndexVec::new(),
             labels: FxHashMap::default(),
         };
@@ -1194,7 +1196,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 LocalSpecial::Self_ => {
                     self.pattern.self_idx = Some(local);
                 },
-                LocalSpecial::Arg | LocalSpecial::None => {},
+                LocalSpecial::Arg => {
+                    self.pattern.params_idx.insert(local);
+                },
+                LocalSpecial::None => {},
             }
             if let Some(label) = label {
                 self.pattern.labels.insert(label, Spanned::Local(local));

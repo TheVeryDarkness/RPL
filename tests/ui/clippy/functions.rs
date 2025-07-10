@@ -178,4 +178,9 @@ impl Bar {
     }
 }
 
+pub fn non_arg(p: &u8) {
+    let p = p as *const u8;
+    println!("{}", unsafe { *p });
+}
+
 fn main() {}

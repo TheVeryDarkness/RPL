@@ -280,6 +280,17 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
         if locals.contains(local) {
             return true;
         }
+
+        if self.mir_pat.params_idx.contains(&pat) {
+            // If the local variable is a parameter, we only need to match the
+            // corresponding local variable in the MIR graph.
+            trace!(?pat, "expected parameter");
+            if !(local.as_usize() > 0 && local.as_usize() <= self.body.arg_count) {
+                debug!(?local, "found non-parameter local");
+                return false;
+            }
+        }
+
         let matched = self
             .ty()
             .match_ty(self.mir_pat().locals[pat], self.body().local_decls[local].ty);
