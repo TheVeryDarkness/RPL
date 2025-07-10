@@ -1,3 +1,4 @@
+//@ignore-on-host
 #[allow(clippy::borrow_as_ptr)]
 fn main() {
     unsafe {
