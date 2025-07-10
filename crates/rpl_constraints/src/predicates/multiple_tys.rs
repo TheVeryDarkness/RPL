@@ -27,3 +27,21 @@ pub fn same_abi_and_pref_align<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEn
         .collect::<Vec<_>>();
     layouts.windows(2).all(|w| w[0] == w[1])
 }
+
+/// Check if all tys have the same layout.
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
+pub fn same_layout<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, tys: Vec<Ty<'tcx>>) -> bool {
+    if tys.is_empty() {
+        return true;
+    }
+    let first_layout = tcx.layout_of(typing_env.as_query_input(tys[0]));
+    if first_layout.is_err() {
+        return false;
+    }
+    let first_layout = first_layout.unwrap().layout;
+    tys.iter().all(|ty| {
+        tcx.layout_of(typing_env.as_query_input(*ty))
+            .map(|layout| layout.layout == first_layout)
+            .unwrap_or(false)
+    })
+}

@@ -126,7 +126,7 @@ impl<'pcx> RustItems<'pcx> {
         let path = item.path;
         let (attr, item, where_block) = item.get_matched();
         let constraints = Constraints::from_where_block_opt(attr.iter_matched(), where_block, path)
-            .expect("unexpected error in constraints");
+            .unwrap_or_else(|err| panic!("unexpected error in constraints:\n{err}"));
         match item.deref() {
             Choice4::_0(rust_fn) => {
                 let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());

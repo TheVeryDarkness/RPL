@@ -58,6 +58,7 @@ pub const ALL_PREDICATES: &[&str] = &[
     // multiple_tys_preds
     "same_abi_and_pref_align",
     "same_size",
+    "same_layout",
     // single_fn_preds
     "requires_monomorphization",
     // ty_const_preds
@@ -98,6 +99,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "false" => Self::Trivial(r#false),
             "true" => Self::Trivial(r#true),
             "same_abi_and_pref_align" => Self::MultipleTys(same_abi_and_pref_align),
+            "same_layout" => Self::MultipleTys(same_layout),
             "same_size" => Self::MultipleTys(same_size),
             "requires_monomorphization" => Self::Fn(requires_monomorphization),
             "maybe_misaligned" => Self::TyConst(maybe_misaligned),
