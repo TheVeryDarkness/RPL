@@ -1,6 +1,8 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=true
+//@[normal] compile-flags: -Zinline-mir=false
 #![allow(clippy::missing_safety_doc, clippy::uninlined_format_args)]
 
-// TOO_MANY_ARGUMENTS
 fn good(_one: u32, _two: u32, _three: &str, _four: bool, _five: f32, _six: f32, _seven: bool) {}
 
 fn bad(
@@ -14,11 +16,9 @@ fn bad(
     _eight: (),
 ) {
 }
-//~^ too_many_arguments
 
 #[rustfmt::skip]
 fn bad_multiline(
-//~^ too_many_arguments
 
     one: u32,
     two: u32,
@@ -63,7 +63,6 @@ pub trait Foo {
         _seven: bool,
         _eight: (),
     );
-    //~^ too_many_arguments
 
     fn ptr(p: *const u8);
 }
@@ -92,7 +91,6 @@ impl Bar {
         _eight: (),
     ) {
     }
-    //~^ too_many_arguments
 }
 
 // ok, we don’t want to warn implementations
@@ -118,7 +116,7 @@ impl Foo for Bar {
         //~^ not_unsafe_ptr_arg_deref
 
         unsafe { std::ptr::read(p) };
-        //~^ not_unsafe_ptr_arg_deref
+        //~[normal]^ not_unsafe_ptr_arg_deref
     }
 }
 
@@ -136,7 +134,7 @@ pub fn public(p: *const u8) {
     //~^ not_unsafe_ptr_arg_deref
 
     unsafe { std::ptr::read(p) };
-    //~^ not_unsafe_ptr_arg_deref
+    //~[normal]^ not_unsafe_ptr_arg_deref
 }
 
 type Alias = *const u8;
@@ -149,7 +147,7 @@ pub fn type_alias(p: Alias) {
     //~^ not_unsafe_ptr_arg_deref
 
     unsafe { std::ptr::read(p) };
-    //~^ not_unsafe_ptr_arg_deref
+    //~[normal]^ not_unsafe_ptr_arg_deref
 }
 
 impl Bar {
@@ -165,7 +163,7 @@ impl Bar {
         //~^ not_unsafe_ptr_arg_deref
 
         unsafe { std::ptr::read(p) };
-        //~^ not_unsafe_ptr_arg_deref
+        //~[normal]^ not_unsafe_ptr_arg_deref
     }
 
     pub fn public_ok(self, p: *const u8) {

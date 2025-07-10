@@ -140,15 +140,15 @@ impl PatItemKind {
 pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<Res> {
     let (base, path) = match path {
         [primitive] => {
-            let primitive = PrimTy::from_name(*primitive);
-            match primitive {
+            let resolved = PrimTy::from_name(*primitive);
+            match resolved {
                 Some(prim) => {
                     // If the path is a primitive type, return it directly.
                     return vec![Res::PrimTy(prim)];
                 },
                 None => {
                     // If the path is not a primitive type, show an error.
-                    warn!("Unknown primitive type: {:?}", primitive);
+                    warn!("Unknown primitive type: {}", primitive);
                     return Vec::new();
                 },
             }

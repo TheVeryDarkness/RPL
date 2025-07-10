@@ -10,8 +10,8 @@ use rustc_span::Symbol;
 
 use crate::context::MetaContext;
 use crate::symbol_table::{
-    AdtPatType, EnumInner, FnInner, GetType as _, ImplInner, NonLocalMetaSymTab, SymbolTable, Variant, WithMetaTable,
-    WithPath, ident_is_primitive,
+    AdtPatType, EnumInner, FnInner, GetType as _, ImplInner, LocalSpecial, NonLocalMetaSymTab, SymbolTable, Variant,
+    WithMetaTable, WithPath, ident_is_primitive,
 };
 use crate::utils::{Ident, Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
@@ -282,6 +282,8 @@ impl<'i> CheckFnCtxt<'i, '_> {
         let ident = ident.into();
         self.fn_def.add_param(mctx, ident, ty, self.errors);
         self.check_type(mctx, ty);
+        self.fn_def
+            .add_local(mctx, None, ident, ty, LocalSpecial::None, self.errors);
     }
 
     fn check_fn_body(&mut self, mctx: &MetaContext<'i>, fn_body: &'i pairs::FnBody<'i>) {

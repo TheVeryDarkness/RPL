@@ -11,5 +11,6 @@ uitest "docs/patterns-pest/clippy/from-raw-with-void-ptr.rpl"                   
 uitest "docs/patterns-pest/clippy/mem-replace-with-uninit.rpl:docs/patterns-pest/clippy/uninit-assumed-init.rpl"   "tests/ui/clippy/repl_uninit.rs"
 uitest "docs/patterns-pest/clippy/transmuting-null.rpl"                                                            "tests/ui/clippy/transmuting_null.rs"
 uitest "docs/patterns-pest/clippy/uninit-assumed-init.rpl"                                                         "tests/ui/clippy/uninit.rs"
+uitest "docs/patterns-pest/clippy/not-unsafe-ptr-arg-deref.rpl"                                                    "tests/ui/clippy/functions.rs"
 
 # RPL_PATS="docs/patterns-pest" cargo uibless tests/ui/clippy

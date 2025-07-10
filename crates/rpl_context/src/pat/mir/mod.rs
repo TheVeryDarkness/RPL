@@ -4,6 +4,7 @@ use std::ops::Index;
 
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
+use rpl_parser::SpanWrapper;
 use rpl_parser::generics::{Choice5, Choice6, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::FxIndexMap;
@@ -222,12 +223,20 @@ impl<'pcx> Place<'pcx, PlaceBase> {
         self.projection.is_empty().then(|| self.base.as_local()).flatten()
     }
 
-    pub fn from(place: &pairs::MirPlace<'pcx>, pcx: PatCtxt<'pcx>, sym_tab: &FnSymbolTable<'pcx>) -> Self {
+    pub fn from(
+        place: WithPath<'pcx, &pairs::MirPlace<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &FnSymbolTable<'pcx>,
+    ) -> Self {
+        let path = place.path;
         let (base, suffix) = place.get_matched();
         let (base, mut base_projections) = match base.deref() {
             Choice3::_0(local) => match local.deref() {
-                Choice4::_0(_place_holder) => {
-                    panic!("expect a non-placeholder local");
+                Choice4::_0(place_holder) => {
+                    panic!(
+                        "expect a non-placeholder local:\n{}",
+                        SpanWrapper::new(place_holder.span, place.path)
+                    );
                 },
                 _ => {
                     let base = get_place_or_local(sym_tab, Symbol::intern(local.span.as_str()));
@@ -236,12 +245,12 @@ impl<'pcx> Place<'pcx, PlaceBase> {
             },
             Choice3::_1(paren) => {
                 let (_, place, _) = paren.get_matched();
-                let Place { base, projection } = Place::from(place, pcx, sym_tab);
+                let Place { base, projection } = Place::from(WithPath::new(path, place), pcx, sym_tab);
                 (base, projection.to_vec())
             },
             Choice3::_2(deref) => {
                 let (_, place) = deref.get_matched();
-                let Place { base, projection } = Place::from(place, pcx, sym_tab);
+                let Place { base, projection } = Place::from(WithPath::new(path, place), pcx, sym_tab);
                 let mut new_projection = vec![PlaceElem::Deref];
                 new_projection.extend(projection);
                 (base, new_projection)
@@ -473,7 +482,7 @@ impl<'pcx> RawStatement<'pcx> {
             Choice6::_0(call_ignore_ret) => {
                 Self::from_call_ignore_ret(with_path(p, call_ignore_ret.get_matched().0), pcx, sym_tab)
             },
-            Choice6::_1(drop_) => Self::from_drop(drop_.get_matched().0, pcx, sym_tab),
+            Choice6::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
             Choice6::_2(control) => Self::from_control(control.get_matched().0),
             Choice6::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
             Choice6::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
@@ -491,7 +500,7 @@ impl<'pcx> RawStatement<'pcx> {
         let label = label
             .as_ref()
             .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
-        let place = Place::from(place, pcx, fn_sym_tab);
+        let place = Place::from(WithPath::new(p, place), pcx, fn_sym_tab);
         match rvalue_or_call.deref() {
             Choice2::_0(call) => Self::from_call_assign(label, p, place, call, pcx, fn_sym_tab),
             Choice2::_1(rvalue) => {
@@ -530,9 +539,13 @@ impl<'pcx> RawStatement<'pcx> {
         )
     }
 
-    pub fn from_drop(drop_: &pairs::MirDrop<'pcx>, pcx: PatCtxt<'pcx>, sym_tab: &FnSymbolTable<'pcx>) -> Self {
+    pub fn from_drop(
+        drop_: WithPath<'pcx, &pairs::MirDrop<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &FnSymbolTable<'pcx>,
+    ) -> Self {
         let (label, _, _, place, _) = drop_.get_matched();
-        let place = Place::from(place, pcx, sym_tab);
+        let place = Place::from(WithPath::new(drop_.path, place), pcx, sym_tab);
         Self::Drop(
             label
                 .as_ref()
@@ -617,7 +630,7 @@ impl<'pcx> RawStatement<'pcx> {
                             fn_sym_tab,
                         ));
                     },
-                    Choice4::_1(drop) => stmts.push(Self::from_drop(drop, pcx, fn_sym_tab)),
+                    Choice4::_1(drop) => stmts.push(Self::from_drop(WithPath::new(p, drop), pcx, fn_sym_tab)),
                     Choice4::_2(control) => stmts.push(Self::from_control(control)),
                     Choice4::_3(assign) => stmts.push(Self::from_assign(WithPath::new(p, assign), pcx, fn_sym_tab)),
                 };
@@ -753,18 +766,18 @@ impl<'pcx> Rvalue<'pcx> {
                     RegionKind::ReAny
                 };
                 let mutability = borrow_kind_from_pair_mutability(mutability);
-                let place = Place::from(place, pcx, fn_sym_tab);
+                let place = Place::from(WithPath::new(p, place), pcx, fn_sym_tab);
                 Self::Ref(region_kind, mutability, place)
             },
             Choice12::_5(raw_ptr) => {
                 let (_, _, ptr_mutability, place) = raw_ptr.get_matched();
                 let mutability = mutability_from_pair_ptr_mutability(ptr_mutability);
-                let place = Place::from(place, pcx, fn_sym_tab);
+                let place = Place::from(WithPath::new(p, place), pcx, fn_sym_tab);
                 Self::RawPtr(mutability, place)
             },
             Choice12::_6(len) => {
                 let (_, _, place, _) = len.get_matched();
-                let place = Place::from(place, pcx, fn_sym_tab);
+                let place = Place::from(WithPath::new(p, place), pcx, fn_sym_tab);
                 Self::Len(place)
             },
             Choice12::_7(bin_op) => {
@@ -788,7 +801,7 @@ impl<'pcx> Rvalue<'pcx> {
             },
             Choice12::_10(discriminant) => {
                 let (_, _, place, _) = discriminant.get_matched();
-                let place = Place::from(place, pcx, fn_sym_tab);
+                let place = Place::from(WithPath::new(p, place), pcx, fn_sym_tab);
                 Self::Discriminant(place)
             },
             Choice12::_11(agg) => {
@@ -819,8 +832,8 @@ impl<'pcx> Operand<'pcx> {
             Choice6::_0(_any) => Self::Any,
             Choice6::_1(_any_multiple) => Self::Any, // FIXME
             Choice6::_2(meta_var) => Self::from_meta_var(meta_var),
-            Choice6::_3(move_) => Self::from_move(move_, pcx, fn_sym_tab),
-            Choice6::_4(copy_) => Self::from_copy(copy_, pcx, fn_sym_tab),
+            Choice6::_3(move_) => Self::from_move(WithPath::new(p, move_), pcx, fn_sym_tab),
+            Choice6::_4(copy_) => Self::from_copy(WithPath::new(p, copy_), pcx, fn_sym_tab),
             Choice6::_5(konst) => Self::from_constant(WithPath::new(p, konst), pcx, fn_sym_tab),
         }
     }
@@ -830,19 +843,19 @@ impl<'pcx> Operand<'pcx> {
     }
 
     pub fn from_move(
-        move_: &pairs::MirOperandMove<'pcx>,
+        move_: WithPath<'pcx, &pairs::MirOperandMove<'pcx>>,
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &FnSymbolTable<'pcx>,
     ) -> Self {
-        Self::Move(Place::from(move_.MirPlace(), pcx, fn_sym_tab))
+        Self::Move(Place::from(move_.map(|move_| move_.MirPlace()), pcx, fn_sym_tab))
     }
 
     pub fn from_copy(
-        copy_: &pairs::MirOperandCopy<'pcx>,
+        copy_: WithPath<'pcx, &pairs::MirOperandCopy<'pcx>>,
         pcx: PatCtxt<'pcx>,
         fn_sym_tab: &FnSymbolTable<'pcx>,
     ) -> Self {
-        Self::Copy(Place::from(copy_.MirPlace(), pcx, fn_sym_tab))
+        Self::Copy(Place::from(copy_.map(|copy_| copy_.MirPlace()), pcx, fn_sym_tab))
     }
 
     pub fn from_constant(
@@ -860,8 +873,8 @@ impl<'pcx> Operand<'pcx> {
     ) -> Self {
         let p = op.path;
         match op.inner.deref() {
-            Choice5::_0(copy_) => Self::from_copy(copy_.get_matched().1, pcx, fn_sym_tab),
-            Choice5::_1(move_) => Self::from_move(move_.get_matched().1, pcx, fn_sym_tab),
+            Choice5::_0(copy_) => Self::from_copy(WithPath::new(p, copy_.get_matched().1), pcx, fn_sym_tab),
+            Choice5::_1(move_) => Self::from_move(WithPath::new(p, move_.get_matched().1), pcx, fn_sym_tab),
             Choice5::_2(type_path) => Self::Constant(ConstOperand::from_type_path(
                 WithPath::new(p, type_path),
                 pcx,
@@ -1181,7 +1194,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 LocalSpecial::Self_ => {
                     self.pattern.self_idx = Some(local);
                 },
-                LocalSpecial::None => {},
+                LocalSpecial::Arg | LocalSpecial::None => {},
             }
             if let Some(label) = label {
                 self.pattern.labels.insert(label, Spanned::Local(local));

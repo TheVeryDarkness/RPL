@@ -525,6 +525,8 @@ pub type Fn<'i> = WithMetaTable<'i, FnInner<'i>>;
 #[derive(Clone, Copy)]
 pub enum LocalSpecial {
     None,
+    // FIXME: handle this
+    Arg,
     Self_,
     Return,
 }
@@ -644,7 +646,9 @@ impl<'i> FnInner<'i> {
     }
 
     pub fn get_local_idx(&self, symbol: Symbol) -> usize {
-        self.symbol_to_local_idx.get(&symbol).copied().unwrap() // should not panic
+        self.symbol_to_local_idx.get(&symbol).copied().unwrap_or_else(|| {
+            panic!("Local variable `{}` not found", symbol);
+        }) // Should not panic
     }
 }
 
