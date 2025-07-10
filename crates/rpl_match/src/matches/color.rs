@@ -8,7 +8,7 @@ use crate::mir::pat;
 use crate::statement::MatchStatement;
 use crate::ty::MatchTy;
 
-impl<'a, 'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'a, 'pcx, 'tcx> {
+impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
     fn body(&self) -> &mir::Body<'tcx> {
         self.cx.body
     }
@@ -65,9 +65,9 @@ impl<'a, 'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'a, 'pcx, 'tcx> {
     }
 }
 
-impl<'a, 'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'a, 'pcx, 'tcx> {
+impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
     fn pat(&self) -> &'pcx pat::RustItems<'pcx> {
-        &self.cx.ty.pat
+        self.cx.ty.pat
     }
 
     fn pcx(&self) -> rpl_context::PatCtxt<'pcx> {
@@ -115,6 +115,6 @@ impl<'a, 'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'a, 'pcx, 'tcx> {
             .borrow()
             .get(&adt_pat)
             .and_then(|matches| matches.get(&adt.did()))
-            .map(|adt_match| f(adt_match));
+            .map(f);
     }
 }

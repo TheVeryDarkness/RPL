@@ -236,10 +236,10 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
 
 impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
     fn body(&self) -> &mir::Body<'tcx> {
-        &self.body
+        self.body
     }
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx> {
-        &self.mir_pat
+        self.mir_pat
     }
 
     fn pat_cfg(&self) -> &PatControlFlowGraph {
@@ -249,10 +249,10 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
         &self.pat_ddg
     }
     fn mir_cfg(&self) -> &MirControlFlowGraph {
-        &self.mir_cfg
+        self.mir_cfg
     }
     fn mir_ddg(&self) -> &MirDataDepGraph {
-        &self.mir_ddg
+        self.mir_ddg
     }
 
     fn pat(&self) -> &'pcx pat::RustItems<'pcx> {
