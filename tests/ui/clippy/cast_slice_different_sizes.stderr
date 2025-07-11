@@ -1,31 +1,46 @@
-error: casting between raw pointers to `[i32]` (element size 4) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:10:13
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:7:13
    |
+LL |     let a = r_x as *const [i32];
+   |             ------------------- cast from this
 LL |     let b = a as *const [u8];
-   |             ^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts(a as *const u8, ..)`
+   |             ^^^^^^^^^^^^^^^^
    |
-   = note: `#[deny(clippy::cast_slice_different_sizes)]` on by default
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+   = note: `#[deny(rpl::cast_slice_different_sizes)]` on by default
 
-error: casting between raw pointers to `[u8]` (element size 1) and `[u32]` (element size 4) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:13:13
-   |
-LL |     let c = b as *const [u32];
-   |             ^^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts(b as *const u32, ..)`
-
-error: casting between raw pointers to `[i32]` (element size 4) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:17:16
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:14:16
    |
 LL |     let loss = r_x as *const [i32] as *const [u8];
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts(r_x as *const [i32] as *const u8, ..)`
+   |                -------------------^^^^^^^^^^^^^^^
+   |                |
+   |                cast from this
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[i32]` (element size 4) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:25:24
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:19:19
+   |
+LL |     let restore = r_x as *const [i32] as *const [u8] as *const [u32]; // negative in clippy
+   |                   -------------------^^^^^^^^^^^^^^^
+   |                   |
+   |                   cast from this
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:25:24
    |
 LL |     let loss_block_1 = { r_x as *const [i32] } as *const [u8];
-   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts({ r_x as *const [i32] } as *const u8, ..)`
+   |                        ^^-------------------^^^^^^^^^^^^^^^^^
+   |                          |
+   |                          cast from this
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[i32]` (element size 4) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:28:24
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:28:24
    |
 LL |       let loss_block_2 = {
    |  ________________________^
@@ -33,108 +48,231 @@ LL | |
 LL | |
 LL | |         let _ = ();
 LL | |         r_x as *const [i32]
+   | |         ------------------- cast from this
 LL | |     } as *const [u8];
    | |____________________^
    |
-help: replace with `ptr::slice_from_raw_parts`
-   |
-LL ~     let loss_block_2 = core::ptr::slice_from_raw_parts({
-LL +
-LL + 
-LL +         let _ = ();
-LL +         r_x as *const [i32]
-LL ~     } as *const u8, ..);
-   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[i32]` (element size 4) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:47:27
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:36:27
    |
-LL |     let long_chain_loss = r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8] as *const [u8];
-   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts(r_x as *const [i32] as *const u8, ..)`
+LL |     let restore_block_1 = { r_x as *const [i32] } as *const [u8] as *const [u32]; // negative in clippy
+   |                           ^^-------------------^^^^^^^^^^^^^^^^^
+   |                             |
+   |                             cast from this
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:64:36
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:39:29
    |
-LL |   fn bar(x: *mut [u16]) -> *mut [u8] {
-   |  ____________________________________^
-LL | |
-LL | |
-LL | |     x as *mut [u8]
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(x as *mut u8, ..)`
+LL |     let restore_block_2 = { ({ r_x as *const [i32] }) as *const [u8] } as *const [u32]; // negative in clippy
+   |                             ^^^-------------------^^^^^^^^^^^^^^^^^^
+   |                                |
+   |                                cast from this
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:70:36
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:44:9
    |
-LL |   fn uwu(x: *mut [u16]) -> *mut [u8] {
-   |  ____________________________________^
-LL | |
-LL | |
-LL | |     x as *mut _
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(x as *mut u8, ..)`
+LL | /         ({
+LL | |             let _ = ();
+LL | |             r_x as *const [i32]
+   | |             ------------------- cast from this
+LL | |         }) as *const [u8]
+   | |_________________________^
+   |
+   = note: casting a pointer to a slice of type `i32` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:76:37
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:10:13
    |
-LL |   fn bar2(x: *mut [u16]) -> *mut [u8] {
-   |  _____________________________________^
-LL | |
-LL | |
-LL | |     x as _
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(x as *mut u8, ..)`
+LL |     let b = a as *const [u8];
+   |             ---------------- cast from this
+...
+LL |     let c = b as *const [u32];
+   |             ^^^^^^^^^^^^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:83:39
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:19:19
    |
-LL |   fn bar3(x: *mut [u16]) -> *const [u8] {
-   |  _______________________________________^
-LL | |
-LL | |
-LL | |     x as _
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts`: `core::ptr::slice_from_raw_parts(x as *const u8, ..)`
+LL |     let restore = r_x as *const [i32] as *const [u8] as *const [u32]; // negative in clippy
+   |                   ----------------------------------^^^^^^^^^^^^^^^^
+   |                   |
+   |                   cast from this
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:90:39
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:36:27
    |
-LL |   fn bar4(x: *const [u16]) -> *mut [u8] {
-   |  _______________________________________^
-LL | |
-LL | |
-LL | |     x as _
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(x as *mut u8, ..)`
+LL |     let restore_block_1 = { r_x as *const [i32] } as *const [u8] as *const [u32]; // negative in clippy
+   |                           --------------------------------------^^^^^^^^^^^^^^^^
+   |                           |
+   |                           cast from this
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:97:39
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:39:27
    |
-LL |   fn blocks(x: *mut [u16]) -> *mut [u8] {
-   |  _______________________________________^
-LL | |
-LL | |
-LL | |     ({ x }) as _
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(({ x }) as *mut u8, ..)`
+LL |     let restore_block_2 = { ({ r_x as *const [i32] }) as *const [u8] } as *const [u32]; // negative in clippy
+   |                           ^^----------------------------------------^^^^^^^^^^^^^^^^^^
+   |                             |
+   |                             cast from this
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:103:44
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:42:27
    |
-LL |   fn more_blocks(x: *mut [u16]) -> *mut [u8] {
-   |  ____________________________________________^
-LL | |
-LL | |
-LL | |     { ({ x }) as _ }
-LL | |
-LL | | }
-   | |_^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(({ x }) as *mut u8, ..)`
+LL |        let restore_block_3 = {
+   |  ____________________________^
+LL | |          let _ = ();
+LL | |/         ({
+LL | ||             let _ = ();
+LL | ||             r_x as *const [i32]
+LL | ||         }) as *const [u8]
+   | ||_________________________- cast from this
+LL | |      } as *const [u32];
+   | |______________________^
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: casting between raw pointers to `[u16]` (element size 2) and `[u8]` (element size 1) does not adjust the count
-  --> tests/ui/cast_slice_different_sizes.rs:106:5
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:56:30
    |
+LL |        let long_chain_restore = r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8]
+   |   ______________________________^
+   |  |______________________________|
+...  ||
+LL | ||         as *const [u8] as *const [u32];
+   | ||______________________-_______________^
+   | |_______________________|
+   |                         cast from this
+   |
+   = note: casting a pointer to a slice of type `u8` to a pointer to a slice of another type `u32` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:52:9
+   |
+LL |         r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8] as *const [u8];
+   |         -----------------------------------^^^^^^^^^^^^^^^^
+   |         |
+   |         cast from this
+   |
+   = note: casting a pointer to a slice of type `u32` to a pointer to a slice of another type `u16` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:56:30
+   |
+LL |     let long_chain_restore = r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8]
+   |                              -----------------------------------^^^^^^^^^^^^^^^^
+   |                              |
+   |                              cast from this
+   |
+   = note: casting a pointer to a slice of type `u32` to a pointer to a slice of another type `u16` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:52:9
+   |
+LL |         r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8] as *const [u8];
+   |         ---------------------------------------------------^^^^^^^^^^^^^^^
+   |         |
+   |         cast from this
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `i8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:56:30
+   |
+LL |     let long_chain_restore = r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8]
+   |                              ---------------------------------------------------^^^^^^^^^^^^^^^
+   |                              |
+   |                              cast from this
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `i8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:76:5
+   |
+LL | fn bar(x: *mut [u16]) -> *mut [u8] {
+   |        - cast from this
+...
+LL |     x as *mut [u8]
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:82:5
+   |
+LL | fn uwu(x: *mut [u16]) -> *mut [u8] {
+   |        - cast from this
+...
+LL |     x as *mut _
+   |     ^^^^^^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:88:5
+   |
+LL | fn bar2(x: *mut [u16]) -> *mut [u8] {
+   |         - cast from this
+...
+LL |     x as _
+   |     ^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:95:5
+   |
+LL | fn bar3(x: *mut [u16]) -> *const [u8] {
+   |         - cast from this
+...
+LL |     x as _
+   |     ^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:102:5
+   |
+LL | fn bar4(x: *const [u16]) -> *mut [u8] {
+   |         - cast from this
+...
+LL |     x as _
+   |     ^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:109:5
+   |
+LL | fn blocks(x: *mut [u16]) -> *mut [u8] {
+   |           - cast from this
+...
+LL |     ({ x }) as _
+   |     ^^^^^^^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
+
+error: casts between raw pointers to slices with different element sizes
+  --> tests/ui/clippy/cast_slice_different_sizes.rs:115:7
+   |
+LL | fn more_blocks(x: *mut [u16]) -> *mut [u8] {
+   |                - cast from this
+...
 LL |     { ({ x }) as _ }
-   |     ^^^^^^^^^^^^^^^^ help: replace with `ptr::slice_from_raw_parts_mut`: `core::ptr::slice_from_raw_parts_mut(({ x }) as *mut u8, ..)`
+   |       ^^^^^^^^^^^^
+   |
+   = note: casting a pointer to a slice of type `u16` to a pointer to a slice of another type `u8` with different element type ABI, size or alignment can lead to undefined behavior.
 
-error: aborting due to 14 previous errors
+error: aborting due to 25 previous errors
 

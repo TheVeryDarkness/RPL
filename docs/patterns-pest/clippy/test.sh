@@ -6,6 +6,7 @@ function uitest() {
     RPL_PATS="$1" cargo uitest -- "$2"
 }
 
+uitest "docs/patterns-pest/clippy/cast-slice-different-sizes.rpl"                                                  "tests/ui/clippy/cast_slice_different_sizes.rs"
 uitest "docs/patterns-pest/clippy/cast-slice-from-raw-parts.rpl"                                                   "tests/ui/clippy/cast_raw_slice_pointer_cast.rs"
 uitest "docs/patterns-pest/clippy/from-raw-with-void-ptr.rpl"                                                      "tests/ui/clippy/from_raw_with_void_ptr.rs"
 uitest "docs/patterns-pest/clippy/not-unsafe-ptr-arg-deref.rpl"                                                    "tests/ui/clippy/functions.rs"
@@ -17,5 +18,4 @@ uitest "docs/patterns-pest/clippy/uninit-assumed-init.rpl"                      
 uitest "docs/patterns-pest/clippy/unsound-collection-transmute.rpl"                                                "tests/ui/clippy/transmute_collection.rs"
 uitest "docs/patterns-pest/clippy/wrong-transmute.rpl"                                                             "tests/ui/clippy/transmute_32bit.rs"
 uitest "docs/patterns-pest/clippy/wrong-transmute.rpl"                                                             "tests/ui/clippy/transmute_64bit.rs"
-
 # RPL_PATS="docs/patterns-pest" cargo uibless tests/ui/clippy

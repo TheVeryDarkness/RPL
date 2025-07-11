@@ -1,6 +1,3 @@
-//@no-rustfix: overlapping suggestions
-#![allow(clippy::let_unit_value, clippy::unnecessary_cast)]
-
 fn main() {
     let x: [i32; 3] = [1_i32, 2, 3];
     let r_x = &x;
@@ -19,7 +16,10 @@ fn main() {
 
     // Cast back to same size but different type loses no data, just type conversion
     // This is weird code but there's no reason for this lint specifically to fire *twice* on it
-    let restore = r_x as *const [i32] as *const [u8] as *const [u32];
+    let restore = r_x as *const [i32] as *const [u8] as *const [u32]; // negative in clippy
+    //~^ cast_slice_different_sizes
+    //~| cast_slice_different_sizes
+
 
     // Check casting through blocks is detected
     let loss_block_1 = { r_x as *const [i32] } as *const [u8];
@@ -33,11 +33,15 @@ fn main() {
     } as *const [u8];
 
     // Check that resources of the same size are detected through blocks
-    let restore_block_1 = { r_x as *const [i32] } as *const [u8] as *const [u32];
-    let restore_block_2 = { ({ r_x as *const [i32] }) as *const [u8] } as *const [u32];
-    let restore_block_3 = {
+    let restore_block_1 = { r_x as *const [i32] } as *const [u8] as *const [u32]; // negative in clippy
+    //~^ cast_slice_different_sizes
+    //~| cast_slice_different_sizes
+    let restore_block_2 = { ({ r_x as *const [i32] }) as *const [u8] } as *const [u32]; // negative in clippy
+    //~^ cast_slice_different_sizes
+    //~| cast_slice_different_sizes
+    let restore_block_3 = { //~ cast_slice_different_sizes
         let _ = ();
-        ({
+        ({ //~ cast_slice_different_sizes
             let _ = ();
             r_x as *const [i32]
         }) as *const [u8]
@@ -47,8 +51,12 @@ fn main() {
     let long_chain_loss =
         r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8] as *const [u8];
     //~^ cast_slice_different_sizes
+    //~| cast_slice_different_sizes
 
     let long_chain_restore = r_x as *const [i32] as *const [u32] as *const [u16] as *const [i8]
+    //~^ cast_slice_different_sizes
+    //~| cast_slice_different_sizes
+    //~| cast_slice_different_sizes
         as *const [u8] as *const [u32];
 }
 
@@ -63,46 +71,46 @@ fn foo2(x: *mut [u8]) -> *mut [u8] {
 
 // Test that casts as part of function returns work
 fn bar(x: *mut [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    x as *mut [u8]
+    x as *mut [u8] //~ cast_slice_different_sizes
 }
 
 fn uwu(x: *mut [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    x as *mut _
+    x as *mut _ //~ cast_slice_different_sizes
 }
 
 fn bar2(x: *mut [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    x as _
+    x as _ //~ cast_slice_different_sizes
 }
 
 // constify
 fn bar3(x: *mut [u16]) -> *const [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    x as _
+    x as _ //~ cast_slice_different_sizes
 }
 
 // unconstify
 fn bar4(x: *const [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    x as _
+    x as _ //~ cast_slice_different_sizes
 }
 
 // function returns plus blocks
 fn blocks(x: *mut [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
-    ({ x }) as _
+    ({ x }) as _ //~ cast_slice_different_sizes
 }
 
 fn more_blocks(x: *mut [u16]) -> *mut [u8] {
-    //~^ cast_slice_different_sizes
+    // FIXME:~^ cast_slice_different_sizes
 
     { ({ x }) as _ }
     //~^ cast_slice_different_sizes
