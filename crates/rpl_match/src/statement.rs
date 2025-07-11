@@ -63,7 +63,9 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     type MatchTy: MatchTy<'pcx, 'tcx>;
     fn ty(&self) -> &Self::MatchTy;
 
+    #[must_use]
     fn match_local(&self, pat: pat::Local, local: mir::Local) -> bool;
+    #[must_use]
     fn match_place_var(&self, pat: pat::PlaceVarIdx, place: mir::PlaceRef<'tcx>) -> bool;
 
     // Control flow matching

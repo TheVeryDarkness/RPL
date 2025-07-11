@@ -164,6 +164,9 @@ impl<I: Idx> Candidates<I> {
         false
     }
     pub fn unmatch(&self, name: Symbol, idx: I) {
+        debug_assert!(self.matches.contains_key(&name));
+        debug_assert!(self.matches[&name].get().is_some());
+        debug_assert!(self.matches[&name].get().is_some_and(|matched| matched == idx));
         if self.matches[&name].get().is_some_and(|matched| matched == idx) {
             self.matches[&name].unmatch();
         }

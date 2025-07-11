@@ -114,9 +114,13 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
     fn tcx(&self) -> TyCtxt<'tcx>;
     fn typing_env(&self) -> ty::TypingEnv<'tcx>;
 
+    #[must_use]
     fn match_ty_var(&self, ty_var: pat::TyVar, ty: ty::Ty<'tcx>) -> bool;
+    #[must_use]
     fn match_ty_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: ty::Const<'tcx>) -> bool;
+    #[must_use]
     fn match_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: mir::Const<'tcx>) -> bool;
+    #[must_use]
     fn match_adt_matches(&self, pat: Symbol, adt_match: AdtMatch<'tcx>) -> bool;
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -153,8 +157,7 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
                     })
                 ) =>
             {
-                self.match_ty_var(ty_var, ty);
-                true
+                self.match_ty_var(ty_var, ty)
             },
             (pat::TyKind::Array(ty_pat, konst_pat), ty::Array(ty, konst)) => {
                 self.match_ty(ty_pat, ty) && self.match_const(konst_pat, konst)
@@ -199,8 +202,7 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
             (pat::TyKind::AdtPat(pat), ty::Adt(adt, _)) => {
                 if let Some(adt_pat) = self.pat().get_adt(pat)
                     && let Some(adt_match) = self.match_adt(adt_pat, adt) {
-                        self.match_adt_matches(pat, adt_match);
-                    true
+                        self.match_adt_matches(pat, adt_match)
                 } else {
                     false
                 }

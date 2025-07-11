@@ -65,6 +65,7 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
     }
 }
 
+/// In general this implementation is slow but correct.
 impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
     fn pat(&self) -> &'pcx pat::RustItems<'pcx> {
         self.cx.ty.pat
@@ -91,6 +92,7 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
         if let mir::Const::Ty(_, konst_matched) = konst_matched {
             konst_matched == konst
         } else {
+            info!("expected a type constant, got {:?}", konst_matched);
             false
         }
     }

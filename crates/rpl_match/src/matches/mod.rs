@@ -1004,39 +1004,38 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     // this method.
     #[instrument(level = "debug", skip(self), ret)]
     fn match_local(&self, local_pat: pat::Local, local: mir::Local) -> bool {
+        if !self.match_local_ty(self.cx.mir_pat.locals[local_pat], self.cx.body.local_decls[local].ty) {
+            return false;
+        }
         if self.matching[local_pat].matched.r#match(local) {
             self.log_local_matched(local_pat, local);
+            true
         } else {
             self.log_local_conflicted(local_pat, local);
             return false;
         }
         //FIXME: use a more elegant way to ensure that we reset the matching state when failing
-        if self.match_local_ty(self.cx.mir_pat.locals[local_pat], self.cx.body.local_decls[local].ty) {
-            true
-        } else {
-            self.matching[local_pat].matched.unmatch();
-            false
-        }
     }
     #[instrument(level = "debug", skip(self), ret)]
     fn match_local_ty(&self, ty_pat: pat::Ty<'pcx>, ty: Ty<'tcx>) -> bool {
-        self.cx.ty.match_ty(ty_pat, ty)
-            && self.cx.ty.ty_vars.iter_enumerated().all(|(ty_var, tys)| {
-                let tys = core::mem::take(&mut *tys.borrow_mut());
-                trace!("type variable {ty_var:?} candidates: {tys:?}",);
-                let ty = match tys {
-                    tys if tys.is_empty() => return true,
-                    tys if tys.len() == 1 => tys.iter().copied().next().unwrap(),
-                    tys => {
-                        info!("multiple candidates for type variable {ty_var:?}: {tys:?}",);
-                        return false;
-                    },
-                };
-                let ty_var_matched = self.matching[ty_var].force_get_matched();
-                trace!("type variable {ty_var:?} matched: {ty_var_matched:?} matching: {ty:?}",);
-                // self.match_ty_var(ty_var, ty)
-                ty_var_matched == ty
-            })
+        self.match_ty(ty_pat, ty)
+        // self.cx.ty.match_ty(ty_pat, ty)
+        //     && self.cx.ty.ty_vars.iter_enumerated().all(|(ty_var, tys)| {
+        //         let tys = core::mem::take(&mut *tys.borrow_mut());
+        //         trace!("type variable {ty_var:?} candidates: {tys:?}",);
+        //         let ty = match tys {
+        //             tys if tys.is_empty() => return true,
+        //             tys if tys.len() == 1 => tys.iter().copied().next().unwrap(),
+        //             tys => {
+        //                 info!("multiple candidates for type variable {ty_var:?}: {tys:?}",);
+        //                 return false;
+        //             },
+        //         };
+        //         let ty_var_matched = self.matching[ty_var].force_get_matched();
+        //         trace!("type variable {ty_var:?} matched: {ty_var_matched:?} matching: {ty:?}",);
+        //         // self.match_ty_var(ty_var, ty)
+        //         ty_var_matched == ty
+        //     })
     }
     #[instrument(level = "debug", skip(self), ret)]
     fn match_ty_var(&self, ty_var: pat::TyVarIdx, ty: Ty<'tcx>) -> bool {
