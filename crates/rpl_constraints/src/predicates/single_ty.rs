@@ -72,27 +72,28 @@ pub fn needs_drop<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: 
 }
 
 /// Check if ty is a primitive type.
-#[allow(unused_variables)]
 pub fn is_primitive<'tcx>(_tcx: TyCtxt<'tcx>, _typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_primitive()
 }
 
 /// Check if ty is a floating-point type.
-#[allow(unused_variables)]
 pub fn is_float<'tcx>(_tcx: TyCtxt<'tcx>, _typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_floating_point()
 }
 
 /// Check if ty is `char`.
-#[allow(unused_variables)]
 pub fn is_char<'tcx>(_tcx: TyCtxt<'tcx>, _typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_char()
 }
 
 /// Check if ty is a reference type.
-#[allow(unused_variables)]
 pub fn is_ref<'tcx>(_tcx: TyCtxt<'tcx>, _typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_ref()
+}
+
+/// Check if ty is a function pointer type.
+pub fn is_fn_ptr<'tcx>(_tcx: TyCtxt<'tcx>, _typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
+    ty.is_fn_ptr()
 }
 
 /// Check if ty is a ZST.

@@ -1,8 +1,6 @@
-//@ignore-on-host
+//@revisions: normal
+//@[normal]compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
 #![allow(dead_code)]
-#![warn(clippy::transmute_null_to_fn)]
-#![allow(clippy::zero_ptr, clippy::missing_transmute_annotations)]
-#![allow(clippy::manual_dangling_ptr)]
 
 // Easy to lint because these only span one line.
 fn one_liners() {
@@ -29,6 +27,7 @@ fn transmute_const() {
     }
 }
 
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn issue_11485() {
     unsafe {
         let _: fn() = std::mem::transmute(0 as *const u8 as *const ());
