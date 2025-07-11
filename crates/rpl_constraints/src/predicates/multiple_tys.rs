@@ -28,20 +28,32 @@ pub fn same_abi_and_pref_align<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEn
     layouts.windows(2).all(|w| w[0] == w[1])
 }
 
-/// Check if all tys have the same layout.
+/// Check if the first type's layout is compatible with the rest of the types' layouts.
 #[instrument(level = "debug", skip(tcx, typing_env), ret)]
-pub fn same_layout<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, tys: Vec<Ty<'tcx>>) -> bool {
-    if tys.is_empty() {
-        return true;
+pub fn compatible_layout<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, tys: Vec<Ty<'tcx>>) -> bool {
+    fn compatible_layout<'tcx>(
+        tcx: TyCtxt<'tcx>,
+        typing_env: ty::TypingEnv<'tcx>,
+        from: Ty<'tcx>,
+        to: Ty<'tcx>,
+    ) -> bool {
+        if let Ok(from) = tcx.try_normalize_erasing_regions(typing_env, from)
+            && let Ok(to) = tcx.try_normalize_erasing_regions(typing_env, to)
+            && let Ok(from_layout) = tcx.layout_of(typing_env.as_query_input(from))
+            && let Ok(to_layout) = tcx.layout_of(typing_env.as_query_input(to))
+        {
+            from_layout.size == to_layout.size && from_layout.align.abi == to_layout.align.abi
+        } else {
+            // no idea about layout, so don't lint
+            true
+        }
     }
-    let first_layout = tcx.layout_of(typing_env.as_query_input(tys[0]));
-    if first_layout.is_err() {
-        return false;
+
+    if let Some((first_ty, remained_tys)) = tys.split_first() {
+        // Check if all types have the same layout as the first type
+        return remained_tys
+            .iter()
+            .all(|ty| compatible_layout(tcx, typing_env, *first_ty, *ty));
     }
-    let first_layout = first_layout.unwrap().layout;
-    tys.iter().all(|ty| {
-        tcx.layout_of(typing_env.as_query_input(*ty))
-            .map(|layout| layout.layout == first_layout)
-            .unwrap_or(false)
-    })
+    true
 }
