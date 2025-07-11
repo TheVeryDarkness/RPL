@@ -62,6 +62,8 @@ diag {
     transmute_null = {
         primary(cast) = "transmuting a known null pointer into a function pointer",
         note          = "`{$null}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior",
+        help          = "try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value",
         name          = "transmute_null_to_fn",
+        level         = "warn",
     }
 }

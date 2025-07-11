@@ -1,5 +1,4 @@
-//@revisions: normal
-//@[normal]compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
+//@compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
 #![allow(dead_code)]
 
 // Easy to lint because these only span one line.
