@@ -1,7 +1,7 @@
 #![allow(deprecated, invalid_value)]
 // FIXME: #[allow(rpl::uninit_assumed_init)]
 //@compile-flags: -Z inline-mir=false
-//@no-rustfix
+
 use std::mem;
 
 fn might_panic<X>(x: X) -> X {

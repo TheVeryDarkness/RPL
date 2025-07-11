@@ -1,10 +1,9 @@
-//@ignore-on-host
-#![warn(clippy::unsound_collection_transmute)]
-#![allow(clippy::missing_transmute_annotations)]
-
+//@revisions: inline normal
+//@[inline]compile-flags: -Z inline-mir=true
+//@[normal]compile-flags: -Z inline-mir=false
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::mem::{MaybeUninit, transmute};
-
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     unsafe {
         // wrong size
