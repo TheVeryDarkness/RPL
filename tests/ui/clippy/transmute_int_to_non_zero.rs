@@ -1,8 +1,5 @@
-//@ignore-on-host
-#![warn(clippy::transmute_int_to_non_zero)]
-#![allow(clippy::missing_transmute_annotations)]
-
-use core::num::NonZero;
+//@compile-flags: -Z mir-opt-level=0
+use std::num::NonZero;
 
 fn main() {
     let int_u8: u8 = 1;
