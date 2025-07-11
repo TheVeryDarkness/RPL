@@ -87,14 +87,19 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
         self.matching.ty_vars[ty_var.idx].force_get_matched() == ty
     }
 
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_ty_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: rustc_middle::ty::Const<'tcx>) -> bool {
         let konst_matched = self.matching.const_vars[const_var.idx].force_get_matched();
-        if let mir::Const::Ty(_, konst_matched) = konst_matched {
-            konst_matched == konst
-        } else {
-            info!("expected a type constant, got {:?}", konst_matched);
-            false
+        match (konst_matched, konst.kind()) {
+            (mir::Const::Ty(_, konst_matched), _) => return konst_matched == konst,
+            (mir::Const::Val(value, ty), ty::ConstKind::Value(konst_value)) => {
+                return konst_value.ty == ty && value == self.cx.ty.tcx.valtree_to_const_val(konst_value);
+            },
+            _ => (),
         }
+        // FIXME: handle constants better
+        info!("expected a type constant, got {:?}", konst_matched);
+        false
     }
 
     fn match_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: mir::Const<'tcx>) -> bool {
