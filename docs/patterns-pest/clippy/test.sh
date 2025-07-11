@@ -13,5 +13,7 @@ uitest "docs/patterns-pest/clippy/mem-replace-with-uninit.rpl:docs/patterns-pest
 uitest "docs/patterns-pest/clippy/transmuting-null.rpl"                                                            "tests/ui/clippy/transmuting_null.rs"
 uitest "docs/patterns-pest/clippy/uninit-assumed-init.rpl"                                                         "tests/ui/clippy/uninit.rs"
 uitest "docs/patterns-pest/clippy/unsound-collection-transmute.rpl"                                                "tests/ui/clippy/transmute_collection.rs"
+uitest "docs/patterns-pest/clippy/wrong-transmute.rpl"                                                             "tests/ui/clippy/transmute_32bit.rs"
+uitest "docs/patterns-pest/clippy/wrong-transmute.rpl"                                                             "tests/ui/clippy/transmute_64bit.rs"
 
 # RPL_PATS="docs/patterns-pest" cargo uibless tests/ui/clippy
