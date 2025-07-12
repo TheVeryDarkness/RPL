@@ -227,10 +227,14 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let positive = &pat_op.positive;
-        let positive = self
-            .impl_matched_pat_item(positive.0, positive.1, def_id, header, has_self, body, mir_cfg, mir_ddg)
-            .map(|matched| matched.map(&positive.2));
+        let positive: Vec<_> = pat_op
+            .positive
+            .iter()
+            .flat_map(|positive| {
+                self.impl_matched_pat_item(positive.0, positive.1, def_id, header, has_self, body, mir_cfg, mir_ddg)
+                    .map(|matched| matched.map(&positive.2))
+            })
+            .collect();
         let negative: FxHashSet<_> = pat_op
             .negative
             .iter()
@@ -239,10 +243,10 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     .map(|matched| matched.map(&negative.2))
             })
             .collect();
-        debug!(negative = ?negative, "impl_matched_pat_op");
+        debug!(?positive, ?negative, "impl_matched_pat_op");
 
         let iter = positive
-            .inspect(|positive| debug!(positive = ?positive, "impl_matched_pat_op positive"))
+            .into_iter()
             .filter(move |matched| {
                 debug_assert!(negative.iter().all(|neg| neg.has_same_head(matched)));
                 !negative.contains(matched)
@@ -332,10 +336,14 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
     ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let positive = &pat_op.positive;
-        let positive = self
-            .fn_matched_pat_item(positive.0, positive.1, def_id, header, has_self, body, mir_cfg, mir_ddg)
-            .map(|matched| matched.map(&positive.2));
+        let positive: Vec<_> = pat_op
+            .positive
+            .iter()
+            .flat_map(|positive| {
+                self.fn_matched_pat_item(positive.0, positive.1, def_id, header, has_self, body, mir_cfg, mir_ddg)
+                    .map(|matched| matched.map(&positive.2))
+            })
+            .collect();
         let negative: FxHashSet<_> = pat_op
             .negative
             .iter()
@@ -344,10 +352,10 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     .map(|matched| matched.map(&negative.2))
             })
             .collect();
-        debug!(negative = ?negative, "impl_matched_pat_op");
+        debug!(?positive, ?negative, "impl_matched_pat_op");
 
         let iter = positive
-            .inspect(|positive| debug!(positive = ?positive, "impl_matched_pat_op positive"))
+            .into_iter()
             .filter(move |matched| {
                 debug_assert!(negative.iter().all(|neg| neg.has_same_head(matched)));
                 !negative.contains(matched)

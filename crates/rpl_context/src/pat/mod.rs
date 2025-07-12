@@ -333,14 +333,18 @@ impl<'pcx> RustItems<'pcx> {
 pub struct PatternOperation<'pcx> {
     pub pcx: PatCtxt<'pcx>,
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
-    pub positive: (Symbol, &'pcx PatternItem<'pcx>, MatchedMap),
+    pub positive: Vec<(Symbol, &'pcx PatternItem<'pcx>, MatchedMap)>,
     pub negative: Vec<(Symbol, &'pcx PatternItem<'pcx>, MatchedMap)>,
     pub attr: PatAttr<'pcx>,
 }
 
 impl PatternOperation<'_> {
     fn table_head(&self) -> TableHead {
-        let head = self.positive.1.table_head();
+        let head = self.positive.first().unwrap().1.table_head();
+        debug_assert!(
+            self.positive.iter().all(|(_, item, _)| item.table_head() == head),
+            "All positive pattern items should have the same table head"
+        );
         debug_assert!(
             self.negative.iter().all(|(_, item, _)| item.table_head() == head),
             "All negative pattern items should have the same table head as the positive one"
@@ -479,9 +483,16 @@ impl<'pcx> Pattern<'pcx> {
         meta: Arc<NonLocalMetaVars<'pcx>>,
         block_type: PattOrUtil,
     ) {
-        let (pos, neg) = patt_op.PatternConfiguration();
-        let positive = self.patt_op(&meta, pos);
-        let negative = neg.iter().map(|negative| self.patt_op(&meta, negative)).collect();
+        let patt_op = patt_op.PatternExpression();
+        let (pos, pos_, neg) = patt_op.get_matched();
+        let positive = std::iter::once(pos)
+            .chain(pos_.iter_matched().map(|pos_| pos_.get_matched().1))
+            .map(|pos| self.patt_op(&meta, pos))
+            .collect();
+        let negative = neg
+            .iter_matched()
+            .map(|negative| self.patt_op(&meta, negative.get_matched().1))
+            .collect();
         let attr = PatAttr::parse_all(attr);
         let pat_ops = PatternOperation {
             pcx: self.pcx,

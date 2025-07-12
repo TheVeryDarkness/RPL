@@ -206,6 +206,7 @@ Star       = @{ "*" }
 Arrow      = @{ "->" }
 RightArrow = @{ "=>" }
 Quote      = @{ "'" }
+Plus       = @{ "+" }
 Minus      = @{ "-" }
 // Quote2     = @{ "\"" }
 // At         = @{ "@" }
@@ -901,7 +902,7 @@ PatternConfiguration = {
 }
 
 PatternExpression = {
-    PatternConfiguration ~ (Minus ~ PatternConfiguration)*
+    PatternConfiguration ~ (Plus ~ PatternConfiguration)* ~ (Minus ~ PatternConfiguration)*
 }
 
 // FIXME

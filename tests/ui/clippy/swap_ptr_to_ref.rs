@@ -1,8 +1,7 @@
-//@ignore-on-host
-#![warn(clippy::swap_ptr_to_ref)]
-
+//@compile-flags: -Z inline-mir=false
 use core::ptr::addr_of_mut;
 
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     let mut x = 0u32;
     let y: *mut _ = &mut x;
