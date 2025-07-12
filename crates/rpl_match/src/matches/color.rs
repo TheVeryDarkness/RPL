@@ -13,6 +13,9 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
         self.cx.body
     }
 
+    fn fn_pat(&self) -> &pat::FnPattern<'pcx> {
+        self.cx.fn_pat
+    }
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx> {
         self.cx.mir_pat
     }
@@ -74,13 +77,16 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
     fn pcx(&self) -> rpl_context::PatCtxt<'pcx> {
         self.cx.ty.pcx
     }
-
     fn tcx(&self) -> rustc_middle::ty::TyCtxt<'tcx> {
         self.cx.ty.tcx
     }
 
     fn typing_env(&self) -> rustc_middle::ty::TypingEnv<'tcx> {
         self.cx.ty.typing_env
+    }
+
+    fn self_ty(&self) -> Option<ty::Ty<'tcx>> {
+        self.cx.self_ty
     }
 
     fn match_ty_var(&self, ty_var: pat::TyVar, ty: rustc_middle::ty::Ty<'tcx>) -> bool {

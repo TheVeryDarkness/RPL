@@ -23,6 +23,7 @@ pub struct MatchTyCtxt<'pcx, 'tcx> {
     pub pcx: PatCtxt<'pcx>,
     pub pat: &'pcx pat::RustItems<'pcx>,
     pub typing_env: ty::TypingEnv<'tcx>,
+    pub self_ty: Option<ty::Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, RefCell<FxIndexSet<mir::Const<'tcx>>>>,
     pub ty_vars: IndexVec<pat::TyVarIdx, RefCell<FxIndexSet<ty::Ty<'tcx>>>>,
     pub adt_matches: RefCell<FxHashMap<Symbol, FxHashMap<DefId, AdtMatch<'tcx>>>>,
@@ -34,6 +35,7 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
         typing_env: ty::TypingEnv<'tcx>,
+        self_ty: Option<ty::Ty<'tcx>>,
         pat: &'pcx pat::RustItems<'pcx>,
         meta: &pat::NonLocalMetaVars<'pcx>,
     ) -> Self {
@@ -42,6 +44,7 @@ impl<'pcx, 'tcx> MatchTyCtxt<'pcx, 'tcx> {
             pcx,
             pat,
             typing_env,
+            self_ty,
             ty_vars: IndexVec::from_elem(RefCell::new(FxIndexSet::default()), &meta.ty_vars),
             const_vars: IndexVec::from_elem(RefCell::new(FxIndexSet::default()), &meta.const_vars),
             adt_matches: Default::default(),
@@ -61,6 +64,10 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchTyCtxt<'pcx, 'tcx> {
     }
     fn typing_env(&self) -> ty::TypingEnv<'tcx> {
         self.typing_env
+    }
+
+    fn self_ty(&self) -> Option<ty::Ty<'tcx>> {
+        self.self_ty
     }
 
     fn match_ty_var(&self, ty_var: pat::TyVar, ty: ty::Ty<'tcx>) -> bool {
@@ -109,6 +116,7 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchTyCtxt<'pcx, 'tcx> {
 }
 
 pub(crate) trait MatchTy<'pcx, 'tcx> {
+    fn self_ty(&self) -> Option<ty::Ty<'tcx>>;
     fn pat(&self) -> &'pcx pat::RustItems<'pcx>;
     fn pcx(&self) -> PatCtxt<'pcx>;
     fn tcx(&self) -> TyCtxt<'tcx>;
@@ -213,6 +221,9 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
             //         && self.match_generic_args(args, alias.args)
             // },
             (pat::TyKind::Bool, ty::Bool) => true,
+            (pat::TyKind::Self_, _) => {
+                self.self_ty() == Some(ty)
+            },
             (pat::TyKind::Any, _) => true,
             (
                 pat::TyKind::TyVar(_)

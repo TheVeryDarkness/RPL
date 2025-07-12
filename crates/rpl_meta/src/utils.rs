@@ -46,6 +46,19 @@ impl<'i> From<&pairs::MetaVariable<'i>> for Ident<'i> {
     }
 }
 
+impl<'i> From<&pairs::kw_self<'i>> for Ident<'i> {
+    fn from(meta: &pairs::kw_self<'i>) -> Self {
+        let span = meta.span;
+        let name = Symbol::intern(span.as_str());
+        Self { name, span }
+    }
+}
+impl<'i> From<&pairs::SelfParam<'i>> for Ident<'i> {
+    fn from(meta: &pairs::SelfParam<'i>) -> Self {
+        meta.kw_self().into()
+    }
+}
+
 impl<'i> From<&pairs::Dollarself<'i>> for Ident<'i> {
     fn from(meta: &pairs::Dollarself<'i>) -> Self {
         let span = meta.span;

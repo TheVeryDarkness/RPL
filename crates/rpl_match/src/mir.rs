@@ -22,6 +22,7 @@ pub struct CheckMirCtxt<'a, 'pcx, 'tcx> {
     pub(crate) place: MatchPlaceCtxt<'pcx, 'tcx>,
     pub(crate) body: &'a mir::Body<'tcx>,
     pub(crate) has_self: bool,
+    pub(crate) self_ty: Option<ty::Ty<'tcx>>,
     pub(crate) pat_name: Symbol,
     pub(crate) fn_pat: &'a pat::FnPattern<'pcx>,
     pub(crate) mir_pat: &'a pat::FnPatternBody<'pcx>,
@@ -40,12 +41,15 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
     #[instrument(level = "debug", skip_all, fields(
         def_id = ?body.source.def_id(),
         pat_name = ?pat_name,
+        ?has_self,
+        ?self_ty,
     ))]
     pub fn new(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
         body: &'a mir::Body<'tcx>,
         has_self: bool,
+        self_ty: Option<ty::Ty<'tcx>>,
         pat: &'pcx pat::RustItems<'pcx>,
         pat_name: Symbol,
         fn_pat: &'a pat::FnPattern<'pcx>,
@@ -53,7 +57,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
         mir_ddg: &'a MirDataDepGraph,
     ) -> Self {
         let typing_env = ty::TypingEnv::post_analysis(tcx, body.source.def_id());
-        let ty = MatchTyCtxt::new(tcx, pcx, typing_env, pat, &fn_pat.meta);
+        let ty = MatchTyCtxt::new(tcx, pcx, typing_env, self_ty, pat, &fn_pat.meta);
         let place = MatchPlaceCtxt::new(tcx, pcx, &fn_pat.meta);
         // let places = pat.locals.iter().map(|&local| ty.mk_ty(pat.locals[local].ty)).collect();
         let mir_pat = fn_pat.expect_body();
@@ -66,6 +70,7 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
             place,
             body,
             has_self,
+            self_ty,
             pat_name,
             fn_pat,
             mir_pat,
@@ -237,6 +242,9 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
 impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
     fn body(&self) -> &mir::Body<'tcx> {
         self.body
+    }
+    fn fn_pat(&self) -> &pat::FnPattern<'pcx> {
+        self.fn_pat
     }
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx> {
         self.mir_pat

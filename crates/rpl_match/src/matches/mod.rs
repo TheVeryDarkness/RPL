@@ -393,6 +393,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     #[instrument(level = "debug", skip(self))]
     fn build_candidates(&mut self) {
+        if !self.cx.match_ret_ty() {
+            return;
+        }
         for (bb_pat, block_mat) in self.matching.basic_blocks.iter_enumerated_mut() {
             let _span = debug_span!("build_candidates", ?bb_pat).entered();
             let block_pat = &self.cx.mir_pat[bb_pat];
@@ -548,6 +551,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_ty_var_candidates(&self, ty_var: pat::TyVarIdx, loc_pats: &[pat::Location]) {
         if ty_var == self.cx.fn_pat.meta.ty_vars.next_index() {
+            if !self.match_ret_ty() {
+                return;
+            }
             self.assert_const_var_free();
             self.match_const_var_candidates(pat::ConstVarIdx::ZERO, loc_pats);
             self.assert_const_var_free();

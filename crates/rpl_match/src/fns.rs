@@ -19,7 +19,8 @@ impl<'a, 'pcx, 'tcx> MatchFnCtxt<'a, 'pcx, 'tcx> {
         pat: &'pcx pat::RustItems<'pcx>,
         fn_pat: &'a pat::FnPattern<'pcx>,
     ) -> Self {
-        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &fn_pat.meta); // FIXME
+        // FIXME: `self_ty` should be passed from the caller.
+        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), None, pat, &fn_pat.meta); // FIXME
         Self { ty, fn_pat }
     }
 

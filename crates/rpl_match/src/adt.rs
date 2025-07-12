@@ -23,7 +23,8 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         pat: &'pcx pat::RustItems<'pcx>,
         adt_pat: &'a pat::Adt<'pcx>,
     ) -> Self {
-        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &adt_pat.meta);
+        // FIXME: `self_ty` should be passed from the caller.
+        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), None, pat, &adt_pat.meta);
         Self { ty, adt_pat }
     }
 

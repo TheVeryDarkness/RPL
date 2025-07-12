@@ -1,9 +1,10 @@
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use impls::CheckImplCtxt;
 use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
+use pest_typed::ParsableTypedNode;
 use rpl_constraints::predicates::{PredicateConjunction, PredicateError};
 use rustc_data_structures::fx::FxHashMap;
 use rustc_span::Symbol;
@@ -276,6 +277,22 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_self_param(&mut self, mctx: &MetaContext<'i>, self_param: &'i pairs::SelfParam<'i>) {
         self.fn_def.add_self_param(mctx, self_param, self.errors);
+        static SELF: LazyLock<pairs::Type<'static>> = LazyLock::new(|| pairs::Type::try_parse("Self").unwrap());
+        static REF_SELF: LazyLock<pairs::Type<'static>> = LazyLock::new(|| pairs::Type::try_parse("&Self").unwrap());
+        static REF_MUT_SELF: LazyLock<pairs::Type<'static>> =
+            LazyLock::new(|| pairs::Type::try_parse("&mut Self").unwrap());
+        let ty = if self_param.And().is_some() {
+            if self_param.Mutability().kw_mut().is_some() {
+                &REF_MUT_SELF
+            } else {
+                &REF_SELF
+            }
+        } else {
+            &SELF
+        };
+        let ident = self_param.into();
+        self.fn_def
+            .add_local(mctx, None, ident, ty, LocalSpecial::Arg, self.errors);
     }
 
     fn check_normal_param(&mut self, mctx: &MetaContext<'i>, normal_param: &'i pairs::NormalParam<'i>) {

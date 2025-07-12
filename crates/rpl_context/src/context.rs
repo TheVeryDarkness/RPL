@@ -161,6 +161,9 @@ impl<'pcx> PatCtxt<'pcx> {
     pub fn mk_any_ty(self) -> Ty<'pcx> {
         self.mk_ty(TyKind::Any)
     }
+    pub fn mk_self_ty(self) -> Ty<'pcx> {
+        self.mk_ty(TyKind::Self_)
+    }
     pub(crate) fn mk_ty(self, kind: TyKind<'pcx>) -> Ty<'pcx> {
         Ty(self.arena.alloc(kind))
     }

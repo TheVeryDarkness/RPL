@@ -46,6 +46,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     // Block structure matching, such as statement or terminator matching
 
     fn body(&self) -> &mir::Body<'tcx>;
+    fn fn_pat(&self) -> &pat::FnPattern<'pcx>;
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx>;
 
     fn pat_cfg(&self) -> &PatControlFlowGraph;
@@ -769,6 +770,8 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             });
     }
 
+    // place type
+
     fn get_place_ty_from_local(&self, local: pat::Local) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.mir_pat().locals[local])
     }
@@ -780,5 +783,18 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             pat::PlaceBase::Var(var) => self.get_place_ty_from_place_var(var),
         }
         // self.body.local_decls[place.local].ty
+    }
+
+    // return type
+
+    fn match_ret_ty(&self) -> bool {
+        if let Some(pat_ret) = self.fn_pat().ret {
+            let ret = self.body().return_ty();
+            if !self.ty().match_ty(pat_ret, ret) {
+                debug!("return type does not match: {pat_ret:?} <-> {ret:?}");
+                return false;
+            }
+        }
+        true
     }
 }

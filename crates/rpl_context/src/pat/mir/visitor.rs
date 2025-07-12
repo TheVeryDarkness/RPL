@@ -285,6 +285,7 @@ impl<'pcx> PatternSuperVisitable<'pcx> for Ty<'pcx> {
             | TyKind::Str
             | TyKind::Bool
             | TyKind::Char
+            | TyKind::Self_
             | TyKind::Any => {},
             &TyKind::AdtPat(adt_pat) => vis.visit_adt_pat(adt_pat),
         }

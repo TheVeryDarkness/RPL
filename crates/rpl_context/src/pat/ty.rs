@@ -138,7 +138,7 @@ impl<'pcx> Ty<'pcx> {
                 },
                 MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
             },
-            Choice14::_9(_ty_self) => todo!(),
+            Choice14::_9(_ty_self) => pcx.mk_self_ty(),
             Choice14::_10(primitive_types) => pcx.mk_ty(TyKind::from_primitive_type(primitive_types)),
             Choice14::_11(_place_holder) => pcx.mk_any_ty(),
             Choice14::_12(ty_path) => Self::from_type_path(WithPath::new(p, ty_path), pcx, fn_sym_tab),
@@ -241,6 +241,7 @@ pub enum TyKind<'pcx> {
     Bool,
     Str,
     Char,
+    Self_,
     Any,
 }
 
