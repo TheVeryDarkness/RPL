@@ -257,12 +257,11 @@ pub fn self_param_ty<'i>(self_param: &'i pairs::SelfParam<'i>) -> (&'static pair
     } else {
         (
             &SELF,
-            self_param
-                .Mutability()
-                .kw_mut()
-                .is_some()
-                .then_some(mir::Mutability::Mut)
-                .unwrap_or(mir::Mutability::Not),
+            if self_param.Mutability().kw_mut().is_some() {
+                mir::Mutability::Mut
+            } else {
+                mir::Mutability::Not
+            },
         )
     }
 }
