@@ -5,7 +5,7 @@ use either::Either;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_parser::generics::Choice2;
 use rpl_parser::pairs;
-use rustc_data_structures::fx::{FxHashMap, FxHashSet};
+use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
 use rustc_span::Symbol;
 
 #[derive(Default)]
@@ -78,7 +78,7 @@ impl<'i> PatAttr<'i> {
     pub fn post_process<M: Eq + Hash + Debug>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
         match self.deduplicate {
             true => {
-                let collected: FxHashSet<_> = iter.inspect(|matched| trace!(?matched)).collect();
+                let collected: FxIndexSet<_> = iter.inspect(|matched| trace!(?matched)).collect();
                 trace!(?collected);
                 Either::Left(collected.into_iter())
             },
