@@ -1,0 +1,67 @@
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:23:11
+   |
+LL |         c.offset(0);
+   |           ^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+   = note: `#[deny(rpl::zst_offset)]` on by default
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:29:11
+   |
+LL |         c.sub(0);
+   |           ^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:10:11
+   |
+LL |         m.offset(0);
+   |           ^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:16:11
+   |
+LL |         m.sub(0);
+   |           ^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:26:11
+   |
+LL |         c.wrapping_add(0);
+   |           ^^^^^^^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:32:11
+   |
+LL |         c.wrapping_sub(0);
+   |           ^^^^^^^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:13:11
+   |
+LL |         m.wrapping_add(0);
+   |           ^^^^^^^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: offset calculation on zero-sized value
+  --> tests/ui/clippy/zst_offset.rs:19:11
+   |
+LL |         m.wrapping_sub(0);
+   |           ^^^^^^^^^^^^^^^
+   |
+   = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
+
+error: aborting due to 8 previous errors
+

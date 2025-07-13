@@ -1,5 +1,9 @@
-//@ignore-on-host
-#[allow(clippy::borrow_as_ptr)]
+//@revisions: inline normal
+//@compile-flags: -Z mir-opt-level=0
+//@[inline]compile-flags: -Z inline-mir=true
+//@[normal]compile-flags: -Z inline-mir=false
+
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     unsafe {
         let m = &mut () as *mut ();
