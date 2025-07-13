@@ -155,7 +155,7 @@ impl FnAttr {
                 .requires_monomorphization
                 .is_none_or(|req| tcx.generics_of(def_id).requires_monomorphization(tcx) == req)
             && self.inner_unsafe.is_none_or(|inner_unsafe| {
-                inner_unsafe == contains_unsafe_block(tcx.hir().body_owned_by(def_id).value)
+                inner_unsafe == contains_unsafe_block(tcx, tcx.hir().body_owned_by(def_id).value)
                     || header.is_some_and(|header| header.is_unsafe())
             })
     }
