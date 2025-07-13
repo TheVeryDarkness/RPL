@@ -117,7 +117,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             // hir::ItemKind::Trait(hir::IsAuto::No, hir::Safety::Safe, ..) | hir::ItemKind::Fn { .. } => {},
             hir::ItemKind::Trait(_, _, _, _, impl_) => {
                 for trait_item in impl_ {
-                    self.check_trait_item_ref(&trait_item, None);
+                    self.check_trait_item_ref(trait_item, None);
                 }
             },
             hir::ItemKind::Impl(impl_) => self.check_impl(
