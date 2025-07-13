@@ -1,0 +1,17 @@
+pattern mut-from-ref
+
+patt {
+    mut_from_ref[$T: type, $U: type] = 
+        #[rpl(inner_unsafe)]
+        #[output = "ref_mut"]
+        unsafe? fn _($arg: &$T) -> &mut $U;
+}
+
+diag {
+    mut_from_ref = {
+        primary(arg)  = "mutable borrow from immutable input(s)",
+        note(ref_mut) = "immutable borrow here",
+        name          = "mut_from_ref",
+        level         = "warn",
+    }
+}

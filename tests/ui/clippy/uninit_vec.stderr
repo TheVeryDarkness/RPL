@@ -1,32 +1,31 @@
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:24:5
-   |
-LL |     let mut vec = Vec::<UnsafeCell<*mut S>>::with_capacity(2);
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(2);
-   |         ^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-   = note: `-D clippy::uninit-vec` implied by `-D warnings`
-   = help: to override `-D warnings` add `#[allow(clippy::uninit_vec)]`
-
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:19:9
+  --> tests/ui/clippy/uninit_vec.rs:18:23
    |
 LL |         let mut vec = Vec::<UnsafeCell<*mut S>>::with_capacity(1);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 LL |
 LL |         vec.set_len(1);
    |         ^^^^^^^^^^^^^^
    |
    = help: initialize the buffer or wrap the content in `MaybeUninit`
+   = note: `#[deny(rpl::uninit_vec)]` on by default
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:33:5
+  --> tests/ui/clippy/uninit_vec.rs:23:19
+   |
+LL |     let mut vec = Vec::<UnsafeCell<*mut S>>::with_capacity(2);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(2);
+   |         ^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:32:28
    |
 LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |         vec.set_len(200);
    |         ^^^^^^^^^^^^^^^^
@@ -34,48 +33,10 @@ LL |         vec.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:41:5
-   |
-LL |     vec.reserve(1000);
-   |     ^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-
-error: calling `set_len()` on empty `Vec` creates out-of-bound values
-  --> tests/ui/uninit_vec.rs:49:5
-   |
-LL |     let mut vec: Vec<u8> = Vec::new();
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^
-
-error: calling `set_len()` on empty `Vec` creates out-of-bound values
-  --> tests/ui/uninit_vec.rs:57:5
-   |
-LL |     let mut vec: Vec<u8> = Default::default();
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^
-
-error: calling `set_len()` on empty `Vec` creates out-of-bound values
-  --> tests/ui/uninit_vec.rs:64:5
-   |
-LL |     let mut vec: Vec<u8> = Vec::default();
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^
-
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:84:5
+  --> tests/ui/clippy/uninit_vec.rs:32:28
    |
 LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |         vec.set_len(200);
    |         ^^^^^^^^^^^^^^^^
@@ -83,32 +44,10 @@ LL |         vec.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:95:5
-   |
-LL |     my_vec.vec.reserve(1000);
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         my_vec.vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:102:5
-   |
-LL |     my_vec.vec = Vec::with_capacity(1000);
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         my_vec.vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:73:9
+  --> tests/ui/clippy/uninit_vec.rs:72:32
    |
 LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |         vec.set_len(200);
    |         ^^^^^^^^^^^^^^^^
@@ -116,10 +55,10 @@ LL |         vec.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:78:9
+  --> tests/ui/clippy/uninit_vec.rs:72:32
    |
-LL |         vec.reserve(1000);
-   |         ^^^^^^^^^^^^^^^^^^
+LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |         vec.set_len(200);
    |         ^^^^^^^^^^^^^^^^
@@ -127,10 +66,98 @@ LL |         vec.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:158:9
+  --> tests/ui/clippy/uninit_vec.rs:83:28
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:109:28
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:128:29
+   |
+LL |     let mut vec1: Vec<u8> = Vec::with_capacity(1000);
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec1.set_len(200);
+   |         ^^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:129:29
+   |
+LL |     let mut vec2: Vec<u8> = Vec::with_capacity(1000);
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec2.set_len(200);
+   |         ^^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:136:28
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     unsafe {
+LL |         vec.set_len(0);
+   |         ^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` on empty `Vec` creates out-of-bound values
+  --> tests/ui/clippy/uninit_vec.rs:48:28
+   |
+LL |     let mut vec: Vec<u8> = Vec::new();
+   |                            ^^^^^^^^^^
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` on empty `Vec` creates out-of-bound values
+  --> tests/ui/clippy/uninit_vec.rs:56:28
+   |
+LL |     let mut vec: Vec<u8> = Default::default();
+   |                            ^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` on empty `Vec` creates out-of-bound values
+  --> tests/ui/clippy/uninit_vec.rs:63:28
+   |
+LL |     let mut vec: Vec<u8> = Vec::default();
+   |                            ^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/clippy/uninit_vec.rs:157:31
    |
 LL |         let mut vec: Vec<T> = Vec::with_capacity(1000);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |             vec.set_len(10);
    |             ^^^^^^^^^^^^^^^
@@ -138,10 +165,10 @@ LL |             vec.set_len(10);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:186:9
+  --> tests/ui/clippy/uninit_vec.rs:185:42
    |
 LL |         let mut vec: Vec<Recursive<T>> = Vec::with_capacity(1);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                                          ^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |             vec.set_len(1);
    |             ^^^^^^^^^^^^^^
@@ -149,15 +176,15 @@ LL |             vec.set_len(1);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/uninit_vec.rs:200:9
+  --> tests/ui/clippy/uninit_vec.rs:199:37
    |
 LL |         let mut vec: Vec<Enum<T>> = Vec::with_capacity(1);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                                     ^^^^^^^^^^^^^^^^^^^^^
 ...
 LL |             vec.set_len(1);
    |             ^^^^^^^^^^^^^^
    |
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
-error: aborting due to 15 previous errors
+error: aborting due to 17 previous errors
 

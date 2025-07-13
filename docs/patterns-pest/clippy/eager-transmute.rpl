@@ -1,0 +1,17 @@
+pattern eager-transmute
+
+patt {
+    #[diag = "eager_transmute"]
+    and_then[$T: type, $U: type, $src: place($T)] = unsafe? fn _(..) {
+        'dst:
+        let $dst: $U = move $src as $U (Transmute);
+        _ = bool::then_some::<$U>(_, move $dst);
+    }
+}
+
+diag {
+    eager_transmute = {
+        primary(dst) = "this transmute is always evaluated eagerly, even if the condition is false",
+        name         = "eager_transmute",
+    }
+}

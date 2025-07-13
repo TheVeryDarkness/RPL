@@ -1,6 +1,4 @@
-//@ignore-on-host
-#![warn(clippy::uninit_vec)]
-
+//@compile-flags: -Z inline-mir=false
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 
@@ -28,7 +26,7 @@ unsafe fn requires_paramenv<S>() {
         vec.set_len(2);
     }
 }
-
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = Vec::with_capacity(1000);
@@ -109,7 +107,7 @@ fn main() {
 
     // Test `#[allow(...)]` attributes on inner unsafe block (shouldn't trigger)
     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-    #[allow(clippy::uninit_vec)]
+    #[allow(rpl::uninit_vec)]
     unsafe {
         vec.set_len(200);
     }
