@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_parser::generics::{Choice2, Choice3};
 use rpl_parser::pairs;
+use rustc_errors::MultiSpan;
 use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Const, PlaceRef};
@@ -15,6 +16,10 @@ use crate::pat::NonLocalMetaVars;
 
 pub trait Matched<'tcx>: fmt::Debug {
     fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span;
+    fn multi_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &[&str]) -> MultiSpan {
+        let spans = name.iter().map(|n| self.span(body, decl, n)).collect();
+        MultiSpan::from_spans(spans)
+    }
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
     fn place_meta_var(&self, idx: PlaceVarIdx) -> PlaceRef<'tcx>;

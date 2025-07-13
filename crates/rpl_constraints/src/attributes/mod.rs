@@ -9,6 +9,9 @@ use rustc_span::Symbol;
 pub use safety::Safety;
 pub use visibility::Visibility;
 
+use crate::attributes::body::contains_unsafe_block;
+
+mod body;
 mod inline;
 mod safety;
 mod visibility;
@@ -22,6 +25,7 @@ pub struct FnAttr {
     pub visibility: Visibility,
     pub safety: Safety,
     pub requires_monomorphization: Option<bool>,
+    pub inner_unsafe: Option<bool>,
     pub inline: Option<Inline>,
     pub output_name: Option<Symbol>,
 }
@@ -76,6 +80,9 @@ impl FnAttr {
                                         "requires_monomorphization" => {
                                             result.requires_monomorphization = Some(true);
                                         },
+                                        "inner_unsafe" => {
+                                            result.inner_unsafe = Some(true);
+                                        },
                                         _ => panic!("Unexpected RPL attribute: {}", key.span.as_str()),
                                     }
                                 }
@@ -114,6 +121,9 @@ impl FnAttr {
                 "requires_monomorphization" => {
                     result.requires_monomorphization = Some(value.parse().unwrap());
                 },
+                "inner_unsafe" => {
+                    result.inner_unsafe = Some(value.parse().unwrap());
+                },
                 "marked_inline" => {
                     result.inline = match value {
                         "always" => Some(Inline::Always),
@@ -144,6 +154,10 @@ impl FnAttr {
             && self
                 .requires_monomorphization
                 .is_none_or(|req| tcx.generics_of(def_id).requires_monomorphization(tcx) == req)
+            && self.inner_unsafe.is_none_or(|inner_unsafe| {
+                inner_unsafe == contains_unsafe_block(tcx.hir().body_owned_by(def_id).value)
+                    || header.is_some_and(|header| header.is_unsafe())
+            })
     }
 
     /// Returns the extra spans for this function pattern.

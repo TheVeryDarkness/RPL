@@ -1198,6 +1198,11 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 },
                 LocalSpecial::Arg => {
                     self.pattern.params_idx.insert(local);
+                    self.mk_raw_decl(RawDecleration::LocalInit(
+                        None,
+                        local,
+                        Some(RvalueOrCall::Rvalue(Rvalue::Any)),
+                    ));
                 },
                 LocalSpecial::None => {},
             }

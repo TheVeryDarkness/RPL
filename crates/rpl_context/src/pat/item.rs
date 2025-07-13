@@ -6,12 +6,13 @@ use rpl_constraints::Constraints;
 use rpl_constraints::attributes::{ExtraSpan, Safety, Visibility};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{WithMetaTable, WithPath};
+use rpl_meta::utils::self_param_ty;
 use rpl_parser::generics::Choice4;
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_hir::FnHeader;
 use rustc_hir::def_id::LocalDefId;
-use rustc_middle::mir;
+use rustc_middle::mir::{self, Body};
 use rustc_middle::ty::TyCtxt;
 use rustc_span::Symbol;
 
@@ -228,9 +229,13 @@ impl<'pcx> FnPattern<'pcx> {
         (safety, visibility, fn_name, params, ret)
     }
 
-    #[instrument(level = "trace", skip(self, tcx, header), fields(self = ?self.name), ret)]
-    pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>) -> bool {
-        self.constraints.attrs.filter(tcx, def_id, header)
+    #[instrument(level = "trace", skip(self, tcx, header), fields(self = ?self.name, pat_args = ?self.params.len(), args = ?body.arg_count), ret)]
+    pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>, body: &Body<'_>) -> bool {
+        (if self.params.non_exhaustive {
+            self.params.len() <= body.arg_count
+        } else {
+            self.params.len() == body.arg_count
+        }) && self.constraints.attrs.filter(tcx, def_id, header)
     }
     /// Returns the extra spans for this function pattern.
     #[instrument(level = "trace", skip(self, tcx), fields(self = ?self.name), ret)]
@@ -272,9 +277,18 @@ impl<'pcx> Param<'pcx> {
     ) -> (Option<Self>, bool) {
         let p = param.path;
         match param.inner.deref() {
-            Choice4::_0(_self_param) => {
+            Choice4::_0(self_param) => {
+                let (ty, mutability) = self_param_ty(self_param);
+                let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);
                 // FIXME: implement self param
-                (None, false)
+                (
+                    Some(Self {
+                        mutability,
+                        ident: Symbol::intern("self"),
+                        ty,
+                    }),
+                    false,
+                )
             },
             Choice4::_1(normal) => {
                 let (mutability, ident, _, ty) = normal.get_matched();

@@ -53,6 +53,7 @@ pub const ALL_PREDICATES: &[&str] = &[
     "is_primitive",
     "is_ptr",
     "is_ref",
+    "is_zst",
     "needs_drop",
     // translate_preds
     "translate_from_function",
@@ -61,6 +62,7 @@ pub const ALL_PREDICATES: &[&str] = &[
     "true",
     // multiple_tys_preds
     "compatible_layout",
+    "niche_ordered",
     "same_abi_and_pref_align",
     "same_size",
     // single_fn_preds
@@ -103,7 +105,9 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "is_sync" => Self::Ty(is_sync),
             "is_primitive" => Self::Ty(is_primitive),
             "is_ptr" => Self::Ty(is_ptr),
+            "is_zst" => Self::Ty(is_zst),
             "needs_drop" => Self::Ty(needs_drop),
+            "niche_ordered" => Self::MultipleTys(niche_ordered),
             "translate_from_function" => Self::Translate(translate_from_function),
             "false" => Self::Trivial(r#false),
             "true" => Self::Trivial(r#true),

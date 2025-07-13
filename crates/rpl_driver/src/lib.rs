@@ -115,6 +115,11 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     fn visit_item(&mut self, item: &'tcx hir::Item<'tcx>) -> Self::Result {
         match item.kind {
             // hir::ItemKind::Trait(hir::IsAuto::No, hir::Safety::Safe, ..) | hir::ItemKind::Fn { .. } => {},
+            hir::ItemKind::Trait(_, _, _, _, impl_) => {
+                for trait_item in impl_ {
+                    self.check_trait_item_ref(&trait_item, None);
+                }
+            },
             hir::ItemKind::Impl(impl_) => self.check_impl(
                 impl_,
                 Some(self.tcx.type_of(item.owner_id.def_id).instantiate_identity()),
@@ -171,7 +176,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
             self.tcx.emit_node_span_lint(
                 error.lint(),
                 self.tcx.local_def_id_to_hir_id(def_id),
-                error.primary_span(),
+                error.primary_span().clone(),
                 error,
             );
         }
@@ -200,7 +205,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
             impl_pat
                 .fns
                 .values()
-                .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
+                .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header, body))
                 .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
                 .flat_map(move |(fn_pat, attr_map)| {
                     // FIXME: sometimes we need to check function name
@@ -320,7 +325,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         let iter = rpl_rust_items
             .fns
             .iter()
-            .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header))
+            .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header, body))
             .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
             .flat_map(move |(fn_pat, attr_map)| {
                 CheckMirCtxt::new(
@@ -440,47 +445,72 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
 }
 
 impl<'tcx> CheckFnCtxt<'_, 'tcx> {
-    #[instrument(level = "debug", skip_all)]
+    #[instrument(level = "debug", skip(self, trait_item), fields(trait_item_id = ?trait_item.id))]
+    fn check_trait_item_ref(&mut self, trait_item: &'tcx hir::TraitItemRef, self_ty: Option<ty::Ty<'tcx>>) {
+        if let hir::AssocItemKind::Fn { has_self } = trait_item.kind {
+            let id = trait_item.id;
+            let trait_item = self.tcx.hir().trait_item(id);
+            let def_id = trait_item.owner_id.def_id;
+            match trait_item.kind {
+                hir::TraitItemKind::Fn(sig, _) => {
+                    self.check_assoc_fn(has_self, self_ty, &sig, def_id);
+                },
+                _ => (), // Actually impossible, but we handle it gracefully.
+            }
+        }
+    }
+    #[instrument(level = "debug", skip(self, impl_))]
     fn check_impl(&mut self, impl_: &hir::Impl<'tcx>, self_ty: Option<ty::Ty<'tcx>>) {
         for impl_item in impl_.items {
-            if let hir::AssocItemKind::Fn { has_self } = impl_item.kind {
-                let id = impl_item.id;
-                let impl_item = self.tcx.hir().impl_item(id);
-                let def_id = impl_item.owner_id.def_id;
-                match impl_item.kind {
-                    hir::ImplItemKind::Fn(sig, _) => {
-                        if self.tcx.is_mir_available(def_id) {
-                            let decl = sig.decl;
-                            let body = self.tcx.optimized_mir(def_id);
-                            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
-                            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
-                            let header = Some(sig.header);
-                            let source_map = self.tcx.sess.source_map();
-                            self.pcx.for_each_rpl_pattern(|_id, pattern| {
-                                for (&name, pat_item) in &pattern.patt_block {
-                                    for matched in self.impl_matched_pat_item(
-                                        name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
-                                    ) {
-                                        let error = pattern
-                                            .get_diag(name, source_map, None, body, decl, &matched)
-                                            .unwrap_or_else(identity);
-                                        self.tcx.emit_node_span_lint(
-                                            error.lint(),
-                                            self.tcx.local_def_id_to_hir_id(def_id),
-                                            error.primary_span(),
-                                            error,
-                                        );
-                                    }
-                                }
-                            });
-                        }
-                    },
-                    _ => (), // Actually impossible, but we handle it gracefully.
-                }
-                self.visit_nested_body(self.tcx.hir().body_owned_by(def_id).id());
-            } else {
-                self.visit_impl_item_ref(impl_item);
+            self.check_impl_item_ref(impl_item, self_ty);
+        }
+    }
+    #[instrument(level = "debug", skip(self, impl_item), fields(impl_item_id = ?impl_item.id))]
+    fn check_impl_item_ref(&mut self, impl_item: &'tcx hir::ImplItemRef, self_ty: Option<ty::Ty<'tcx>>) {
+        if let hir::AssocItemKind::Fn { has_self } = impl_item.kind {
+            let id = impl_item.id;
+            let impl_item = self.tcx.hir().impl_item(id);
+            let def_id = impl_item.owner_id.def_id;
+            match impl_item.kind {
+                hir::ImplItemKind::Fn(sig, _) => {
+                    self.check_assoc_fn(has_self, self_ty, &sig, def_id);
+                },
+                _ => (), // Actually impossible, but we handle it gracefully.
             }
+        }
+    }
+    #[instrument(level = "debug", skip(self, sig), fields(is_mir_available = ?self.tcx.is_mir_available(def_id)))]
+    fn check_assoc_fn(
+        &mut self,
+        has_self: bool,
+        self_ty: Option<ty::Ty<'tcx>>,
+        sig: &hir::FnSig<'tcx>,
+        def_id: LocalDefId,
+    ) {
+        if self.tcx.is_mir_available(def_id) {
+            let decl = sig.decl;
+            let body = self.tcx.optimized_mir(def_id);
+            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
+            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+            let header = Some(sig.header);
+            let source_map = self.tcx.sess.source_map();
+            self.pcx.for_each_rpl_pattern(|_id, pattern| {
+                for (&name, pat_item) in &pattern.patt_block {
+                    for matched in self.impl_matched_pat_item(
+                        name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
+                    ) {
+                        let error = pattern
+                            .get_diag(name, source_map, None, body, decl, &matched)
+                            .unwrap_or_else(identity);
+                        self.tcx.emit_node_span_lint(
+                            error.lint(),
+                            self.tcx.local_def_id_to_hir_id(def_id),
+                            error.primary_span().clone(),
+                            error,
+                        );
+                    }
+                }
+            });
         }
     }
     #[instrument(level = "debug", skip(self, decl, header))]
@@ -493,6 +523,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         self_ty: Option<ty::Ty<'tcx>>,
         def_id: LocalDefId,
     ) {
+        trace!(is_mir_available = ?self.tcx.is_mir_available(def_id), "check_fn");
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
             let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
@@ -510,7 +541,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         self.tcx.emit_node_span_lint(
                             error.lint(),
                             self.tcx.local_def_id_to_hir_id(def_id),
-                            error.primary_span(),
+                            error.primary_span().clone(),
                             error,
                         );
                     }

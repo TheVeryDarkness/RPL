@@ -117,6 +117,9 @@ pub fn can_be_uninit<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, t
                     AdtKind::Union => adt_def
                         .all_fields()
                         .any(|field| can_be_uninit(tcx, typing_env, field.ty(tcx, args))),
+                    AdtKind::Struct => adt_def
+                        .all_fields()
+                        .all(|field| can_be_uninit(tcx, typing_env, field.ty(tcx, args))),
                     _ => false,
                 }
             }

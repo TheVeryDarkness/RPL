@@ -77,6 +77,11 @@ kw_struct    = @{ "struct" ~ !WordFollowing }
 kw_enum      = @{ "enum" ~ !WordFollowing }
 kw_impl      = @{ "impl" ~ !WordFollowing }
 kw_for       = @{ "for" ~ !WordFollowing }
+kw_place     = @{ "place" ~ !WordFollowing }
+kw_where     = @{ "where" ~ !WordFollowing }
+kw_RET       = @{ "RET" ~ !WordFollowing }
+
+// Primitive Types are soft keywords
 kw_u8        = @{ "u8" ~ !WordFollowing }
 kw_u16       = @{ "u16" ~ !WordFollowing }
 kw_u32       = @{ "u32" ~ !WordFollowing }
@@ -87,11 +92,8 @@ kw_i16       = @{ "i16" ~ !WordFollowing }
 kw_i32       = @{ "i32" ~ !WordFollowing }
 kw_i64       = @{ "i64" ~ !WordFollowing }
 kw_isize     = @{ "isize" ~ !WordFollowing }
-kw_RET       = @{ "RET" ~ !WordFollowing }
 kw_bool      = @{ "bool" ~ !WordFollowing }
 kw_str       = @{ "str" ~ !WordFollowing }
-kw_place     = @{ "place" ~ !WordFollowing }
-kw_where     = @{ "where" ~ !WordFollowing }
 
 Keywords = @{
     kw_pattern
@@ -159,18 +161,6 @@ Keywords = @{
   | kw_enum
   | kw_impl
   | kw_for
-  | kw_u8
-  | kw_u16
-  | kw_u32
-  | kw_u64
-  | kw_usize
-  | kw_i8
-  | kw_i16
-  | kw_i32
-  | kw_i64
-  | kw_isize
-  | kw_bool
-  | kw_str
   | kw_where
 }
 

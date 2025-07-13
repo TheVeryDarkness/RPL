@@ -15,7 +15,7 @@ use rpl_parser::generics::Choice2;
 use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
-use rustc_errors::{Applicability, LintDiagnostic};
+use rustc_errors::{Applicability, LintDiagnostic, MultiSpan};
 use rustc_hir::FnDecl;
 use rustc_lint::{Level, Lint};
 use rustc_middle::mir::Body;
@@ -37,7 +37,7 @@ pub struct DynamicError {
     ///
     /// See [`rustc_errors::Diag::primary_message`].
     /// The primary message is the main error message that will be displayed to the user.
-    primary: (String, Span),
+    primary: (String, MultiSpan),
     /// Label description, and the span of the label.
     ///
     /// See [`rustc_errors::Diag::span_label`].
@@ -94,7 +94,7 @@ impl DynamicError {
     // }
     fn unknown_attribute_error(span: Span) -> Self {
         Self {
-            primary: ("Unknown attribute key".to_string(), span),
+            primary: ("Unknown attribute key".to_string(), MultiSpan::from_span(span)),
             labels: Vec::new(),
             notes: vec![(
                 "Allowed attribute keys are: `primary_message`, `labels`, `note`, `help`".to_string(),
@@ -107,7 +107,7 @@ impl DynamicError {
     }
     fn missing_primary_message_error(attr: &rustc_hir::Attribute) -> Self {
         Self {
-            primary: ("Missing primary message".to_string(), attr.span),
+            primary: ("Missing primary message".to_string(), MultiSpan::from_span(attr.span)),
             labels: Vec::new(),
             notes: Vec::new(),
             helps: Vec::new(),
@@ -120,7 +120,7 @@ impl DynamicError {
             // If the value is not a string, we return an error.
             // This is a fallback to ensure that we always return a valid error.
             Self {
-                primary: ("Expected a string value".to_string(), item.span()),
+                primary: ("Expected a string value".to_string(), MultiSpan::from_span(item.span())),
                 labels: Vec::new(),
                 notes: Vec::new(),
                 helps: Vec::new(),
@@ -132,7 +132,7 @@ impl DynamicError {
     }
     fn expected_meta_item_list_error(span: Span) -> Box<Self> {
         Self {
-            primary: ("Expected a meta item list".to_string(), span),
+            primary: ("Expected a meta item list".to_string(), MultiSpan::from_span(span)),
             labels: Vec::new(),
             notes: Vec::new(),
             helps: Vec::new(),
@@ -188,7 +188,7 @@ impl DynamicError {
             }
         }
         let primary_message = primary_message.ok_or_else(|| Self::missing_primary_message_error(attr))?;
-        let primary = (primary_message, span);
+        let primary = (primary_message, MultiSpan::from_span(span));
         Ok(DynamicError {
             primary,
             labels,
@@ -209,8 +209,8 @@ impl DynamicError {
 }
 
 impl DynamicError {
-    pub const fn primary_span(&self) -> Span {
-        self.primary.1
+    pub const fn primary_span(&self) -> &MultiSpan {
+        &self.primary.1
     }
     /// Also see [`rustc_session::declare_tool_lint!`].
     pub const fn lint(&self) -> &'static Lint {
@@ -222,7 +222,10 @@ impl DynamicError {
             default_level: Level::Deny,
             ..Lint::default_fields_for_macro()
         };
-        let primary = (String::from("A pattern instance found in this span"), span);
+        let primary = (
+            String::from("A pattern instance found in this span"),
+            MultiSpan::from_span(span),
+        );
         let labels = Vec::new();
         let notes = vec![
             (String::from("This is a fallback diagnostic message."), None),
@@ -310,7 +313,7 @@ pub(crate) struct DynamicErrorBuilder<'i> {
     /// Primary message and its span.
     ///
     /// See [`DynamicError::primary`].
-    primary: (Vec<SubMsg<'i>>, &'i str),
+    primary: (Vec<SubMsg<'i>>, Vec<&'i str>),
     /// Label description, and the span of the label.
     ///
     /// See [`DynamicError::labels`].
@@ -371,6 +374,17 @@ fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> R
     Ok(ident.span.as_str())
 }
 
+fn parse_idents<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> Result<Vec<&'i str>, ParseError<'i>> {
+    let mut idents = Vec::new();
+    for attr in collect_elems_separated_by_comma!(attrs) {
+        let (ident, arguments_or_value) = attr.get_matched();
+        if arguments_or_value.is_some() {
+            return Err(ParseError::NotAnIdentifier(SpanWrapper::new(attr.span, path)));
+        }
+        idents.push(ident.span.as_str());
+    }
+    Ok(idents)
+}
 fn parse_suggestion<'i>(
     path: &'i std::path::Path,
     attrs: &'i pairs::diagAttrs<'i>,
@@ -445,11 +459,11 @@ impl<'i> DynamicErrorBuilder<'i> {
 
             match key {
                 "primary" => {
-                    let ident = parse_ident(
+                    let idents = parse_idents(
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
                     )?;
-                    primary = Some((SubMsg::parse(message, meta_vars, consts, locals), ident));
+                    primary = Some((SubMsg::parse(message, meta_vars, consts, locals), idents));
                 },
                 "label" => {
                     let ident = parse_ident(
@@ -557,7 +571,7 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         let primary = (
             formatter.format(&self.primary.0),
-            matched.span(body, decl, self.primary.1),
+            matched.multi_span(body, decl, &self.primary.1),
         );
         let labels = self
             .labels

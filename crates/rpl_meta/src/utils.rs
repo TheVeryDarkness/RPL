@@ -1,6 +1,9 @@
+use std::sync::LazyLock;
+
 use derive_more::Debug;
 use parser::pairs;
-use pest_typed::Span;
+use pest_typed::{ParsableTypedNode, Span};
+use rustc_middle::mir;
 use rustc_span::Symbol;
 
 use crate::collect_elems_separated_by_comma;
@@ -27,6 +30,14 @@ use std::hash::{Hash, Hasher};
 impl Hash for Ident<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
+    }
+}
+
+impl<'i, const INHERITED: usize> From<&pairs::Word<'i, INHERITED>> for Ident<'i> {
+    fn from(ident: &pairs::Word<'i, INHERITED>) -> Self {
+        let span = ident.span;
+        let name = Symbol::intern(span.as_str());
+        Self { name, span }
     }
 }
 
@@ -229,5 +240,29 @@ impl<T, E> Record for Result<T, E> {
                 None
             },
         }
+    }
+}
+
+pub fn self_param_ty<'i>(self_param: &'i pairs::SelfParam<'i>) -> (&'static pairs::Type<'static>, mir::Mutability) {
+    static SELF: LazyLock<pairs::Type<'static>> = LazyLock::new(|| pairs::Type::try_parse("Self").unwrap());
+    static REF_SELF: LazyLock<pairs::Type<'static>> = LazyLock::new(|| pairs::Type::try_parse("&Self").unwrap());
+    static REF_MUT_SELF: LazyLock<pairs::Type<'static>> =
+        LazyLock::new(|| pairs::Type::try_parse("&mut Self").unwrap());
+    if self_param.And().is_some() {
+        if self_param.Mutability().kw_mut().is_some() {
+            (&REF_MUT_SELF, mir::Mutability::Mut)
+        } else {
+            (&REF_SELF, mir::Mutability::Not)
+        }
+    } else {
+        (
+            &SELF,
+            self_param
+                .Mutability()
+                .kw_mut()
+                .is_some()
+                .then_some(mir::Mutability::Mut)
+                .unwrap_or(mir::Mutability::Not),
+        )
     }
 }

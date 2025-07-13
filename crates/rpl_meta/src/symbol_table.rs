@@ -10,12 +10,13 @@ use pest_typed::Span;
 use rpl_constraints::predicates::PredicateConjunction;
 use rustc_data_structures::sync::RwLock;
 use rustc_hash::FxHashMap;
+use rustc_middle::mir;
 use rustc_span::Symbol;
 
 use crate::check::CheckCtxt;
 use crate::context::MetaContext;
 use crate::error::{RPLMetaError, RPLMetaResult};
-use crate::utils::{Ident, Path};
+use crate::utils::{Ident, Path, self_param_ty};
 
 pub(crate) mod diag;
 
@@ -531,6 +532,13 @@ pub enum LocalSpecial {
     Return,
 }
 
+/// Implicit `self` parameter type in a function.
+#[derive(Clone, Copy, Debug)]
+pub enum SelfType {
+    Value(mir::Mutability),
+    Ref(mir::Mutability),
+}
+
 pub struct FnInner<'i> {
     #[expect(unused)]
     span: Span<'i>,
@@ -543,7 +551,7 @@ pub struct FnInner<'i> {
     ret_value: Option<&'i pairs::Type<'i>>,
     self_param: Option<&'i pairs::SelfParam<'i>>,
     self_ty: Option<&'i pairs::Type<'i>>,
-    params: FxHashMap<Symbol, &'i pairs::Type<'i>>,
+    params: FxHashMap<Symbol, (usize, &'i pairs::Type<'i>)>,
     locals: FxHashMap<Symbol, (Option<Symbol>, usize, &'i pairs::Type<'i>, LocalSpecial)>,
     pub symbol_to_local_idx: FxHashMap<Symbol, usize>,
 }
@@ -628,6 +636,19 @@ impl<'i> FnInner<'i> {
         self.add_type_impl(mctx, ident, ty_or_path, errors);
     }
 
+    pub fn get_params(&self) -> WithPath<'i, Vec<(Symbol, &'i pairs::Type<'i>)>> {
+        let mut params = self
+            .params
+            .iter()
+            .map(|(ident, (idx, ty))| (ident, (idx, ty)))
+            .collect::<Vec<_>>();
+        params.sort_by_key(|(_, (idx, _))| *idx);
+        WithPath::new(
+            self.path,
+            params.into_iter().map(|(ident, (_, ty))| (*ident, *ty)).collect(),
+        )
+    }
+
     #[expect(clippy::type_complexity)]
     pub fn get_sorted_locals(&self) -> WithPath<'i, Vec<(Option<Symbol>, Symbol, &'i pairs::Type<'i>, LocalSpecial)>> {
         let mut locals = self
@@ -665,15 +686,20 @@ impl<'i> FnInner<'i> {
             });
         }
         self.self_param = Some(self_param);
+        let ident: Ident<'i> = self_param.into();
+        let ty = self_param_ty(self_param).0;
+        self.add_param(mctx, Some(ident.name), ident, ty, errors);
     }
     pub fn add_param(
         &mut self,
         mctx: &MetaContext<'i>,
+        label: Option<Symbol>,
         ident: Ident<'i>,
         ty: &'i pairs::Type<'i>,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) {
-        _ = self.params.try_insert(ident.name, ty).map_err(|_entry| {
+        let idx = self.add_local(mctx, label, ident, ty, LocalSpecial::Arg, errors);
+        _ = self.params.try_insert(ident.name, (idx, ty)).map_err(|_entry| {
             let err = RPLMetaError::SymbolAlreadyDeclared {
                 ident: ident.name,
                 span: SpanWrapper::new(ident.span, mctx.get_active_path()),
@@ -689,7 +715,7 @@ impl<'i> FnInner<'i> {
         ty: &'i pairs::Type<'i>,
         special: LocalSpecial,
         errors: &mut Vec<RPLMetaError<'i>>,
-    ) {
+    ) -> usize {
         let len = self.locals.len();
         if let std::collections::hash_map::Entry::Vacant(e) = self.locals.entry(ident.name) {
             e.insert((label, len, ty, special));
@@ -701,6 +727,8 @@ impl<'i> FnInner<'i> {
             };
             errors.push(err);
         }
+        // FIXME: this is a hack to return the index of the local variable
+        len
     }
     pub fn add_place_local(
         &mut self,
@@ -732,7 +760,9 @@ impl<'i> FnInner<'i> {
                     self.add_local(mctx, label, ret_value.into(), ty, LocalSpecial::Return, errors);
                 }
             },
-            Choice4::_3(ident) => self.add_local(mctx, label, ident.into(), ty, LocalSpecial::None, errors),
+            Choice4::_3(ident) => {
+                self.add_local(mctx, label, ident.into(), ty, LocalSpecial::None, errors);
+            },
         }
     }
     fn get_place_impl(&self, ident: Ident<'i>, meta_vars: &NonLocalMetaSymTab<'i>) -> Option<&'i pairs::Type<'i>> {
@@ -742,7 +772,7 @@ impl<'i> FnInner<'i> {
         self.locals
             .get(&ident.name)
             .map(|(_label, _idx, ty, _)| ty)
-            .or_else(|| self.params.get(&ident.name))
+            // .or_else(|| self.params.get(&ident.name).map(|(_idx, ty)| ty))
             .copied()
     }
     pub fn get_place_or_local(
