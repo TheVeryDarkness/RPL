@@ -37,6 +37,18 @@ LL |     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mu
    = help: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
    = note: `#[deny(rpl::slice_from_raw_parts_uninitialized)]` on by default
 
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:8:19
+   |
+LL |     let mut vec = Vec::with_capacity(len);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(len);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+   = note: `#[deny(rpl::uninit_vec)]` on by default
+
 error: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
   --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:33:36
    |
@@ -89,6 +101,17 @@ LL |     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mu
    |
    = help: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
 
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:41:19
+   |
+LL |     let mut vec = Vec::with_capacity(len);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(len);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
   --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:77:9
    |
@@ -126,6 +149,17 @@ LL |     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mu
    |
    = help: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
 
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+  --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:68:19
+   |
+LL |     let mut vec = Vec::with_capacity(len);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+LL |         vec.set_len(len);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
 error: it is unsound to trust return value of `std::iter::ExactSizeIterator::len` and pass it to an unsafe function like `std::vec::Vec::set_len`, which may leak uninitialized memory
   --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:95:9
    |
@@ -137,5 +171,16 @@ LL |         vec.set_len(len);
    |
    = help: incorrect implementation of `std::iter::ExactSizeIterator::len` must not cause safety issues, and consider using `std::iter::TrustedLen` instead if it's stabilized
 
-error: aborting due to 11 previous errors
+error: calling `set_len()` on empty `Vec` creates out-of-bound values
+  --> tests/ui/cve_2021_29941_2/cve_2021_29941_2.rs:86:19
+   |
+LL |     let mut vec = Vec::new();
+   |                   ^^^^^^^^^^
+...
+LL |         vec.set_len(len);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
+
+error: aborting due to 15 previous errors
 

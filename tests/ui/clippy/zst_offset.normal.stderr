@@ -16,7 +16,7 @@ LL |         m.offset(0);
    = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
 
 error: offset calculation on zero-sized value
-  --> tests/ui/clippy/zst_offset.rs:29:9
+  --> tests/ui/clippy/zst_offset.rs:30:9
    |
 LL |         c.sub(0);
    |         ^^^^^^^^
@@ -32,7 +32,7 @@ LL |         m.sub(0);
    = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
 
 error: offset calculation on zero-sized value
-  --> tests/ui/clippy/zst_offset.rs:26:9
+  --> tests/ui/clippy/zst_offset.rs:27:9
    |
 LL |         c.wrapping_add(0);
    |         ^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ LL |         m.wrapping_add(0);
    = note: `()` is a zero-sized type, offsetting a pointer to it will always yield the same address
 
 error: offset calculation on zero-sized value
-  --> tests/ui/clippy/zst_offset.rs:32:9
+  --> tests/ui/clippy/zst_offset.rs:34:9
    |
 LL |         c.wrapping_sub(0);
    |         ^^^^^^^^^^^^^^^^^

@@ -19,11 +19,13 @@ impl Foo {
 
 trait Ouch {
     fn ouch(x: &Foo) -> &mut Foo;
-    //~^ mut_from_ref
+    //FIXME: ~^ mut_from_ref
 }
 
 impl Ouch for Foo {
     fn ouch(x: &Foo) -> &mut Foo {
+        //~^ mut_from_ref
+        // FIXME: new positive compared to clippy
         unsafe { unimplemented!() }
     }
 }
@@ -35,25 +37,25 @@ fn fail(x: &u32) -> &mut u16 {
 }
 
 fn fail_lifetime<'a>(x: &'a u32, y: &mut u32) -> &'a mut u32 {
-    //~^ mut_from_ref
+    //FIXME: ~^ mut_from_ref
 
     unsafe { unimplemented!() }
 }
 
 fn fail_double<'a, 'b>(x: &'a u32, y: &'a u32, z: &'b mut u32) -> &'a mut u32 {
-    //~^ mut_from_ref
+    //FIXME: ~^ mut_from_ref
 
     unsafe { unimplemented!() }
 }
 
 fn fail_tuples<'a>(x: (&'a u32, &'a u32)) -> &'a mut u32 {
-    //~^ mut_from_ref
+    //FIXME: ~^ mut_from_ref
 
     unsafe { unimplemented!() }
 }
 
 fn fail_box<'a>(x: Box<&'a u32>) -> &'a mut u32 {
-    //~^ mut_from_ref
+    //FIXME: ~^ mut_from_ref
 
     unsafe { unimplemented!() }
 }

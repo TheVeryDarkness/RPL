@@ -309,12 +309,14 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
         }
     }
 
-    #[instrument(level = "trace", skip(self), ret)]
+    #[instrument(level = "debug", skip(self), ret)]
     fn match_region(&self, pat: pat::RegionKind, region: ty::Region<'tcx>) -> bool {
-        matches!(
-            (pat, region.kind()),
-            (pat::RegionKind::ReStatic, ty::RegionKind::ReStatic) | (pat::RegionKind::ReAny, _)
-        )
+        // FIXME: implement region matching
+        true
+        // matches!(
+        //     (pat, region.kind()),
+        //     (pat::RegionKind::ReStatic, ty::RegionKind::ReStatic) | (pat::RegionKind::ReAny, _)
+        // )
     }
 
     /// Match type path

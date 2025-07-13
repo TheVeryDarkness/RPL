@@ -6,6 +6,8 @@ patt {
         'dst:
         let $dst: $U = move $src as $U (Transmute);
         _ = bool::then_some::<$U>(_, move $dst);
+    } where {
+        !niche_ordered($T, $U)
     }
 }
 

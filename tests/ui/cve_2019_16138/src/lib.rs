@@ -197,7 +197,7 @@ mod hdr {
                 let uszwidth = self.width as usize;
 
                 let pixel_count = self.width as usize * self.height as usize;
-                let mut ret = Vec::with_capacity(pixel_count);
+                let mut ret = Vec::with_capacity(pixel_count); //~[regular] uninit_vec
                 unsafe {
                     // RGBE8Pixel doesn't implement Drop, so it's Ok to drop half-initialized ret
                     ret.set_len(pixel_count);
@@ -210,7 +210,7 @@ mod hdr {
 
                     (pool.scoped(|scope| {
                         for chunk in chunks_iter {
-                            let mut buf = Vec::<RGBE8Pixel>::with_capacity(uszwidth);
+                            let mut buf = Vec::<RGBE8Pixel>::with_capacity(uszwidth); //~[regular] uninit_vec
                             unsafe {
                                 buf.set_len(uszwidth);
                                 //~[regular]^ERROR: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance

@@ -14,6 +14,20 @@ LL | |     }
    = note: `-D rpl::generic-function-marked-inline` implied by `-D warnings`
    = help: to override `-D warnings` add `#[allow(rpl::generic_function_marked_inline)]`
 
+error: mutable borrow from immutable input(s)
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:189:29
+   |
+LL |     pub fn as_mut_slice<'a>(&self) -> &'a mut [T] {
+   |                             ^^^^^
+   |
+note: immutable borrow here
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:189:39
+   |
+LL |     pub fn as_mut_slice<'a>(&self) -> &'a mut [T] {
+   |                                       ^^^^^^^^^^^
+   = note: `-D rpl::mut-from-ref` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::mut_from_ref)]`
+
 error: it usually isn't necessary to apply #[inline] to generic functions
   --> tests/ui/cve_2020_35862/cve_2020_35862.rs:189:5
    |
@@ -21,6 +35,7 @@ LL |       #[inline]
    |       --------- `#[inline]` here
 LL | /     pub fn as_mut_slice<'a>(&self) -> &'a mut [T] {
 ...  |
+LL | |         unsafe { slice::from_raw_parts_mut(self.pointer().w, self.elements()) }
 LL | |     }
    | |_____^ `#[inline]` applied here
    |
@@ -28,7 +43,7 @@ LL | |     }
    = note: generic functions are always `#[inline]` (monomorphization)
 
 error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:201:5
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:205:5
    |
 LL |       #[inline]
    |       --------- `#[inline]` here
@@ -41,7 +56,7 @@ LL | |     }
    = note: generic functions are always `#[inline]` (monomorphization)
 
 error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:216:5
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:220:5
    |
 LL |       #[inline]
    |       --------- `#[inline]` here
@@ -54,7 +69,7 @@ LL | |     }
    = note: generic functions are always `#[inline]` (monomorphization)
 
 error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:484:5
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:488:5
    |
 LL |       #[inline]
    |       --------- `#[inline]` here
@@ -67,7 +82,7 @@ LL | |     }
    = note: generic functions are always `#[inline]` (monomorphization)
 
 error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:497:5
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:501:5
    |
 LL |       #[inline(always)]
    |       ----------------- `#[inline]` here
@@ -81,20 +96,20 @@ LL | |     }
    = note: generic functions are always `#[inline]` (monomorphization)
 
 error: use a pointer from `std::vec::Vec<T>` after it's moved
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:513:43
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:517:43
    |
 LL |         unsafe { BitBox::from_raw(pointer.as_mut_ptr()) }
    |                                           ^^^^^^^^^^^^ used here
    |
 note: the `std::vec::Vec<T>` value may be moved here
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:511:26
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:515:26
    |
 LL |         mem::forget(self.into_boxed_slice());
    |                          ^^^^^^^^^^^^^^^^^^
    = note: `#[deny(rpl::use_after_move)]` on by default
 
 error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:519:5
+  --> tests/ui/cve_2020_35862/cve_2020_35862.rs:523:5
    |
 LL |       #[inline]
    |       --------- `#[inline]` here
@@ -106,5 +121,5 @@ LL | |     }
    = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
    = note: generic functions are always `#[inline]` (monomorphization)
 
-error: aborting due to 8 previous errors
+error: aborting due to 9 previous errors
 

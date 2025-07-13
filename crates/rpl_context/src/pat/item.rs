@@ -229,7 +229,7 @@ impl<'pcx> FnPattern<'pcx> {
         (safety, visibility, fn_name, params, ret)
     }
 
-    #[instrument(level = "trace", skip(self, tcx, header), fields(self = ?self.name, pat_args = ?self.params.len(), args = ?body.arg_count), ret)]
+    #[instrument(level = "trace", skip(self, tcx, header, body), fields(self = ?self.name, pat_args = ?self.params.len(), args = ?body.arg_count), ret)]
     pub fn filter(&self, tcx: TyCtxt<'_>, def_id: LocalDefId, header: Option<FnHeader>, body: &Body<'_>) -> bool {
         (if self.params.non_exhaustive {
             self.params.len() <= body.arg_count
