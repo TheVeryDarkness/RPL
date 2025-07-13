@@ -4,7 +4,7 @@ patt {
     #[diag = "cast_slice_from_raw_parts"]
     #[const(mut = "const ", alternative = "slice_from_raw_parts")]
     cast_slice_from_raw_parts_const[$T: type] =
-        fn _ () {
+        fn _(..) {
             'slice_ptr:
             let $slice_ptr: *const $T = _;
             'len:
@@ -16,7 +16,7 @@ patt {
     #[diag = "cast_slice_from_raw_parts"]
     #[const(mut = "mut ", alternative = "slice_from_raw_parts_mut")]
     cast_slice_from_raw_parts_mut[$T: type] =
-        fn _ () {
+        fn _(..) {
             'slice_ptr:
             let $slice_ptr: *mut $T = _;
             'len:
@@ -28,7 +28,7 @@ patt {
     #[diag = "cast_slice_from_raw_parts"]
     #[const(mut = "const ", alternative = "slice_from_raw_parts")]
     cast_slice_from_raw_parts_const_const[$T: type, $len: const(usize)] =
-        fn _ () {
+        fn _(..) {
             'slice_ptr:
             let $slice_ptr: *const $T = _;
             let $slice: &[$T] = std::slice::from_raw_parts<'_, $T>(move $slice_ptr, const $len);
@@ -38,7 +38,7 @@ patt {
     #[diag = "cast_slice_from_raw_parts"]
     #[const(mut = "mut ", alternative = "slice_from_raw_parts_mut")]
     cast_slice_from_raw_parts_mut_const[$T: type, $len: const(usize)] =
-        fn _ () {
+        fn _(..) {
             'slice_ptr:
             let $slice_ptr: *mut $T = _;
             let $slice: &mut [$T] = std::slice::from_raw_parts_mut<'_, $T>(move $slice_ptr, const $len);

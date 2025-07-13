@@ -2,7 +2,7 @@ pattern transmuting-null
 
 patt {
     #[diag = "transmute_null"]
-    transmute_ptr_null_inline[$T: type] = fn _() {
+    transmute_ptr_null_inline[$T: type] = fn _(..) {
         'null:
         let $null: *const $T = const 0_usize as *const $T (PointerWithExposedProvenance);
         'cast:
@@ -11,7 +11,7 @@ patt {
     }
 
     #[diag = "transmute_null"]
-    transmute_ptr_null[$T: type] = fn _() {
+    transmute_ptr_null[$T: type] = fn _(..) {
         'null:
         let $null: *const $T = std::ptr::null::<$T>();
         'cast:
@@ -21,7 +21,7 @@ patt {
 
     #[diag = "transmute_null"]
     #[deduplicate]
-    transmute_const_zero_ptr[$T: type, $null: const(*const $T) /* where is_null_ptr(self) */] = fn _() {
+    transmute_const_zero_ptr[$T: type, $null: const(*const $T) /* where is_null_ptr(self) */] = fn _(..) {
         'cast:
         // This is a known null pointer, so transmuting it into a reference is undefined behavior.
         let $value: &$T = const $null as &$T (Transmute);

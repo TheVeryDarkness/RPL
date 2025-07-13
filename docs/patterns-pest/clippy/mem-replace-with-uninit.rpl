@@ -8,7 +8,7 @@ patt {
     
     #[diag = "mem_replace_with_uninit"]
     #[const(value = "mem::uninitialized()")]
-    mem_replace_with_uninit_uninitialized[$T: type] = fn _ () {
+    mem_replace_with_uninit_uninitialized[$T: type] = fn _(..) {
         'with:
         let $with: &mut $T = _;
         'uninitialized:
@@ -19,7 +19,7 @@ patt {
     
     #[diag = "mem_replace_with_uninit"]
     #[const(value = "mem::MaybeUninit::uninit().assume_init()")]
-    mem_replace_with_uninit_uninit_assume_init[$T: type] = fn _ () {
+    mem_replace_with_uninit_uninit_assume_init[$T: type] = fn _(..) {
         'with:
         let $with: &mut $T = _;
         let $maybe_uninit: MaybeUninit<$T> = MaybeUninit::uninit::<$T>();
@@ -32,7 +32,7 @@ patt {
     
     #[diag = "mem_replace_with_uninit"]
     #[const(value = "mem::zeroed()")]
-    mem_replace_with_uninit_zeroed[$T: type where !is_primitive(self)] = fn _ () {
+    mem_replace_with_uninit_zeroed[$T: type where !is_primitive(self)] = fn _(..) {
         'with:
         let $with: &mut $T = _;
         'uninitialized:

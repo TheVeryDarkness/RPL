@@ -3,7 +3,7 @@ pattern uninit-assumed-init
 patt {
     use std::mem::MaybeUninit;
     
-    uninit_assumed_init[$T: type where !can_be_uninit(self)] = fn _ () {
+    uninit_assumed_init[$T: type where !can_be_uninit(self)] = fn _(..) {
         let $maybe_uninit: MaybeUninit<$T> = MaybeUninit::uninit();
         'assume_init:
         let $value: $T = MaybeUninit::assume_init(move $maybe_uninit);

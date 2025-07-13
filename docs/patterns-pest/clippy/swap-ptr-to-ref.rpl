@@ -8,14 +8,14 @@ patt {
 util {
     use core::mem::swap;
 
-    left[$T: type] = fn _() {
+    left[$T: type] = fn _(..) {
         let $ptr: *mut $T = _;
         let $ref_1: &mut $T = &mut *$ptr;
         let $ref_2: &mut $T = _;
         'swap:
         _ = swap::<$T>(copy $ref_1, copy $ref_2);
     }
-    right[$T: type] = fn _() {
+    right[$T: type] = fn _(..) {
         let $ptr: *mut $T = _;
         let $ref_1: &mut $T = _;
         let $ref_2: &mut $T = &mut *$ptr;

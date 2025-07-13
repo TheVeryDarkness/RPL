@@ -2,7 +2,7 @@ pattern transmute-int-to-non-zero
 
 patt {
     use core::num::NonZero;
-    transmute_int_to_non_zero[$T: type where is_integral(self), $U: type where is_integral(self)] = fn _() {
+    transmute_int_to_non_zero[$T: type where is_integral(self), $U: type where is_integral(self)] = fn _(..) {
         type NonZeroU = NonZero<$U>;
         'src:
         let $p: $T = _; // This is an integer type.

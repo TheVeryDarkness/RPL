@@ -11,7 +11,7 @@ patt {
     
     #[diag = "from_raw_with_void_ptr"]
     #[const(ty = "Box")]
-    from_raw_with_void_ptr_box = fn _ () {
+    from_raw_with_void_ptr_box = fn _(..) {
         'ptr:
         let $ptr: *mut c_void = _;
         'from_raw:
@@ -20,7 +20,7 @@ patt {
     
     #[diag = "from_raw_with_void_ptr"]
     #[const(ty = "Rc")]
-    from_raw_with_void_ptr_rc = fn _ () {
+    from_raw_with_void_ptr_rc = fn _(..) {
         'ptr:
         let $ptr: *const c_void = _;
         'from_raw:
@@ -28,7 +28,7 @@ patt {
     }
     #[diag = "from_raw_with_void_ptr"]
     #[const(ty = "Arc")]
-    from_raw_with_void_ptr_arc = fn _ () {
+    from_raw_with_void_ptr_arc = fn _(..) {
         'ptr:
         let $ptr: *const c_void = _;
         'from_raw:
@@ -36,7 +36,7 @@ patt {
     }
     #[diag = "from_raw_with_void_ptr"]
     #[const(ty = "Weak")]
-    from_raw_with_void_ptr_rc_weak = fn _ () {
+    from_raw_with_void_ptr_rc_weak = fn _(..) {
         'ptr:
         let $ptr: *const c_void = _;
         'from_raw:
@@ -44,7 +44,7 @@ patt {
     }
     #[diag = "from_raw_with_void_ptr"]
     #[const(ty = "Weak")]
-    from_raw_with_void_ptr_arc_weak = fn _ () {
+    from_raw_with_void_ptr_arc_weak = fn _(..) {
         'ptr:
         let $ptr: *const c_void = _;
         'from_raw:
