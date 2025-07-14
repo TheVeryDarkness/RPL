@@ -1,111 +1,20 @@
+use std::fmt;
 use std::sync::LazyLock;
 
 use derive_more::Debug;
 use parser::pairs;
 use pest_typed::{ParsableTypedNode, Span};
 use rustc_middle::mir;
-use rustc_span::Symbol;
 
 use crate::collect_elems_separated_by_comma;
 
-/// Identifier in RPL meta language.
-#[derive(Copy, Clone, Debug)]
-#[debug("{name}")]
-pub struct Ident<'i> {
-    pub name: Symbol,
-    pub span: Span<'i>,
-}
-
-impl PartialEq for Ident<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
-impl Eq for Ident<'_> {}
-
-use std::fmt;
-use std::hash::{Hash, Hasher};
-
-impl Hash for Ident<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
-
-impl<'i, const INHERITED: usize> From<&pairs::Word<'i, INHERITED>> for Ident<'i> {
-    fn from(ident: &pairs::Word<'i, INHERITED>) -> Self {
-        let span = ident.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl<'i> From<&pairs::Identifier<'i>> for Ident<'i> {
-    fn from(ident: &pairs::Identifier<'i>) -> Self {
-        let span = ident.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl<'i> From<&pairs::MetaVariable<'i>> for Ident<'i> {
-    fn from(meta: &pairs::MetaVariable<'i>) -> Self {
-        let span = meta.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl<'i> From<&pairs::kw_self<'i>> for Ident<'i> {
-    fn from(meta: &pairs::kw_self<'i>) -> Self {
-        let span = meta.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-impl<'i> From<&pairs::SelfParam<'i>> for Ident<'i> {
-    fn from(meta: &pairs::SelfParam<'i>) -> Self {
-        meta.kw_self().into()
-    }
-}
-
-impl<'i> From<&pairs::Dollarself<'i>> for Ident<'i> {
-    fn from(meta: &pairs::Dollarself<'i>) -> Self {
-        let span = meta.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl<'i> From<&pairs::DollarRET<'i>> for Ident<'i> {
-    fn from(meta: &pairs::DollarRET<'i>) -> Self {
-        let span = meta.span;
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl<'i> From<Span<'i>> for Ident<'i> {
-    fn from(span: Span<'i>) -> Self {
-        let name = Symbol::intern(span.as_str());
-        Self { name, span }
-    }
-}
-
-impl std::fmt::Display for Ident<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.name, f)
-    }
-}
-
-pub struct Path<'i> {
+pub struct Path<'i, Ident = &'i pairs::Identifier<'i>> {
     pub leading: Option<&'i pairs::PathLeading<'i>>,
-    pub segments: Vec<(Ident<'i>, Vec<&'i pairs::GenericArgument<'i>>)>,
+    pub segments: Vec<(Ident, Vec<&'i pairs::GenericArgument<'i>>)>,
     pub _span: Span<'i>,
 }
 
-impl<'i> From<&'i pairs::Path<'i>> for Path<'i> {
+impl<'i, Ident: From<&'i pairs::Identifier<'i>>> From<&'i pairs::Path<'i>> for Path<'i, Ident> {
     fn from(path: &'i pairs::Path<'i>) -> Self {
         fn collect_args<'i>(args: Option<&'i pairs::PathArguments<'i>>) -> Vec<&'i pairs::GenericArgument<'i>> {
             args.map(|args| {
@@ -130,9 +39,9 @@ impl<'i> From<&'i pairs::Path<'i>> for Path<'i> {
     }
 }
 
-impl<'i> Path<'i> {
+impl<'i, Ident: Copy> Path<'i, Ident> {
     /// Returns `Some(ident)` if `self` is a single identifier.
-    pub fn as_ident(&self) -> Option<Ident<'i>> {
+    pub fn as_ident(&self) -> Option<Ident> {
         if self.leading.is_none() && self.segments.len() == 1 && self.segments[0].1.is_empty() {
             // If the path has no leading identifier and only one segment with no generic arguments,
             // it can be treated as a single identifier.
@@ -142,14 +51,14 @@ impl<'i> Path<'i> {
         }
     }
     /// Returns the last segment.
-    pub fn ident(&self) -> Ident<'i> {
+    pub fn ident(&self) -> Ident {
         //FIXME: use a non-empty `Vec` type
         let last = self.segments.last().unwrap();
         last.0
     }
 
     /// Returns the leading identifier if it's the path is not starting with `::`.
-    pub fn leading_ident(&self) -> Option<Ident<'i>> {
+    pub fn leading_ident(&self) -> Option<Ident> {
         if self.leading.is_none() {
             Some(self.segments[0].0)
         } else {
@@ -173,7 +82,7 @@ impl<'i> Path<'i> {
     }
 }
 
-impl fmt::Debug for Path<'_> {
+impl<Ident: fmt::Display> fmt::Debug for Path<'_, Ident> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(leading) = self.leading {
             write!(f, "{}", leading.span.as_str().trim())?;
@@ -198,7 +107,7 @@ impl fmt::Debug for Path<'_> {
     }
 }
 
-impl fmt::Display for Path<'_> {
+impl<Ident: fmt::Display> fmt::Display for Path<'_, Ident> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Debug::fmt(self, f)
     }

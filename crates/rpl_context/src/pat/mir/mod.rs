@@ -198,7 +198,7 @@ impl Debug for PlaceBase {
     }
 }
 
-fn get_place_or_local(sym_tab: &FnSymbolTable<'_>, ident: Symbol) -> PlaceBase {
+fn get_place_or_local(sym_tab: &FnSymbolTable<'_>, ident: &str) -> PlaceBase {
     if let Some(idx) = sym_tab.meta_vars.place_vars_map().get(&ident) {
         PlaceBase::Var(idx.0.into())
     } else if let Some(idx) = sym_tab.inner.symbol_to_local_idx.get(&ident) {
@@ -237,7 +237,7 @@ impl<'pcx> Place<'pcx, PlaceBase> {
             Choice3::_0(local) => match local.deref() {
                 Choice4::_0(_) => (PlaceBase::Any, vec![]),
                 _ => {
-                    let base = get_place_or_local(sym_tab, Symbol::intern(local.span.as_str()));
+                    let base = get_place_or_local(sym_tab, local.span.as_str());
                     (base, vec![])
                 },
             },
@@ -260,7 +260,7 @@ impl<'pcx> Place<'pcx, PlaceBase> {
                 Choice5::_0(field) => PlaceElem::from_field(field),
                 Choice5::_1(index) => {
                     let (_, local, _) = index.get_matched();
-                    let local = sym_tab.inner.get_local_idx(Symbol::intern(local.span.as_str()));
+                    let local = sym_tab.inner.get_local_idx(local.span.as_str());
                     PlaceElem::Index(Local::from(local))
                 },
                 Choice5::_2(const_index) => {
@@ -453,7 +453,7 @@ impl<'pcx> RawDecleration<'pcx> {
             },
             Choice2::_1(local_init) => {
                 let (label, _, _, local, _, _, init, _) = local_init.get_matched();
-                let local = Local::from(fn_sym_tab.inner.get_local_idx(Symbol::intern(local.span.as_str())));
+                let local = Local::from(fn_sym_tab.inner.get_local_idx(local.span.as_str()));
                 let rvalue_or_call = if let Some(init) = init {
                     let (_, init) = init.get_matched();
                     let rvalue_or_call = RvalueOrCall::from(WithPath::new(p, init), pcx, fn_sym_tab);
@@ -995,7 +995,7 @@ impl<'pcx> ConstOperand<'pcx> {
     ) -> Self {
         let (idx, ty, pred) = fn_sym_tab
             .meta_vars
-            .get_from_symbol(Symbol::intern(meta_var.span.as_str()))
+            .get_meta_var_from_name(meta_var.span.as_str())
             .unwrap()
             .expect_const();
         Self::ConstVar(ConstVar::from(
@@ -1242,7 +1242,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 LocalSpecial::None => {},
             }
             if let Some(label) = label {
-                self.pattern.labels.insert(label, Spanned::Local(local));
+                self.pattern.labels.insert(Symbol::intern(label), Spanned::Local(local));
             }
         }
     }

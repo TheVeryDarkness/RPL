@@ -1556,6 +1556,7 @@ name = "rpl_context"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "pest_typed",
  "rpl_constraints",
  "rpl_meta",
  "rpl_parser",

@@ -55,20 +55,20 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
     }
 
     #[instrument(level = "debug", skip(self), ret)]
-    pub fn evaluate_constraint(&self, constraint: &Constraints) -> bool {
+    pub fn evaluate_constraint(&self, constraint: &'m Constraints) -> bool {
         constraint.preds.iter().all(|pred| self.evaluate_conjunction(pred))
         // FIX: we should possibly check attributes here
     }
 
-    fn evaluate_conjunction(&self, conjunction: &PredicateConjunction) -> bool {
+    fn evaluate_conjunction(&self, conjunction: &'m PredicateConjunction) -> bool {
         conjunction.clauses.iter().all(|clause| self.evaluate_clause(clause))
     }
 
-    fn evaluate_clause(&self, clause: &PredicateClause) -> bool {
+    fn evaluate_clause(&self, clause: &'m PredicateClause) -> bool {
         clause.terms.iter().any(|term| self.evaluate_term(term))
     }
 
-    fn evaluate_term(&self, term: &PredicateTerm) -> bool {
+    fn evaluate_term(&self, term: &'m PredicateTerm) -> bool {
         let mut arg_instance = Vec::new();
         for arg in term.args.iter() {
             let instance = self.instantiate_arg(arg).unwrap();
@@ -167,7 +167,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         if term.is_neg { !result } else { result }
     }
 
-    fn instantiate_arg(&self, arg: &PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
+    fn instantiate_arg(&self, arg: &'m PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
         match arg {
             PredicateArg::Label(label) => {
                 let pat_loc = self
@@ -187,7 +187,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
             },
             PredicateArg::MetaVar(name) => {
-                let meta_var = self.symbol_table.meta_vars.get_from_symbol(*name);
+                let meta_var = self.symbol_table.meta_vars.get_meta_var_from_name(name.as_str());
                 if let Some(meta_var) = meta_var {
                     match meta_var {
                         MetaVariable::Type(idx, _) => {
@@ -207,7 +207,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                         },
                         MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
                     }
-                } else if let Some(idx) = self.symbol_table.inner.try_get_local_idx(*name) {
+                } else if let Some(idx) = self.symbol_table.inner.try_get_local_idx(name.as_str()) {
                     let local = pat::Local::from_usize(idx);
                     let local = self.matched[local];
                     Ok(PredicateArgInstance::Local(local))

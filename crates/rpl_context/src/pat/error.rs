@@ -259,9 +259,9 @@ enum SubMsg<'i> {
 }
 
 impl<'i> SubMsg<'i> {
-    fn parse(
+    fn parse<'mcx>(
         s: &pairs::diagMessageInner<'i, 0>,
-        meta_vars: &NonLocalMetaSymTab,
+        meta_vars: &NonLocalMetaSymTab<'mcx>,
         consts: &FxHashMap<Symbol, &'i str>,
         labels: &FxHashSet<Symbol>,
     ) -> Vec<Self> {
@@ -271,18 +271,18 @@ impl<'i> SubMsg<'i> {
                 Choice2::_0(arg) => {
                     let meta_var = arg.MetaVariable();
                     let name = meta_var.Word();
-                    let meta_var = Symbol::intern(meta_var.span.as_str());
+                    let meta_var = meta_var.span.as_str();
                     let name = Symbol::intern(name.span.as_str());
                     if let Some(const_value) = consts.get(&name) {
                         msgs.push(SubMsg::Str(const_value));
-                    } else if meta_var.as_str() == "$fn" {
+                    } else if meta_var == "$fn" {
                         // FIXME: this is a hack to handle `$fn` meta variable
                         msgs.push(SubMsg::FnName)
                     } else if labels.contains(&name) {
                         msgs.push(SubMsg::Label(name))
                     } else {
                         let (var_type, idx, _) = meta_vars
-                            .get_from_symbol(meta_var)
+                            .get_meta_var_from_name(meta_var)
                             .unwrap_or_else(|| {
                                 panic!(
                                     "Meta variable `{}` not found:\n    non-local meta symbol table {:?}\n    labels: {:?}",
@@ -432,9 +432,9 @@ impl<'i> DynamicErrorBuilder<'i> {
     /// # Note
     ///
     /// See [`rpl_meta::symbol_table::DiagSymbolTable`] for earlier passes.
-    pub(super) fn from_item(
+    pub(super) fn from_item<'mcx: 'i>(
         item: WithPath<'i, &'i pairs::diagBlockItem<'i>>,
-        meta_vars: &NonLocalMetaSymTab,
+        meta_vars: &NonLocalMetaSymTab<'mcx>,
         consts: &FxHashMap<Symbol, &'i str>,
         locals: &FxHashSet<Symbol>,
         table: &DiagSymbolTable,

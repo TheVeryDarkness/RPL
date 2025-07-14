@@ -2,18 +2,18 @@ use std::sync::Arc;
 
 use parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
-use rustc_span::Symbol;
 
 use super::CheckFnCtxt;
 use crate::RPLMetaError;
 use crate::context::MetaContext;
-use crate::symbol_table::{FnInner, ImplInner, NonLocalMetaSymTab};
+use crate::symbol_table::{AdtPats, FnInner, ImplInner, NonLocalMetaSymTab};
 use crate::utils::Record;
 
 pub(super) struct CheckImplCtxt<'i, 'r> {
     pub(super) meta_vars: Arc<NonLocalMetaSymTab<'i>>,
+    pub(crate) adt_pats: &'r AdtPats<'i>,
     pub(super) impl_def: &'r mut ImplInner<'i>,
-    pub(super) imports: &'r FxHashMap<Symbol, &'i pairs::Path<'i>>,
+    pub(super) imports: &'r FxHashMap<&'i str, &'i pairs::Path<'i>>,
     pub(super) errors: &'r mut Vec<RPLMetaError<'i>>,
 }
 
@@ -27,6 +27,7 @@ impl<'i> CheckImplCtxt<'i, '_> {
             let meta_vars = self.meta_vars.clone();
             CheckFnCtxt {
                 meta_vars: meta_vars.clone(),
+                adt_pats: self.adt_pats,
                 impl_def: Some(self.impl_def),
                 fn_def: &mut fn_def,
                 imports: self.imports,
@@ -35,7 +36,7 @@ impl<'i> CheckImplCtxt<'i, '_> {
             .check_fn(mctx, rust_fn);
             if let Some(ident) = fn_name {
                 self.impl_def
-                    .add_fn(mctx, ident, (fn_def, meta_vars).into())
+                    .add_fn(mctx, &ident, (fn_def, meta_vars, self.adt_pats).into())
                     .or_record(self.errors);
             }
         }

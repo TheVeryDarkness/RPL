@@ -37,10 +37,10 @@ impl<'pcx> Ty<'pcx> {
         pcx.mk_ty(TyKind::Def(def_id, args))
     }
 
-    pub fn from(
-        ty: WithPath<'pcx, &'pcx pairs::Type<'pcx>>,
+    pub fn from<'mcx>(
+        ty: WithPath<'mcx, &'mcx pairs::Type<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> Self {
         let p = ty.path;
         match ty.inner.deref() {
@@ -51,10 +51,8 @@ impl<'pcx> Ty<'pcx> {
                 match len {
                     Choice2::_0(len) => pcx.mk_array_ty(ty, IntValue::from_integer(len).into()),
                     Choice2::_1(len) => {
-                        let (const_idx, const_ty, const_pred) = fn_sym_tab
-                            .as_ref()
-                            .force_non_local_meta_var(WithPath::new(p, len))
-                            .expect_const();
+                        let (const_idx, const_ty, const_pred) =
+                            fn_sym_tab.force_get_meta_var(WithPath::new(p, len)).expect_const();
                         let len = ConstVar::from(pcx, fn_sym_tab, const_idx, WithPath::new(p, const_ty), const_pred);
                         pcx.mk_array_ty(ty, len.into())
                     },
@@ -121,10 +119,7 @@ impl<'pcx> Ty<'pcx> {
                 };
                 pcx.mk_tuple_ty(&tys)
             },
-            Choice14::_8(ty_meta_var) => match fn_sym_tab
-                .as_ref()
-                .force_non_local_meta_var(WithPath::new(p, ty_meta_var))
-            {
+            Choice14::_8(ty_meta_var) => match fn_sym_tab.force_get_ty_meta_var(WithPath::new(p, ty_meta_var)) {
                 MetaVariable::Type(idx, pred) => {
                     let ty_meta_var = TyVar {
                         idx: idx.into(),
@@ -136,7 +131,7 @@ impl<'pcx> Ty<'pcx> {
                 MetaVariable::Const(..) | MetaVariable::Place(..) => {
                     panic!("A non-type meta variable used as a type variable")
                 },
-                MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(name),
+                MetaVariable::AdtPat(_, name) => pcx.mk_adt_pat_ty(Symbol::intern(name)),
             },
             Choice14::_9(_ty_self) => pcx.mk_self_ty(),
             Choice14::_10(primitive_types) => pcx.mk_ty(TyKind::from_primitive_type(primitive_types)),
@@ -156,10 +151,10 @@ impl<'pcx> Ty<'pcx> {
     /// Also checks [`PathWithArgs::from_type_path`] for resolving type paths.
     /// Maybe reuse `PathWithArgs::from_type_path`?
     #[instrument(level = "trace", skip_all, ret)]
-    fn from_type_path(
-        ty_path: WithPath<'pcx, &'pcx pairs::TypePath<'pcx>>,
+    fn from_type_path<'mcx>(
+        ty_path: WithPath<'mcx, &'mcx pairs::TypePath<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> Self {
         let p = ty_path.path;
         let (qself, path) = ty_path.get_matched();
@@ -193,10 +188,10 @@ impl<'pcx> Ty<'pcx> {
         pcx.mk_path_ty(path_with_args)
     }
 
-    pub fn from_fn_ret(
-        ty: WithPath<'pcx, &'pcx pairs::FnRet<'pcx>>,
+    pub fn from_fn_ret<'mcx>(
+        ty: WithPath<'mcx, &'mcx pairs::FnRet<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+        fn_sym_tab: &FnSymbolTable<'mcx>,
     ) -> Self {
         let p = ty.path;
         let (_, placeholder_or_ty) = ty.get_matched();
@@ -328,10 +323,10 @@ pub enum GenericArgKind<'pcx> {
 }
 
 impl<'pcx> GenericArgKind<'pcx> {
-    fn from(
-        arg: WithPath<'pcx, &'pcx pairs::GenericArgument<'pcx>>,
+    fn from<'mcx>(
+        arg: WithPath<'mcx, &'mcx pairs::GenericArgument<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> GenericArgKind<'pcx> {
         let p = arg.path;
         match arg.inner.deref() {
@@ -384,7 +379,7 @@ impl<'pcx> Path<'pcx> {
             items.push(Symbol::intern("crate"));
         }
         //FIXME: how about the path arguments?
-        items.extend(path.segments.iter().map(|seg| seg.0.name));
+        items.extend(path.segments.iter().map(|seg| Symbol::intern(seg.0.span.as_str())));
         ItemPath(pcx.mk_slice(&items)).into()
     }
 }
@@ -422,10 +417,10 @@ impl<'pcx> GenericArgsRef<'pcx> {
         Self::from_path(args, pcx, fn_sym_tab)
     }
     // FIXME: this function accumulates generic arguments from all path segments
-    pub fn from_path(
-        args: WithPath<'pcx, &rpl_meta::utils::Path<'pcx>>,
+    pub fn from_path<'mcx>(
+        args: WithPath<'mcx, &rpl_meta::utils::Path<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> Self {
         let p = args.path;
         let path: &rpl_meta::utils::Path<'_> = args.inner;
@@ -440,11 +435,11 @@ impl<'pcx> GenericArgsRef<'pcx> {
         GenericArgsRef(pcx.mk_slice(&items))
     }
 
-    pub fn from_generic_arguments(
-        p: &'pcx std::path::Path,
-        args: impl Iterator<Item = &'pcx pairs::GenericArgument<'pcx>>,
+    pub fn from_generic_arguments<'mcx>(
+        p: &'mcx std::path::Path,
+        args: impl Iterator<Item = &'mcx pairs::GenericArgument<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> Self {
         let args = args
             .into_iter()
@@ -525,10 +520,10 @@ impl<'pcx> PathWithArgs<'pcx> {
         Self::from_path(WithPath::new(p, path), pcx, fn_sym_tab)
     }
 
-    pub fn from_lang_item(
-        lang_item: WithPath<'pcx, &'pcx pairs::LangItemWithArgs<'pcx>>,
+    pub fn from_lang_item<'mcx>(
+        lang_item: WithPath<'mcx, &'mcx pairs::LangItemWithArgs<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
     ) -> Self {
         let p = lang_item.path;
         let (_, _, _, _, lang_item, _, args) = lang_item.get_matched();

@@ -7,8 +7,8 @@ pub use error::DynamicError;
 use error::DynamicErrorBuilder;
 use rpl_constraints::Constraints;
 use rpl_meta::collect_elems_separated_by_comma;
+use rpl_meta::meta::PattSymbolTables;
 use rpl_meta::symbol_table::WithPath;
-use rpl_meta::utils::Ident;
 use rpl_parser::generics::{Choice2, Choice3, Choice4};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
@@ -19,6 +19,7 @@ use rustc_span::source_map::SourceMap;
 
 use crate::PatCtxt;
 use crate::pat::table::ColumnType;
+use crate::pat::utils::Ident;
 
 mod attr;
 mod error;
@@ -121,7 +122,7 @@ impl<'pcx> RustItems<'pcx> {
         pat_name: Option<Symbol>,
         item: WithPath<'pcx, &'pcx pairs::RustItemWithConstraint<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'_>,
+        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
     ) {
         let path = item.path;
         let (attr, item, where_block) = item.get_matched();
@@ -129,7 +130,7 @@ impl<'pcx> RustItems<'pcx> {
             .unwrap_or_else(|err| panic!("unexpected error in constraints:\n{err}"));
         match item.deref() {
             Choice4::_0(rust_fn) => {
-                let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
+                let fn_name = rust_fn.FnSig().FnName().span.as_str();
                 let fn_symbol_table = symbol_table.get_fn(fn_name).unwrap();
                 self.add_fn(WithPath::new(path, rust_fn), meta, fn_symbol_table, constraints);
             },
@@ -169,12 +170,12 @@ impl<'pcx> RustItems<'pcx> {
     }
 
     #[instrument(level = "debug", skip(self, rust_struct, symbol_table))]
-    fn add_struct(
+    fn add_struct<'mcx>(
         &mut self,
         pat_name: Option<Symbol>,
-        rust_struct: WithPath<'pcx, &'pcx pairs::Struct<'pcx>>,
+        rust_struct: WithPath<'mcx, &'mcx pairs::Struct<'mcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        symbol_table: &rpl_meta::symbol_table::SymbolTable<'mcx>,
         constraints: Constraints,
     ) {
         let mut struct_inner = StructInner::default();
@@ -196,12 +197,12 @@ impl<'pcx> RustItems<'pcx> {
     }
 
     #[instrument(level = "debug", skip(self, rust_enum, symbol_table))]
-    fn add_enum(
+    fn add_enum<'mcx>(
         &mut self,
         pat_name: Option<Symbol>,
-        rust_enum: WithPath<'pcx, &'pcx pairs::Enum<'pcx>>,
+        rust_enum: WithPath<'mcx, &'mcx pairs::Enum<'mcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        symbol_table: &'mcx rpl_meta::symbol_table::SymbolTable<'mcx>,
         constraints: Constraints,
     ) {
         let mut enum_inner = EnumInner::default();
@@ -246,12 +247,12 @@ impl<'pcx> RustItems<'pcx> {
     }
 
     #[instrument(level = "debug", skip(self, rust_impl, meta, symbol_table))]
-    fn add_impl(
+    fn add_impl<'mcx: 'pcx>(
         &mut self,
         pat_name: Option<Symbol>,
         rust_impl: WithPath<'pcx, &'pcx pairs::Impl<'pcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
-        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        symbol_table: &'mcx rpl_meta::symbol_table::SymbolTable<'mcx>,
         constraints: Constraints,
     ) {
         let p = rust_impl.path;
@@ -268,7 +269,7 @@ impl<'pcx> RustItems<'pcx> {
                 // FIXME: attributes on associated functions are not supported yet
                 let constraints = Constraints::from_where_block_opt(std::iter::empty(), where_block, p)
                     .expect("unexpected error in constraints");
-                let fn_name = Symbol::intern(rust_fn.FnSig().FnName().span.as_str());
+                let fn_name = rust_fn.FnSig().FnName().span.as_str();
                 let fn_sym_tab = impl_sym_tab.inner.get_fn(fn_name).unwrap();
                 let fn_def = FnPattern::from(
                     WithPath::new(p, rust_fn),
@@ -277,7 +278,7 @@ impl<'pcx> RustItems<'pcx> {
                     Arc::clone(&meta),
                     constraints,
                 );
-                (fn_name, fn_def)
+                (Symbol::intern(fn_name), fn_def)
             })
             .collect();
         let impl_pat = Impl {
@@ -397,18 +398,19 @@ impl<'pcx> Pattern<'pcx> {
     pub fn add_pattern_item(
         &mut self,
         pat_item: WithPath<'pcx, &'pcx pairs::RPLPatternItem<'pcx>>,
-        symbol_tables: &'pcx FxHashMap<Symbol, rpl_meta::symbol_table::SymbolTable<'_>>,
+        symbol_tables: &'pcx PattSymbolTables<'_>,
         block_type: PattOrUtil,
     ) {
         let p = pat_item.path;
         let (attr, name, meta_decls, _, item_or_patt_op) = pat_item.get_matched();
-        let name = Symbol::intern(name.span.as_str());
+        let name = name.span.as_str();
         let symbol_table = symbol_tables.get(&name).unwrap();
         let meta = Arc::new(NonLocalMetaVars::from_meta_decls(
             meta_decls.as_ref().map(|meta_decls| with_path(p, meta_decls)),
             self.pcx,
             symbol_table,
         ));
+        let name = Symbol::intern(name);
         self.add_item_or_patt_op(
             name,
             attr.iter_matched(),
@@ -475,11 +477,11 @@ impl<'pcx> Pattern<'pcx> {
     }
 
     #[instrument(level = "debug", skip(self, attr, patt_op, meta), fields(patt_block = ?self.patt_block.keys(), util_block = ?self.util_block.keys()))]
-    fn add_patt_op(
+    fn add_patt_op<'mcx: 'pcx>(
         &mut self,
         pat_name: Symbol,
-        attr: impl Iterator<Item = &'pcx pairs::Attr<'pcx>>,
-        patt_op: WithPath<'pcx, &'pcx pairs::PatternOperation<'pcx>>,
+        attr: impl Iterator<Item = &'mcx pairs::Attr<'mcx>>,
+        patt_op: WithPath<'mcx, &'mcx pairs::PatternOperation<'mcx>>,
         meta: Arc<NonLocalMetaVars<'pcx>>,
         block_type: PattOrUtil,
     ) {
@@ -549,11 +551,11 @@ impl<'pcx> Pattern<'pcx> {
         };
     }
 
-    pub fn add_diag(
+    pub fn add_diag<'mcx: 'pcx>(
         &mut self,
-        diag: WithPath<'pcx, &'pcx pairs::diagBlock<'_>>,
-        diag_symbol_tables: &'pcx rpl_meta::symbol_table::DiagSymbolTables<'_>,
-        symbol_tables: &'pcx FxHashMap<Symbol, rpl_meta::symbol_table::SymbolTable<'_>>,
+        diag: WithPath<'mcx, &'mcx pairs::diagBlock<'mcx>>,
+        diag_symbol_tables: &rpl_meta::meta::DiagSymbolTables<'mcx>,
+        symbol_tables: &PattSymbolTables<'mcx>,
     ) {
         let mut items = FxHashMap::default();
         for item in diag.get_matched().2.iter_matched() {
@@ -564,18 +566,18 @@ impl<'pcx> Pattern<'pcx> {
         }
 
         for (name, pat_item) in &self.patt_block {
-            let symbol_table = symbol_tables.get(name).unwrap();
+            let symbol_table = symbol_tables.get(&name.as_str()).unwrap();
 
             let diag_name = pat_item.diag_name().unwrap_or(*name);
             if let Some(diag_item) = items.get(&diag_name) {
-                let labels = symbol_table.labels();
-                let diag = DynamicErrorBuilder::from_item(
+                let labels = symbol_table.labels().map(Symbol::intern);
+                let diag = DynamicErrorBuilder::<'pcx>::from_item(
                     WithPath::new(diag.path, diag_item),
                     &symbol_table.meta_vars,
                     pat_item.consts(),
                     &labels.collect(),
                     diag_symbol_tables
-                        .get(&diag_name)
+                        .get(&diag_name.as_str())
                         .unwrap_or_else(|| panic!("No diagnostic symbol table found for {diag_name}")),
                 )
                 .unwrap_or_else(|err| panic!("{err}"));

@@ -6,6 +6,7 @@ use rpl_meta::cli::collect_file_from_string_args;
 // use rpl_middle::ty::RplConfig;
 use rustc_interface::interface;
 use rustc_middle::ty::TyCtxt;
+use rustc_session::EarlyDiagCtxt;
 use rustc_session::parse::ParseSess;
 use rustc_span::Symbol;
 
@@ -103,6 +104,22 @@ impl rustc_driver::Callbacks for RplCallbacks {
         }));
         config.locale_resources = crate::default_locale_resources();
 
+        let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
+        let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
+        // let dcx = compiler.sess.dcx();
+        let mut error_counter = 0;
+        let mctx = MCTX.get_or_init(|| {
+            rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
+                error_counter += 1;
+                eprintln!("{error_counter}. {error}"); //FIXME: this would mess up when running on a workspace with multiple crates
+                // let _ = dcx.emit_err(error.clone());
+            })
+        });
+        // dcx.abort_if_errors();
+        if error_counter > 0 {
+            EarlyDiagCtxt::new(config.opts.error_format).early_fatal(ErrorFound);
+        }
+
         let previous = config.register_lints.take();
         config.register_lints = Some(Box::new(move |sess, lint_store| {
             // technically we're ~guaranteed that this is none but might as well call anything that
@@ -112,7 +129,7 @@ impl rustc_driver::Callbacks for RplCallbacks {
             }
 
             //FIXME: consider collect patterns earlier, so that we can register lints here
-            // register_lints(lint_store);
+            mctx.register_lints(lint_store);
         }));
 
         config.override_queries = Some(|_sess, providers| {
