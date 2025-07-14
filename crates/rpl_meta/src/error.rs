@@ -1,5 +1,6 @@
 //! Error type from RPL meta pass.
 
+use std::env::current_dir;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,10 +24,12 @@ error_type!(
             100 FileError {
                 /// Referencing file.
                 path: PathBuf,
+                /// Current working directory.
+                current: PathBuf,
                 /// Cause.
                 error: Arc<std::io::Error>,
             }
-                "Cannot locate RPL pattern file `{path:?}`. Caused by: {error}",
+                "Cannot locate RPL pattern file `{path:?}` from {current:?}. Caused by: {error}",
             200 ImportError {
                 /// Referencing position.
                 span: SpanWrapper<'i>,
@@ -177,7 +180,11 @@ impl<'a> RPLMetaError<'a> {
             Self::ImportError { path, error, span }
         } else {
             let path = path.clone();
-            Self::FileError { path, error }
+            Self::FileError {
+                path,
+                current: current_dir().unwrap_or_else(|_| PathBuf::from("<unknown>")),
+                error,
+            }
         }
     }
 }

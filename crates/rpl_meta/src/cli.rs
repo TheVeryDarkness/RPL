@@ -1,3 +1,4 @@
+use std::env::current_dir;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Debug;
 use std::io;
@@ -18,6 +19,7 @@ pub fn collect_file_from_string_args(args: &[String]) -> Vec<(PathBuf, String)> 
                         "{}",
                         RPLMetaError::FileError {
                             path,
+                            current: current_dir().unwrap_or_else(|_| PathBuf::from("<unknown>")),
                             error: Arc::new(err)
                         }
                     );
