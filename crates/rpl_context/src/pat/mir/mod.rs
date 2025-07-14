@@ -210,12 +210,12 @@ fn get_place_or_local(sym_tab: &FnSymbolTable<'_>, ident: &str) -> PlaceBase {
 
 /// A place is a path to a value in memory.
 #[derive(Clone, Copy)]
-pub struct Place<'pcx, B = PlaceBase> {
-    pub base: B,
+pub struct Place<'pcx> {
+    pub base: PlaceBase,
     pub projection: &'pcx [PlaceElem<'pcx>],
 }
 
-impl<'pcx> Place<'pcx, PlaceBase> {
+impl<'pcx> Place<'pcx> {
     pub fn new(local: Local, projection: &'pcx [PlaceElem<'pcx>]) -> Self {
         Self {
             base: PlaceBase::Local(local),
@@ -304,7 +304,7 @@ impl<'pcx> Place<'pcx, PlaceBase> {
     }
 }
 
-impl<'pcx, B: Copy> Place<'pcx, B> {
+impl<'pcx> Place<'pcx> {
     /// Iterate over the projections in evaluation order, i.e., the first element is the base with
     /// its projection and then subsequently more projections are added.
     /// As a concrete example, given the place a.b.c, this would yield:
@@ -329,13 +329,13 @@ impl<'pcx, B: Copy> Place<'pcx, B> {
     }
 }
 
-impl<B> From<B> for Place<'_, B> {
-    fn from(base: B) -> Self {
+impl From<PlaceBase> for Place<'_> {
+    fn from(base: PlaceBase) -> Self {
         Place { base, projection: &[] }
     }
 }
 
-impl From<Local> for Place<'_, PlaceBase> {
+impl From<Local> for Place<'_> {
     fn from(local: Local) -> Self {
         Place {
             base: PlaceBase::Local(local),
@@ -344,7 +344,7 @@ impl From<Local> for Place<'_, PlaceBase> {
     }
 }
 
-impl From<PlaceVarIdx> for Place<'_, PlaceBase> {
+impl From<PlaceVarIdx> for Place<'_> {
     fn from(var: PlaceVarIdx) -> Self {
         Place {
             base: PlaceBase::Var(var),
