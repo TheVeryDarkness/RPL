@@ -5,14 +5,19 @@ use rustc_middle::mir::{self};
 use rustc_middle::ty::{self, TyCtxt};
 
 pub struct BodyInfoCache {
-    source: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>>,
+    /// `product_of[i][j]` is `Some(true)` if `i` may be a product of `j`, `Some(false)` if `i` may
+    /// be a quotient of `j`, and `None` if there is no relationship.
+    product_of: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>>,
+    // /// `derive_from[i][j]` is `true` if `i` may be computed from `j`, `false` if there is no
+    // /// relationship.
+    // derive_from: IndexVec<mir::Local, IndexVec<mir::Local, bool>>,
 }
 
 impl fmt::Debug for BodyInfoCache {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list()
             .entries(
-                self.source
+                self.product_of
                     .iter_enumerated()
                     .flat_map(|(i, j)| j.iter_enumerated().filter_map(move |(k, v)| v.map(|b| (i, k, b)))),
             )
@@ -24,12 +29,12 @@ impl BodyInfoCache {
     #[instrument(level = "debug", skip(body), ret)]
     pub fn new(body: &mir::Body<'_>) -> Self {
         let n = body.local_decls.len();
-        // Track the source of each local, true for product, false for quotient
-        let mut source: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>> =
+        // Track the product relationship among locals, true for product, false for quotient
+        let mut product_of: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>> =
             IndexVec::from_fn_n(|_| IndexVec::from_elem_n(None, n), n);
         for i in 0..n {
             let i = mir::Local::from_usize(i);
-            source[i][i] = Some(true);
+            product_of[i][i] = Some(true);
         }
         for local in body.basic_blocks.iter() {
             for stmt in &local.statements {
@@ -53,30 +58,30 @@ impl BodyInfoCache {
                             if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
                                 && let Some(rhs1) = rhs1.as_local()
                             {
-                                source[lhs][rhs1] = Some(true);
+                                product_of[lhs][rhs1] = Some(true);
                             }
                             if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
                                 && let Some(rhs2) = rhs2.as_local()
                             {
-                                source[lhs][rhs2] = Some(true);
+                                product_of[lhs][rhs2] = Some(true);
                             }
                         },
                         mir::Rvalue::BinaryOp(mir::BinOp::Div, box rhs) => {
                             if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
                                 && let Some(rhs1) = rhs1.as_local()
                             {
-                                source[lhs][rhs1] = Some(true);
+                                product_of[lhs][rhs1] = Some(true);
                             }
                             if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
                                 && let Some(rhs2) = rhs2.as_local()
                             {
-                                source[lhs][rhs2] = Some(false);
+                                product_of[lhs][rhs2] = Some(false);
                             }
                         },
                         mir::Rvalue::Use(mir::Operand::Copy(rhs) | mir::Operand::Move(rhs))
                         | mir::Rvalue::Cast(_, mir::Operand::Copy(rhs) | mir::Operand::Move(rhs), _) => {
                             if let Some(rhs) = rhs.as_local() {
-                                source[lhs][rhs] = Some(true);
+                                product_of[lhs][rhs] = Some(true);
                             }
                         },
                         _ => (),
@@ -93,13 +98,13 @@ impl BodyInfoCache {
                     }
                     let i = mir::Local::from_usize(i);
                     let k = mir::Local::from_usize(k);
-                    if let (Some(s1), Some(s2)) = (source[i][j], source[j][k]) {
-                        source[i][k] = Some(s1 == s2);
+                    if let (Some(s1), Some(s2)) = (product_of[i][j], product_of[j][k]) {
+                        product_of[i][k] = Some(s1 == s2);
                     }
                 }
             }
         }
-        Self { source }
+        Self { product_of }
     }
 }
 
@@ -118,6 +123,6 @@ pub(crate) fn product_of<'tcx>(
 ) -> bool {
     locals.windows(2).all(|pair| {
         let (first, second) = (pair[0], pair[1]);
-        cache.source[first][second].unwrap_or(false)
+        cache.product_of[first][second].unwrap_or(false)
     })
 }
