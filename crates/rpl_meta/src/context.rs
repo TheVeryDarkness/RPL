@@ -4,6 +4,7 @@ use std::sync::RwLock;
 use parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_index::IndexVec;
+use rustc_lint::LintId;
 
 use crate::arena::Arena;
 use crate::idx::RPLIdx;
@@ -88,5 +89,11 @@ impl<'mcx> MetaContext<'mcx> {
     /// Register the lints in the lint store.
     pub fn register_lints(&self, lint_store: &mut rustc_lint::LintStore) {
         lint_store.register_lints(&self.lints);
+        lint_store.register_group(
+            true,
+            "rpl::all",
+            None,
+            self.lints.iter().cloned().map(LintId::of).collect(),
+        );
     }
 }
