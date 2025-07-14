@@ -767,6 +767,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
         }
     }
 
+    /// See [`rustc_hir::lang_items::LangItem::from_name`].
     fn check_lang_item_with_args(&mut self, mctx: &MetaContext<'i>, lang_item: &'i pairs::LangItemWithArgs<'i>) {
         let item_span = lang_item.String().span;
         let args = lang_item.AngleBracketedGenericArguments();
