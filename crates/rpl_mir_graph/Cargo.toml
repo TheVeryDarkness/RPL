@@ -15,6 +15,7 @@ proc-macro2.workspace = true
 quote.workspace = true
 
 [features]
+default = ["interblock_edges"]
 interblock_edges = []
 
 [package.metadata.rust-analyzer]

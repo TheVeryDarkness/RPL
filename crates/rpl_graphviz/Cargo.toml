@@ -22,7 +22,8 @@ pest_typed.workspace = true
 quote.workspace = true
 
 [features]
-interblock_edges = []
+default = ["interblock_edges"]
+interblock_edges = ["rpl_mir_graph/interblock_edges"]
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

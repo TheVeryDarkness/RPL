@@ -17,7 +17,7 @@ rpl_driver = { path = "./crates/rpl_driver" }
 rpl_parser = { path = "./crates/rpl_parser" }
 rpl_graphviz = { path = "./crates/rpl_graphviz" }
 rpl_interface = { path = "./crates/rpl_interface" }
-rpl_match = { path = "./crates/rpl_match" }
+rpl_match = { path = "./crates/rpl_match", features = ["interblock_edges"] }
 rpl_mir_graph = { path = "./crates/rpl_mir_graph" }
 rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
 rpl_utils = { path = "./crates/rpl_utils" }

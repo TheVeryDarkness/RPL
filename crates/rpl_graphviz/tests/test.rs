@@ -3,6 +3,7 @@
 #![feature(macro_metavar_expr_concat)]
 #![feature(generic_arg_infer)]
 #![recursion_limit = "256"]
+#![cfg(feature = "interblock_edges")]
 
 extern crate rustc_arena;
 extern crate rustc_data_structures;
