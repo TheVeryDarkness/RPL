@@ -7,6 +7,7 @@
 /// See [`rustc_hir::lang_items::LangItem`].
 // The actual lang items defined come at the end of this file in one handy table.
 // So you probably just want to nip down to the end.
+#[rustfmt::skip]
 macro_rules! language_item_table {
     (
         $( $(#[$attr:meta])* $variant:ident, $module:ident :: $name:ident, $method:ident, $target:expr, $generics:expr; )*
@@ -22,6 +23,7 @@ macro_rules! language_item_table {
     }
 }
 
+#[rustfmt::skip]
 language_item_table! {
 //  Variant name,            Name,                     Getter method name,         Target                  Generic requirements;
     Sized,                   sym::sized,               sized_trait,                Target::Trait,          GenericRequirement::Exact(0);
