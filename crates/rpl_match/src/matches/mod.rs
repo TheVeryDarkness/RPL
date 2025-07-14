@@ -498,13 +498,24 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     #[instrument(level = "info", skip(self), fields(?pat_name = self.cx.pat_name, ?fn_name = self.cx.fn_pat.name))]
     fn do_match(&mut self) {
+        #[cfg(feature = "timing")]
+        static TOTAL: std::sync::atomic::AtomicU128 = std::sync::atomic::AtomicU128::new(0);
+        #[cfg(feature = "timing")]
+        let mut start = std::time::Instant::now();
         self.build_candidates();
         self.matching.log_candidates();
-        if self.matching.has_empty_candidates(self.cx) {
-            return;
+        if !self.matching.has_empty_candidates(self.cx) {
+            self.match_candidates();
+            self.log_matched();
         }
-        self.match_candidates();
-        self.log_matched();
+        #[cfg(feature = "timing")]
+        {
+            let duration = start.elapsed();
+            warn!("do_match took {:?}", duration);
+            let duration = duration.as_nanos();
+            let total = TOTAL.fetch_add(duration, std::sync::atomic::Ordering::SeqCst);
+            warn!("total do_match time: {:?} + {:?}", total, duration);
+        }
     }
     fn log_matched(&self) {
         let matched = self.matched.take();

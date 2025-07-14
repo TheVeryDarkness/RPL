@@ -1,0 +1,7 @@
+[workspace]
+
+[package]
+name = "comparison"
+
+[dependencies]
+libc = "0.2"
