@@ -24,12 +24,13 @@ kw_use             = @{ "use" ~ !WordFollowing }
 kw_type            = @{ "type" ~ !WordFollowing }
 kw_let             = @{ "let" ~ !WordFollowing }
 kw_move            = @{ "move" ~ !WordFollowing }
-kw_copy            = @{ "copy" ~ !WordFollowing }
 kw_Len             = @{ "Len" ~ !WordFollowing }
 kw_PtrToPtr        = @{ "PtrToPtr" ~ !WordFollowing }
 kw_IntToInt        = @{ "IntToInt" ~ !WordFollowing }
 kw_Transmute       = @{ "Transmute" ~ !WordFollowing }
 kw_PointerCoercion = @{ "PointerCoercion" ~ !WordFollowing }
+// Soft Keyword
+kw_copy = @{ "copy" ~ !WordFollowing }
 // Soft Keyword
 kw_Unsize = @{ "Unsize" ~ !WordFollowing }
 // Soft Keyword
@@ -81,19 +82,21 @@ kw_place     = @{ "place" ~ !WordFollowing }
 kw_where     = @{ "where" ~ !WordFollowing }
 kw_RET       = @{ "RET" ~ !WordFollowing }
 
+kw_copy_nonoverlapping = @{ "copy_nonoverlapping" ~ !WordFollowing }
+
 // Primitive Types are soft keywords
-kw_u8        = @{ "u8" ~ !WordFollowing }
-kw_u16       = @{ "u16" ~ !WordFollowing }
-kw_u32       = @{ "u32" ~ !WordFollowing }
-kw_u64       = @{ "u64" ~ !WordFollowing }
-kw_usize     = @{ "usize" ~ !WordFollowing }
-kw_i8        = @{ "i8" ~ !WordFollowing }
-kw_i16       = @{ "i16" ~ !WordFollowing }
-kw_i32       = @{ "i32" ~ !WordFollowing }
-kw_i64       = @{ "i64" ~ !WordFollowing }
-kw_isize     = @{ "isize" ~ !WordFollowing }
-kw_bool      = @{ "bool" ~ !WordFollowing }
-kw_str       = @{ "str" ~ !WordFollowing }
+kw_u8    = @{ "u8" ~ !WordFollowing }
+kw_u16   = @{ "u16" ~ !WordFollowing }
+kw_u32   = @{ "u32" ~ !WordFollowing }
+kw_u64   = @{ "u64" ~ !WordFollowing }
+kw_usize = @{ "usize" ~ !WordFollowing }
+kw_i8    = @{ "i8" ~ !WordFollowing }
+kw_i16   = @{ "i16" ~ !WordFollowing }
+kw_i32   = @{ "i32" ~ !WordFollowing }
+kw_i64   = @{ "i64" ~ !WordFollowing }
+kw_isize = @{ "isize" ~ !WordFollowing }
+kw_bool  = @{ "bool" ~ !WordFollowing }
+kw_str   = @{ "str" ~ !WordFollowing }
 
 Keywords = @{
     kw_pattern
@@ -116,7 +119,6 @@ Keywords = @{
   | kw_type
   | kw_let
   | kw_move
-  | kw_copy
   | kw_Len
   | kw_PtrToPtr
   | kw_IntToInt
@@ -145,6 +147,7 @@ Keywords = @{
   | kw_Not
   | kw_PtrMetadata
   | kw_discriminant
+  | kw_copy_nonoverlapping
   | kw_Ctor
   | kw_from
   | kw_of
@@ -792,6 +795,10 @@ MirSwitchInt = {
     LabelWithColon? ~ kw_switchInt ~ LeftParen ~ MirOperand ~ RightParen ~ LeftBrace ~ (MirSwitchTarget)* ~ RightBrace
 }
 
+MirCopyNonOverlapping = {
+    LabelWithColon? ~ kw_copy_nonoverlapping ~ LeftParen ~ MirOperand ~ Comma ~ MirOperand ~ Comma ~ MirOperand ~ RightParen
+}
+
 MirAssign = {
     LabelWithColon? ~ MirPlace ~ Assign ~ MirRvalueOrCall
 }
@@ -803,6 +810,7 @@ MirStmt = {
   | MirAssign ~ SemiColon
   | MirLoop
   | MirSwitchInt
+  | MirCopyNonOverlapping ~ SemiColon
 }
 
 MirBody = {

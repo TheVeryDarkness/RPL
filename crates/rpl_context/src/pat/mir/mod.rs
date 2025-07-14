@@ -5,7 +5,7 @@ use std::ops::Index;
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
 use rpl_parser::SpanWrapper;
-use rpl_parser::generics::{Choice5, Choice6, Choice12};
+use rpl_parser::generics::{Choice5, Choice6, Choice7, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_hir::Target;
@@ -412,8 +412,25 @@ impl<'pcx> PlaceTy<'pcx> {
     }
 }
 
+/// Refer to [`mir::CopyNonOverlapping`] for more details.
+pub struct CopyNonOverlapping<'pcx> {
+    pub src: Operand<'pcx>,
+    pub dst: Operand<'pcx>,
+    pub count: Operand<'pcx>,
+}
+
+/// Refer to [`mir::NonDivergingIntrinsic`] for more details.
+pub enum NonDivergingIntrinsic<'pcx> {
+    /// Refer to [`mir::NonDivergingIntrinsic::CopyNonOverlapping`] for more details.
+    CopyNonOverlapping(CopyNonOverlapping<'pcx>),
+}
+
+/// Refer to [`mir::StatementKind`] for more details.
 pub enum StatementKind<'pcx> {
+    /// Refer to [`mir::StatementKind::Assign`] for more details.
     Assign(Place<'pcx>, Rvalue<'pcx>),
+    /// Refer to [`mir::StatementKind::Intrinsic`] for more details.
+    Intrinsic(NonDivergingIntrinsic<'pcx>),
 }
 
 pub enum RawDecleration<'pcx> {
@@ -460,6 +477,7 @@ pub enum RawStatement<'pcx> {
     Assign(Option<Label>, Place<'pcx>, Rvalue<'pcx>),
     Call(Option<Label>, Place<'pcx>, Call<'pcx>),
     CallIgnoreRet(Option<Label>, Call<'pcx>),
+    CopyNonOverlapping(Option<Label>, Operand<'pcx>, Operand<'pcx>, Operand<'pcx>),
     Drop(Option<Label>, Place<'pcx>),
     Break,
     Continue,
@@ -480,14 +498,17 @@ impl<'pcx> RawStatement<'pcx> {
     ) -> Self {
         let p = stmt.path;
         match stmt.inner.deref() {
-            Choice6::_0(call_ignore_ret) => {
+            Choice7::_0(call_ignore_ret) => {
                 Self::from_call_ignore_ret(with_path(p, call_ignore_ret.get_matched().0), pcx, sym_tab)
             },
-            Choice6::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
-            Choice6::_2(control) => Self::from_control(control.get_matched().0),
-            Choice6::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
-            Choice6::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
-            Choice6::_5(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
+            Choice7::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
+            Choice7::_2(control) => Self::from_control(control.get_matched().0),
+            Choice7::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
+            Choice7::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
+            Choice7::_5(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
+            Choice7::_6(copy_non_overlapping) => {
+                Self::from_copy_non_overlapping(WithPath::new(p, copy_non_overlapping.get_matched().0), pcx, sym_tab)
+            },
         }
     }
 
@@ -610,6 +631,22 @@ impl<'pcx> RawStatement<'pcx> {
         }
     }
 
+    pub fn from_copy_non_overlapping(
+        copy_non_overlapping: WithPath<'pcx, &'pcx pairs::MirCopyNonOverlapping<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let p = copy_non_overlapping.path;
+        let (label, _, _, src, _, dst, _, count, _) = copy_non_overlapping.get_matched();
+        let label = label
+            .as_ref()
+            .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
+        let src = Operand::from(with_path(p, src), pcx, fn_sym_tab);
+        let dst = Operand::from(with_path(p, dst), pcx, fn_sym_tab);
+        let count = Operand::from(with_path(p, count), pcx, fn_sym_tab);
+        Self::CopyNonOverlapping(label, src, dst, count)
+    }
+
     pub fn from_switch_int_block(
         block: WithPath<'pcx, &'pcx pairs::MirSwitchBody<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -702,7 +739,7 @@ impl<'i> Cast<CoercionSource> for &'i pairs::CoercionSource<'i> {
 
 /// A value that can be used in an rvalue.
 ///
-/// See [`mir::Rvalue`].
+/// See [`mir::Rvalue`] for more details.
 pub enum Rvalue<'pcx> {
     Any,
     Use(Operand<'pcx>),
@@ -813,6 +850,7 @@ impl<'pcx> Rvalue<'pcx> {
     }
 }
 
+/// Refer to [`mir::Operand`] for more details.
 #[derive(Clone)]
 pub enum Operand<'pcx> {
     Any,
@@ -1251,6 +1289,14 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             RawStatement::CallIgnoreRet(label, Call(func, args)) => {
                 self.mk_fn_call(label, func, args.into_boxed_slice(), None)
             },
+            RawStatement::CopyNonOverlapping(label, dst, src, count) => self.mk_assign(
+                label,
+                StatementKind::Intrinsic(NonDivergingIntrinsic::CopyNonOverlapping(CopyNonOverlapping {
+                    dst,
+                    src,
+                    count,
+                })),
+            ),
             RawStatement::Drop(label, place) => self.mk_drop(label, place),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),

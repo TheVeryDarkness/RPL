@@ -207,6 +207,15 @@ pub trait PatternVisitor<'pcx>: Sized {
                 self.visit_place(place, store, location);
                 self.visit_rvalue(rvalue, location);
             },
+            StatementKind::Intrinsic(NonDivergingIntrinsic::CopyNonOverlapping(CopyNonOverlapping {
+                ref src,
+                ref dst,
+                ref count,
+            })) => {
+                self.visit_operand(src, location);
+                self.visit_operand(dst, location);
+                self.visit_operand(count, location);
+            },
         }
     }
     fn super_terminator(&mut self, terminator: &TerminatorKind<'pcx>, location: Location) {

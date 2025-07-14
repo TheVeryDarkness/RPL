@@ -952,6 +952,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                                 .is_some_and(|local_pat| self.matching.locals[local_pat].force_get_matched() == arg)
                                 && matches!(value, pat::Rvalue::Any)
                         },
+                        pat::StatementKind::Intrinsic(_) => false,
                     }
                 }
             },

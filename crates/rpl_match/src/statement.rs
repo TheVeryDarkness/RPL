@@ -97,6 +97,43 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
+    fn match_copy_non_overlapping(
+        &self,
+        copy_pat: &pat::CopyNonOverlapping<'pcx>,
+        copy: &mir::CopyNonOverlapping<'tcx>,
+    ) -> bool {
+        match (copy_pat, copy) {
+            (
+                pat::CopyNonOverlapping {
+                    src: src_pat,
+                    dst: dst_pat,
+                    count: count_pat,
+                },
+                mir::CopyNonOverlapping { src, dst, count },
+            ) => {
+                self.match_operand(src_pat, src)
+                    && self.match_operand(dst_pat, dst)
+                    && self.match_operand(count_pat, count)
+            },
+        }
+    }
+
+    #[instrument(level = "trace", skip(self), ret)]
+    fn match_intrinsic(
+        &self,
+        intrinsic_pat: &pat::NonDivergingIntrinsic<'pcx>,
+        intrinsic: &mir::NonDivergingIntrinsic<'tcx>,
+    ) -> bool {
+        match (intrinsic_pat, intrinsic) {
+            (
+                pat::NonDivergingIntrinsic::CopyNonOverlapping(copy_pat),
+                mir::NonDivergingIntrinsic::CopyNonOverlapping(copy),
+            ) => self.match_copy_non_overlapping(copy_pat, copy),
+            _ => false,
+        }
+    }
+
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_statement(
         &self,
         loc_pat: pat::Location,
@@ -109,10 +146,13 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 &pat::StatementKind::Assign(place_pat, ref rvalue_pat),
                 &mir::StatementKind::Assign(box (place, ref rvalue)),
             ) => self.match_rvalue(rvalue_pat, rvalue) && self.match_place(place_pat, place),
+            (&pat::StatementKind::Intrinsic(ref intrinsic_pat), &mir::StatementKind::Intrinsic(ref intrinsic)) => {
+                self.match_intrinsic(intrinsic_pat, intrinsic)
+            },
             (
-                pat::StatementKind::Assign(..),
-                // mir::StatementKind::Assign(..)
-                mir::StatementKind::FakeRead(..)
+                pat::StatementKind::Assign(..) | pat::StatementKind::Intrinsic(..),
+                mir::StatementKind::Assign(..)
+                | mir::StatementKind::FakeRead(..)
                 | mir::StatementKind::SetDiscriminant { .. }
                 | mir::StatementKind::Deinit(_)
                 | mir::StatementKind::StorageLive(_)
