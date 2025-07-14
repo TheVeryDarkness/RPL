@@ -25,6 +25,9 @@ pub fn mir_data_dep_graph(body: &mir::Body<'_>, cfg: &MirControlFlowGraph) -> Mi
     for (bb, block) in body.basic_blocks.iter_enumerated() {
         BlockDataDepGraphVisitor::new(&mut graph.blocks[bb]).visit_basic_block_data(bb, block);
     }
+    #[cfg(not(feature = "interblock_edges"))]
+    let _ = cfg;
+    #[cfg(feature = "interblock_edges")]
     graph.build_interblock_edges(cfg);
     graph
 }

@@ -256,7 +256,10 @@ impl MultiGraph {
 impl<B: HasBasicBlocks + HasLocals> DdgBuilder<'_, B> {
     pub fn build(&self) -> MultiGraph {
         let blocks = self.build_blocks();
-        let mut edges = self.cfg_builder.build_edges();
+        let edges = self.cfg_builder.build_edges();
+        #[cfg(feature = "interblock_edges")]
+        let mut edges = edges;
+        #[cfg(feature = "interblock_edges")]
         self.build_interblock_edges(&mut edges);
         MultiGraph::new("DataDependencyGraph".into(), blocks, edges)
     }
@@ -345,6 +348,7 @@ impl<B: HasBasicBlocks + HasLocals> DdgBuilder<'_, B> {
         )
         .collect()
     }
+    #[cfg(feature = "interblock_edges")]
     fn build_interblock_edges(&self, edges: &mut Vec<Edge>) {
         edges.extend(
             self.ddg

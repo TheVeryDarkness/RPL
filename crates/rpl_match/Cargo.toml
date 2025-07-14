@@ -18,6 +18,7 @@ rpl_meta.workspace = true
 
 [features]
 strict = []
+interblock_edges = ["rpl_mir_graph/interblock_edges"]
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

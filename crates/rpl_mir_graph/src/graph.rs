@@ -1,7 +1,9 @@
 use core::default::Default;
 use std::ops::Index;
 
-use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
+#[cfg(feature = "interblock_edges")]
+use rustc_data_structures::fx::FxHashMap;
+use rustc_data_structures::fx::FxIndexMap;
 use rustc_data_structures::packed::Pu128;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexSlice, IndexVec};
@@ -350,18 +352,21 @@ pub struct SwitchTargets<BasicBlock: Idx> {
     pub otherwise: Option<BasicBlock>,
 }
 
+#[cfg(feature = "interblock_edges")]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Location<BasicBlock> {
     block: BasicBlock,
     statement_index: usize,
 }
 
+#[cfg(feature = "interblock_edges")]
 impl<BasicBlock: Idx> std::fmt::Debug for Location<BasicBlock> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}[{}]", self.block, self.statement_index)
     }
 }
 
+#[cfg(feature = "interblock_edges")]
 impl<BasicBlock> Location<BasicBlock> {
     pub fn new(block: BasicBlock, statement_index: usize) -> Self {
         Self { block, statement_index }
@@ -375,6 +380,7 @@ pub struct DataDepGraph<BasicBlock: Idx, Local: Idx> {
     /// Record the interblock data dependencies.
     /// i.e. the bb[stmt] depends on the dep_bb[dep_stmt] writing to the local.
     /// and bb[Out] depends on the dep_bb[dep_stmt] writing to the local.
+    #[cfg(feature = "interblock_edges")]
     interblock_edges: IndexVec<BasicBlock, InterblockEdges<BasicBlock, Local>>,
 }
 
@@ -391,6 +397,7 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
         Self {
             num_locals,
             blocks: IndexVec::from_fn_n(|bb| BlockDataDepGraph::new(num_statements(bb), num_locals), num_blocks),
+            #[cfg(feature = "interblock_edges")]
             interblock_edges: IndexVec::from_fn_n(|bb| InterblockEdges::new(num_statements(bb)), num_blocks),
         }
     }
@@ -398,14 +405,16 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
         self.blocks.iter_enumerated()
     }
     pub fn deps(&self, bb_from: BasicBlock, stmt_from: usize) -> impl Iterator<Item = ((BasicBlock, usize), Local)> {
-        self.blocks[bb_from]
+        let deps = self.blocks[bb_from]
             .deps(stmt_from)
-            .map(move |(stmt, local)| ((bb_from, stmt), local))
-            .chain(
-                self.interblock_edges[bb_from].deps[stmt_from]
-                    .iter()
-                    .map(|(loc, local)| ((loc.block, loc.statement_index), local)),
-            )
+            .map(move |(stmt, local)| ((bb_from, stmt), local));
+        #[cfg(feature = "interblock_edges")]
+        let deps = deps.chain(
+            self.interblock_edges[bb_from].deps[stmt_from]
+                .iter()
+                .map(|(loc, local)| ((loc.block, loc.statement_index), local)),
+        );
+        deps
     }
     #[instrument(level = "debug", skip_all, fields(?bb, dep_loc = %format!("{dep_bb:?}[{dep_stmt}]")), ret)]
     pub fn get_dep_end(&self, bb: BasicBlock, dep_bb: BasicBlock, dep_stmt: usize) -> Option<Local> {
@@ -413,7 +422,8 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
         if bb == dep_bb {
             ret = ret.or(self.blocks[bb].get_dep_end(dep_stmt));
         }
-        ret.or_else(|| {
+        #[cfg(feature = "interblock_edges")]
+        let ret = ret.or_else(|| {
             self.interblock_edges[bb]
                 .dep_end
                 .entry
@@ -422,18 +432,19 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
                     statement_index: dep_stmt,
                 })
                 .copied()
-        })
+        });
+        ret
     }
     pub fn dep_end(&self, bb: BasicBlock) -> impl Iterator<Item = ((BasicBlock, usize), Local)> + '_ {
-        self.blocks[bb]
-            .dep_end()
-            .map(move |(stmt, local)| ((bb, stmt), local))
-            .chain(
-                self.interblock_edges[bb]
-                    .dep_end
-                    .iter()
-                    .map(|(loc, local)| ((loc.block, loc.statement_index), local)),
-            )
+        let dep_end = self.blocks[bb].dep_end().map(move |(stmt, local)| ((bb, stmt), local));
+        #[cfg(feature = "interblock_edges")]
+        let dep_end = dep_end.chain(
+            self.interblock_edges[bb]
+                .dep_end
+                .iter()
+                .map(|(loc, local)| ((loc.block, loc.statement_index), local)),
+        );
+        dep_end
     }
     #[instrument(level = "debug", skip(self), ret)]
     pub fn get_dep(&self, bb: BasicBlock, stmt: usize, dep_bb: BasicBlock, dep_stmt: usize) -> Option<Local> {
@@ -441,13 +452,16 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
         if bb == dep_bb {
             ret = ret.or(self.blocks[bb].get_dep(stmt, dep_stmt));
         }
-        ret.or_else(|| {
+        #[cfg(feature = "interblock_edges")]
+        let ret = ret.or_else(|| {
             self.interblock_edges[bb].deps[stmt]
                 .entry
                 .get(&(Location::new(dep_bb, dep_stmt)))
                 .copied()
-        })
+        });
+        ret
     }
+    #[cfg(feature = "interblock_edges")]
     pub fn interblock_edges(&self) -> impl Iterator<Item = (BasicBlock, usize, BasicBlock, usize, Local)> {
         self.interblock_edges.iter_enumerated().flat_map(|(bb, edges)| {
             edges.deps.iter().enumerate().flat_map(move |(stmt, edges)| {
@@ -457,6 +471,7 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
             })
         })
     }
+    #[cfg(feature = "interblock_edges")]
     pub fn build_interblock_edges(&mut self, cfg: &ControlFlowGraph<BasicBlock>) {
         loop {
             let mut changed = false;
@@ -505,6 +520,7 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
     }
 }
 
+#[cfg(feature = "interblock_edges")]
 #[derive(Clone)]
 struct InterblockEdges<BasicBlock, Local> {
     /// deps[stmt] records the interblock dependencies of the `stmt` in basic block.
@@ -513,6 +529,7 @@ struct InterblockEdges<BasicBlock, Local> {
     dep_end: InterblockEdgesEntry<BasicBlock, Local>,
 }
 
+#[cfg(feature = "interblock_edges")]
 impl<BasicBlock: Idx, Local: Idx> InterblockEdges<BasicBlock, Local> {
     fn new(statements: usize) -> Self {
         Self {
@@ -522,11 +539,13 @@ impl<BasicBlock: Idx, Local: Idx> InterblockEdges<BasicBlock, Local> {
     }
 }
 
+#[cfg(feature = "interblock_edges")]
 #[derive(Clone)]
 struct InterblockEdgesEntry<BasicBlock, Local> {
     entry: FxHashMap<Location<BasicBlock>, Local>,
 }
 
+#[cfg(feature = "interblock_edges")]
 impl<BasicBlock, Local> Default for InterblockEdgesEntry<BasicBlock, Local> {
     fn default() -> Self {
         Self {
@@ -535,6 +554,7 @@ impl<BasicBlock, Local> Default for InterblockEdgesEntry<BasicBlock, Local> {
     }
 }
 
+#[cfg(feature = "interblock_edges")]
 impl<BasicBlock: Idx, Local: Idx> InterblockEdgesEntry<BasicBlock, Local> {
     fn union_with_intersection(
         &mut self,

@@ -15,6 +15,7 @@ proc-macro2.workspace = true
 quote.workspace = true
 
 [features]
+interblock_edges = []
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]
