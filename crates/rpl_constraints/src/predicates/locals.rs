@@ -34,8 +34,10 @@ impl BodyInfoCache {
         for local in body.basic_blocks.iter() {
             for stmt in &local.statements {
                 // Check if the statement is a product or quotient
-                match stmt.kind {
-                    mir::StatementKind::Assign(box (ref lhs, ref rhs)) => match rhs {
+                if let mir::StatementKind::Assign(box (ref lhs, ref rhs)) = stmt.kind
+                    && let Some(lhs) = lhs.as_local()
+                {
+                    match rhs {
                         mir::Rvalue::BinaryOp(
                             mir::BinOp::Mul
                             | mir::BinOp::MulUnchecked
@@ -48,45 +50,38 @@ impl BodyInfoCache {
                             | mir::BinOp::SubWithOverflow,
                             box rhs,
                         ) => {
-                            if let Some(lhs) = lhs.as_local() {
-                                if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
-                                    && let Some(rhs1) = rhs1.as_local()
-                                {
-                                    source[lhs][rhs1] = Some(true);
-                                }
-                                if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
-                                    && let Some(rhs2) = rhs2.as_local()
-                                {
-                                    source[lhs][rhs2] = Some(true);
-                                }
+                            if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
+                                && let Some(rhs1) = rhs1.as_local()
+                            {
+                                source[lhs][rhs1] = Some(true);
+                            }
+                            if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
+                                && let Some(rhs2) = rhs2.as_local()
+                            {
+                                source[lhs][rhs2] = Some(true);
                             }
                         },
                         mir::Rvalue::BinaryOp(mir::BinOp::Div, box rhs) => {
-                            if let Some(lhs) = lhs.as_local() {
-                                if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
-                                    && let Some(rhs1) = rhs1.as_local()
-                                {
-                                    source[lhs][rhs1] = Some(true);
-                                }
-                                if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
-                                    && let Some(rhs2) = rhs2.as_local()
-                                {
-                                    source[lhs][rhs2] = Some(false);
-                                }
+                            if let mir::Operand::Copy(rhs1) | mir::Operand::Move(rhs1) = rhs.0
+                                && let Some(rhs1) = rhs1.as_local()
+                            {
+                                source[lhs][rhs1] = Some(true);
+                            }
+                            if let mir::Operand::Copy(rhs2) | mir::Operand::Move(rhs2) = rhs.1
+                                && let Some(rhs2) = rhs2.as_local()
+                            {
+                                source[lhs][rhs2] = Some(false);
                             }
                         },
                         mir::Rvalue::Use(mir::Operand::Copy(rhs) | mir::Operand::Move(rhs))
                         | mir::Rvalue::Cast(_, mir::Operand::Copy(rhs) | mir::Operand::Move(rhs), _) => {
-                            if let Some(lhs) = lhs.as_local()
-                                && let Some(rhs) = rhs.as_local()
-                            {
+                            if let Some(rhs) = rhs.as_local() {
                                 source[lhs][rhs] = Some(true);
                             }
                         },
                         _ => (),
-                    },
-                    _ => (),
-                };
+                    }
+                }
             }
         }
         for j in 0..n {

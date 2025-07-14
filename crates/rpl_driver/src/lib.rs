@@ -451,7 +451,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
             &fn_pat.expect_body().labels,
             matched,
             cache,
-            &fn_pat.symbol_table,
+            fn_pat.symbol_table,
         );
         evaluator.evaluate_constraint(&fn_pat.constraints)
     }

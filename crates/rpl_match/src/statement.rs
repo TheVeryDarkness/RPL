@@ -102,20 +102,16 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         copy_pat: &pat::CopyNonOverlapping<'pcx>,
         copy: &mir::CopyNonOverlapping<'tcx>,
     ) -> bool {
-        match (copy_pat, copy) {
-            (
-                pat::CopyNonOverlapping {
-                    src: src_pat,
-                    dst: dst_pat,
-                    count: count_pat,
-                },
-                mir::CopyNonOverlapping { src, dst, count },
-            ) => {
-                self.match_operand(src_pat, src)
-                    && self.match_operand(dst_pat, dst)
-                    && self.match_operand(count_pat, count)
+        let (
+            pat::CopyNonOverlapping {
+                src: src_pat,
+                dst: dst_pat,
+                count: count_pat,
             },
-        }
+            mir::CopyNonOverlapping { src, dst, count },
+        ) = (copy_pat, copy);
+
+        self.match_operand(src_pat, src) && self.match_operand(dst_pat, dst) && self.match_operand(count_pat, count)
     }
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -146,7 +142,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 &pat::StatementKind::Assign(place_pat, ref rvalue_pat),
                 &mir::StatementKind::Assign(box (place, ref rvalue)),
             ) => self.match_rvalue(rvalue_pat, rvalue) && self.match_place(place_pat, place),
-            (&pat::StatementKind::Intrinsic(ref intrinsic_pat), &mir::StatementKind::Intrinsic(ref intrinsic)) => {
+            (pat::StatementKind::Intrinsic(intrinsic_pat), mir::StatementKind::Intrinsic(intrinsic)) => {
                 self.match_intrinsic(intrinsic_pat, intrinsic)
             },
             (
