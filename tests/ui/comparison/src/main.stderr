@@ -1,0 +1,55 @@
+error: found a count of bytes instead of a count of elements of `[T; N]`
+  --> tests/ui/comparison/src/main.rs:9:32
+   |
+LL |             p.copy_from(q, N * size_of::<[T; N]>());
+   |                                ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+   = note: `#[deny(rpl::size_of_in_element_count)]` on by default
+
+error: transmuting a known null pointer into a function pointer
+  --> tests/ui/comparison/src/main.rs:17:18
+   |
+LL |         unsafe { std::mem::transmute(null_ptr::<T>()) }
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
+   = note: `{0x0 as *const T}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
+   = note: `-D rpl::transmute-null-to-fn` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::transmute_null_to_fn)]`
+
+error: found a count of bytes instead of a count of elements of `[i32; 3]`
+  --> tests/ui/comparison/src/main.rs:23:9
+   |
+LL |         size_of_in_element_count(&mut a, &b);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+
+error: transmuting a known null pointer into a function pointer
+  --> tests/ui/comparison/src/main.rs:25:17
+   |
+LL |         let x = transmute_null_to_fn::<i32>()();
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
+   = note: `{0x0 as *const i32}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
+
+error: found a count of bytes instead of a count of elements of `[T; N]`
+  --> tests/ui/comparison/src/main.rs:32:25
+   |
+LL |         let count = N * std::mem::size_of::<[T; N]>();
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+
+error: found a count of bytes instead of a count of elements of `[i32; 3]`
+  --> tests/ui/comparison/src/main.rs:41:9
+   |
+LL |         size_of_in_element_count(&mut a, &b);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+
+error: aborting due to 6 previous errors
+
