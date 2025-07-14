@@ -14,6 +14,7 @@
 extern crate rustc_data_structures;
 extern crate rustc_span;
 
+use std::env::current_dir;
 use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -40,6 +41,7 @@ pub fn collect_file_from_args_for_test() -> Vec<(PathBuf, String)> {
                             "{}",
                             RPLMetaError::FileError {
                                 path,
+                                current: current_dir().unwrap_or_else(|_| PathBuf::from("<unknown>")),
                                 error: Arc::new(err)
                             }
                         );
