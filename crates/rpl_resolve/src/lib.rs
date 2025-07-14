@@ -138,6 +138,7 @@ impl PatItemKind {
 /// This function is expensive and should be used sparingly.
 #[tracing::instrument(level = "trace", skip(tcx), ret)]
 pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<Res> {
+    let full_path = path;
     let (base, path) = match path {
         [primitive] => {
             let resolved = PrimTy::from_name(*primitive);
@@ -177,7 +178,7 @@ pub fn def_path_res(tcx: TyCtxt<'_>, path: &[Symbol], kind: PatItemKind) -> Vec<
 
     if resolved.is_empty() {
         // FIXME: consider a more elegant way to show errors.
-        debug!("No items found for path {:?} with kind {:?}", path, kind);
+        debug!(?full_path, ?kind, "No items found with specific kind",);
     }
 
     resolved

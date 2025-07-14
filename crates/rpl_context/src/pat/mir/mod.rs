@@ -4,7 +4,6 @@ use std::ops::Index;
 
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
-use rpl_parser::SpanWrapper;
 use rpl_parser::generics::{Choice5, Choice6, Choice7, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
@@ -22,7 +21,7 @@ use super::utils::{
 };
 pub use super::*;
 
-pub(crate) type FnSymbolTable<'i> = rpl_meta::symbol_table::Fn<'i>;
+pub type FnSymbolTable<'i> = rpl_meta::symbol_table::Fn<'i>;
 
 rustc_index::newtype_index! {
     #[debug_format = "_?{}"]
@@ -176,6 +175,7 @@ impl PlaceElem<'_> {
 pub enum PlaceBase {
     Local(Local),
     Var(PlaceVarIdx),
+    Any,
 }
 
 impl PlaceBase {
@@ -183,6 +183,7 @@ impl PlaceBase {
         match self {
             PlaceBase::Local(local) => Some(local),
             PlaceBase::Var(_) => None,
+            PlaceBase::Any => None,
         }
     }
 }
@@ -192,6 +193,7 @@ impl Debug for PlaceBase {
         match self {
             PlaceBase::Local(local) => Debug::fmt(local, f),
             PlaceBase::Var(var) => Debug::fmt(var, f),
+            PlaceBase::Any => write!(f, "_"),
         }
     }
 }
@@ -233,12 +235,7 @@ impl<'pcx> Place<'pcx, PlaceBase> {
         let (base, suffix) = place.get_matched();
         let (base, mut base_projections) = match base.deref() {
             Choice3::_0(local) => match local.deref() {
-                Choice4::_0(place_holder) => {
-                    panic!(
-                        "expect a non-placeholder local:\n{}",
-                        SpanWrapper::new(place_holder.span, place.path)
-                    );
-                },
+                Choice4::_0(_) => (PlaceBase::Any, vec![]),
                 _ => {
                     let base = get_place_or_local(sym_tab, Symbol::intern(local.span.as_str()));
                     (base, vec![])

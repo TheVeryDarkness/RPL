@@ -1,7 +1,9 @@
 use rpl_constraints::Constraints;
-use rpl_constraints::predicates::{PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm};
-use rpl_context::pat::{ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
-use rpl_meta::symbol_table::{MetaVariable, NonLocalMetaSymTab};
+use rpl_constraints::predicates::{
+    BodyInfoCache, PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm,
+};
+use rpl_context::pat::{self, ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
+use rpl_meta::symbol_table::MetaVariable;
 use rustc_middle::mir::{self, Const, PlaceRef};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::Symbol;
@@ -27,7 +29,8 @@ pub struct PredicateEvaluator<'e, 'm, 'tcx> {
     body: &'e mir::Body<'tcx>,
     label_map: &'e LabelMap,
     matched: &'e Matched<'tcx>,
-    symbol_table: &'e NonLocalMetaSymTab<'m>,
+    body_cache: &'e BodyInfoCache,
+    symbol_table: &'e pat::FnSymbolTable<'m>,
 }
 
 impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
@@ -37,7 +40,8 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         body: &'e mir::Body<'tcx>,
         label_map: &'e LabelMap,
         matched: &'e Matched<'tcx>,
-        symbol_table: &'e NonLocalMetaSymTab<'m>,
+        body_cache: &'e BodyInfoCache,
+        symbol_table: &'e pat::FnSymbolTable<'m>,
     ) -> Self {
         Self {
             tcx,
@@ -45,6 +49,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
             body,
             label_map,
             matched,
+            body_cache,
             symbol_table,
         }
     }
@@ -148,6 +153,16 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
                 p(self.tcx, self.typing_env, args)
             },
+            PredicateKind::MultipleLocals(p) => {
+                let mut args = Vec::new();
+                for arg in arg_instance.iter() {
+                    match arg {
+                        PredicateArgInstance::Local(local) => args.push(*local),
+                        _ => panic!("PredicateArgInstance::Local expected, got {:?}", arg),
+                    }
+                }
+                p(self.tcx, self.typing_env, self.body, self.body_cache, args)
+            },
         };
         if term.is_neg { !result } else { result }
     }
@@ -172,7 +187,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
             },
             PredicateArg::MetaVar(name) => {
-                let meta_var = self.symbol_table.get_from_symbol(*name);
+                let meta_var = self.symbol_table.meta_vars.get_from_symbol(*name);
                 if let Some(meta_var) = meta_var {
                     match meta_var {
                         MetaVariable::Type(idx, _) => {
@@ -192,8 +207,15 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                         },
                         MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
                     }
+                } else if let Some(idx) = self.symbol_table.inner.try_get_local_idx(*name) {
+                    let local = pat::Local::from_usize(idx);
+                    let local = self.matched[local];
+                    Ok(PredicateArgInstance::Local(local))
                 } else {
-                    Err(format!("meta_var `{}` not found in {:?}", name, self.symbol_table))
+                    Err(format!(
+                        "meta_var `{}` not found in {:?}",
+                        name, self.symbol_table.meta_vars,
+                    ))
                 }
             },
             PredicateArg::Path(path) => Ok(PredicateArgInstance::Path(path.clone())),

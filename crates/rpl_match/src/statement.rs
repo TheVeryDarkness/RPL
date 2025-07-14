@@ -710,6 +710,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             },
             pat::PlaceBase::Var(pat_var) => return self.match_place_var(pat_var, place),
             //FIXME: maybe place meta variable can also have a projection
+            pat::PlaceBase::Any => return true,
         }
         let matched = pat.projection.len() == place.projection.len()
             && std::iter::zip(
@@ -816,11 +817,15 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         pat::PlaceTy::from_ty(self.mir_pat().locals[local])
     }
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx>;
+    fn get_place_ty_from_any(&self) -> pat::PlaceTy<'pcx> {
+        pat::PlaceTy::from_ty(self.pcx().mk_any_ty())
+    }
 
     fn get_place_ty_from_base(&self, base: pat::PlaceBase) -> pat::PlaceTy<'pcx> {
         match base {
             pat::PlaceBase::Local(local) => self.get_place_ty_from_local(local),
             pat::PlaceBase::Var(var) => self.get_place_ty_from_place_var(var),
+            pat::PlaceBase::Any => self.get_place_ty_from_any(),
         }
         // self.body.local_decls[place.local].ty
     }

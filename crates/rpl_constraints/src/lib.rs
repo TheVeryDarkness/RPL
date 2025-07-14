@@ -2,6 +2,7 @@
 #![feature(let_chains)]
 #![feature(if_let_guard)]
 #![feature(map_try_insert)]
+#![feature(box_patterns)]
 
 extern crate rustc_abi;
 extern crate rustc_data_structures;
@@ -9,6 +10,7 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_fluent_macro;
 extern crate rustc_hir;
+extern crate rustc_index;
 extern crate rustc_infer;
 extern crate rustc_lint_defs;
 extern crate rustc_macros;

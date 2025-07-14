@@ -8,7 +8,7 @@ use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
 use rustc_hir::def::Res;
 use rustc_hir::def_id::{DefId, LOCAL_CRATE};
-use rustc_hir::definitions::DefPathData;
+use rustc_hir::definitions::{DefPathData, DefPathDataName};
 use rustc_index::IndexVec;
 use rustc_middle::mir;
 use rustc_middle::ty::{self, TyCtxt, ValTreeKind};
@@ -365,13 +365,26 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
             Res::Def(_, id) => Some(id),
             _ => None,
         });
-        let pat_id = if let Some(id) = res.next() { id } else { return false };
-        // FIXME: there should be at most one item matching specific item kind
-        assert!(res.next().is_none());
+        match res.next() {
+            Some(pat_id) => {
+                // FIXME: there should be at most one item matching specific item kind
+                assert!(res.next().is_none());
 
-        trace!(?pat_id, ?def_id);
+                trace!(?pat_id, ?def_id);
 
-        pat_id == def_id
+                pat_id == def_id
+            },
+            None => {
+                let def_path = self.tcx().def_path(def_id);
+                let def_path: Vec<_> = std::iter::once(self.tcx().crate_name(def_path.krate))
+                    .chain(def_path.data.iter().map(|data| match data.data.name() {
+                        DefPathDataName::Named(symbol) | DefPathDataName::Anon { namespace: symbol } => symbol,
+                    }))
+                    .collect();
+                debug!(?path, ?def_id, ?kind, ?def_path, "fallback");
+                path.0 == def_path
+            },
+        }
     }
 
     fn match_item_path(&self, path: pat::ItemPath<'pcx>, def_id: DefId) -> Option<&'pcx [Symbol]> {

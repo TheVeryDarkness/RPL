@@ -39,6 +39,7 @@ impl<'tcx> PatternVisitor<'tcx> for BlockDataDepGraphVisitor<'_, pat::Local> {
         match place.base {
             pat::PlaceBase::Local(local) => self.graph.access_local(local, pcx, location.statement_index),
             pat::PlaceBase::Var(_) => {}, //FIXME: handle var
+            pat::PlaceBase::Any => {},
         }
         self.super_place(place, pcx, location);
     }

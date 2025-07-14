@@ -8,6 +8,7 @@ use rustc_span::Symbol;
 // Attention:
 // When you add a new module here,
 // Try to keep all predicate signatures consistent in it.
+mod locals;
 mod multiple_consts;
 mod multiple_tys;
 mod single_const;
@@ -17,6 +18,7 @@ mod translate;
 mod trivial;
 mod ty_const;
 
+pub use locals::*;
 pub use multiple_consts::*;
 pub use multiple_tys::*;
 pub use single_const::*;
@@ -73,6 +75,8 @@ pub const ALL_PREDICATES: &[&str] = &[
     "is_null_ptr",
     // multiple_consts_preds
     "usize_lt",
+    // multiple_locals_preds
+    "product_of",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -85,6 +89,7 @@ pub enum PredicateKind {
     TyConst(TyConstPredsFnPtr),
     SingleConst(SingleConstPredsFnPtr),
     MultipleConsts(MultipleConstsPredsFnPtr),
+    MultipleLocals(MultipleLocalsPredsFnPtr),
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -92,7 +97,6 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
     fn try_from(span: SpanWrapper<'i>) -> Result<Self, Self::Error> {
         Ok(match span.inner().as_str() {
             "can_be_uninit" => Self::Ty(can_be_uninit),
-            "compatible_layout" => Self::MultipleTys(compatible_layout),
             "is_all_safe_trait" => Self::Ty(is_all_safe_trait),
             "is_integral" => Self::Ty(is_integral),
             "is_char" => Self::Ty(is_char),
@@ -100,13 +104,13 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "is_float" => Self::Ty(is_float),
             "is_fn_ptr" => Self::Ty(is_fn_ptr),
             "is_not_unpin" => Self::Ty(is_not_unpin),
-            "is_null_ptr" => Self::SingleConst(is_null_ptr),
             "is_ref" => Self::Ty(is_ref),
             "is_sync" => Self::Ty(is_sync),
             "is_primitive" => Self::Ty(is_primitive),
             "is_ptr" => Self::Ty(is_ptr),
             "is_zst" => Self::Ty(is_zst),
             "needs_drop" => Self::Ty(needs_drop),
+            "compatible_layout" => Self::MultipleTys(compatible_layout),
             "niche_ordered" => Self::MultipleTys(niche_ordered),
             "translate_from_function" => Self::Translate(translate_from_function),
             "false" => Self::Trivial(r#false),
@@ -115,7 +119,9 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "same_size" => Self::MultipleTys(same_size),
             "requires_monomorphization" => Self::Fn(requires_monomorphization),
             "maybe_misaligned" => Self::TyConst(maybe_misaligned),
+            "is_null_ptr" => Self::SingleConst(is_null_ptr),
             "usize_lt" => Self::MultipleConsts(usize_lt),
+            "product_of" => Self::MultipleLocals(product_of),
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

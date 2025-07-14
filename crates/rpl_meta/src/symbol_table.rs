@@ -666,6 +666,9 @@ impl<'i> FnInner<'i> {
         )
     }
 
+    pub fn try_get_local_idx(&self, symbol: Symbol) -> Option<usize> {
+        self.symbol_to_local_idx.get(&symbol).copied()
+    }
     pub fn get_local_idx(&self, symbol: Symbol) -> usize {
         self.symbol_to_local_idx.get(&symbol).copied().unwrap_or_else(|| {
             panic!("Local variable `{}` not found", symbol);

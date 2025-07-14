@@ -17,9 +17,11 @@ extern crate either;
 rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::convert::identity;
 
 use either::Either;
+use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
 use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
@@ -29,8 +31,8 @@ use rpl_match::mir::pat::PatternItem;
 use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_match::predicate_evaluator::PredicateEvaluator;
 use rpl_meta::context::MetaContext;
-use rustc_data_structures::fx::FxHashSet;
-use rustc_hir::def_id::LocalDefId;
+use rustc_data_structures::fx::{FxHashMap, FxHashSet};
+use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
 use rustc_lint_defs::RegisteredTools;
@@ -87,7 +89,11 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
     //     check_item(tcx, pcx, item_id);
     //     Ok(())
     // });
-    let mut check_ctxt = CheckFnCtxt { tcx, pcx };
+    let mut check_ctxt = CheckFnCtxt {
+        tcx,
+        pcx,
+        body_caches: RefCell::default(),
+    };
     tcx.hir().walk_toplevel_module(&mut check_ctxt);
     rpl_utils::visit_crate(tcx);
 }
@@ -103,6 +109,7 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
 struct CheckFnCtxt<'pcx, 'tcx> {
     tcx: TyCtxt<'tcx>,
     pcx: PatCtxt<'pcx>,
+    body_caches: RefCell<FxHashMap<DefId, BodyInfoCache>>,
 }
 
 impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
@@ -212,6 +219,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     // if *fn_name != impl_item.ident.name {
                     //     continue;
                     // }
+
                     CheckMirCtxt::new(
                         self.tcx,
                         self.pcx,
@@ -432,13 +440,18 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         body: &mir::Body<'tcx>,
         matched: &Matched<'tcx>,
     ) -> bool {
+        let mut cache = self.body_caches.borrow_mut();
+        let cache = cache
+            .entry(body.source.def_id())
+            .or_insert_with(|| BodyInfoCache::new(body));
         let evaluator = PredicateEvaluator::new(
             self.tcx,
             ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
             body,
             &fn_pat.expect_body().labels,
             matched,
-            &fn_pat.symbol_table.meta_vars,
+            cache,
+            &fn_pat.symbol_table,
         );
         evaluator.evaluate_constraint(&fn_pat.constraints)
     }
