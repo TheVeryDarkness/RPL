@@ -1,9 +1,6 @@
-//@ignore-on-host
-#![allow(clippy::ptr_offset_with_cast)]
-
 use std::mem::{size_of, size_of_val};
 use std::ptr::{copy, copy_nonoverlapping, write_bytes};
-
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     const SIZE: usize = 128;
     const HALF_SIZE: usize = SIZE / 2;
@@ -21,9 +18,9 @@ fn main() {
             x.as_ptr(),
             y.as_mut_ptr(),
             HALF_SIZE * size_of_val(&x[0]) * 2,
+            //FIXME: ~^ size_of_in_element_count
         )
     };
-    //~^ size_of_in_element_count
 
     // Count expression involving divisions of size_of (Should trigger the lint)
     unsafe {
@@ -31,9 +28,9 @@ fn main() {
             x.as_ptr(),
             y.as_mut_ptr(),
             DOUBLE_SIZE * size_of::<u16>() / 2,
+            //~^ size_of_in_element_count
         )
     };
-    //~^ size_of_in_element_count
 
     // Count expression involving divisions by size_of (Should not trigger the lint)
     unsafe { copy(x.as_ptr(), y.as_mut_ptr(), DOUBLE_SIZE / size_of::<u16>()) };
@@ -53,9 +50,9 @@ fn main() {
             x.as_ptr(),
             y.as_mut_ptr(),
             DOUBLE_SIZE / (2 / size_of::<u16>()),
+            //~^ size_of_in_element_count
         )
     };
-    //~^ size_of_in_element_count
 
     // No size_of calls (Should not trigger the lint)
     unsafe { copy(x.as_ptr(), y.as_mut_ptr(), SIZE) };

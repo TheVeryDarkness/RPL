@@ -1,13 +1,11 @@
-//@ignore-on-host
-#![allow(clippy::ptr_offset_with_cast)]
-
+//@compile-flags: -Z mir-opt-level=0
 use std::mem::{size_of, size_of_val};
 use std::ptr::{
     copy, copy_nonoverlapping, slice_from_raw_parts, slice_from_raw_parts_mut, swap_nonoverlapping,
     write_bytes,
 };
 use std::slice::{from_raw_parts, from_raw_parts_mut};
-
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {
     const SIZE: usize = 128;
     const HALF_SIZE: usize = SIZE / 2;
@@ -28,8 +26,8 @@ fn main() {
     unsafe {
         x.as_ptr()
             .copy_to_nonoverlapping(y.as_mut_ptr(), size_of::<u16>())
+        //~^ size_of_in_element_count
     };
-    //~^ size_of_in_element_count
 
     unsafe { y.as_mut_ptr().copy_from(x.as_ptr(), size_of::<u16>()) };
     //~^ size_of_in_element_count
@@ -37,8 +35,8 @@ fn main() {
     unsafe {
         y.as_mut_ptr()
             .copy_from_nonoverlapping(x.as_ptr(), size_of::<u16>())
+        //~^ size_of_in_element_count
     };
-    //~^ size_of_in_element_count
 
     unsafe { copy(x.as_ptr(), y.as_mut_ptr(), size_of::<u16>()) };
     //~^ size_of_in_element_count
