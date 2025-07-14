@@ -2,13 +2,16 @@ use std::path::Path;
 
 use itertools::Itertools as _;
 use parser::pairs;
-use rustc_data_structures::fx::FxHashMap;
-use rustc_span::Symbol;
 
+use crate::FlatMap;
 use crate::context::MetaContext;
 use crate::error::RPLMetaError;
 use crate::idx::RPLIdx;
 use crate::symbol_table::{DiagSymbolTable, SymbolTable};
+
+pub type UtilSymbolTables<'mcx> = FlatMap<&'mcx str, SymbolTable<'mcx>>;
+pub type PattSymbolTables<'mcx> = FlatMap<&'mcx str, SymbolTable<'mcx>>;
+pub type DiagSymbolTables<'mcx> = FlatMap<&'mcx str, DiagSymbolTable<'mcx>>;
 
 /// Meta data of a single rpl file.
 pub struct SymbolTables<'mcx> {
@@ -17,13 +20,13 @@ pub struct SymbolTables<'mcx> {
     /// RPL Idx
     pub idx: RPLIdx,
     /// The name of the rpl file
-    pub name: Symbol,
+    pub name: &'mcx str,
     /// The symbol table of the util block
-    pub util_symbol_tables: FxHashMap<Symbol, SymbolTable<'mcx>>,
+    pub util_symbol_tables: UtilSymbolTables<'mcx>,
     /// The symbol table of the patt block
-    pub patt_symbol_tables: FxHashMap<Symbol, SymbolTable<'mcx>>,
+    pub patt_symbol_tables: PattSymbolTables<'mcx>,
     /// The symbol table of the diag block
-    pub diag_symbol_tables: FxHashMap<Symbol, DiagSymbolTable<'mcx>>,
+    pub diag_symbol_tables: DiagSymbolTables<'mcx>,
     /// errors
     pub errors: Vec<RPLMetaError<'mcx>>,
 }
@@ -60,11 +63,11 @@ impl<'mcx> SymbolTables<'mcx> {
         }
     }
 
-    fn collect_rpl_pattern_name(main: &pairs::main<'mcx>) -> Symbol {
+    fn collect_rpl_pattern_name(main: &pairs::main<'mcx>) -> &'mcx str {
         let rpl_pattern = main.get_matched().1;
         let rpl_header = rpl_pattern.get_matched().0;
         let name = rpl_header.get_matched().1.span.as_str();
-        Symbol::intern(name)
+        name
     }
 }
 

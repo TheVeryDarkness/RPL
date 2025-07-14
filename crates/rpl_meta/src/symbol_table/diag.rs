@@ -4,12 +4,11 @@ use std::sync::LazyLock;
 use parser::{SpanWrapper, collect_elems_separated_by_comma, pairs};
 use rustc_hash::FxHashMap;
 use rustc_lint::{Level, Lint};
-use rustc_span::Symbol;
 use sync_arena::declare_arena;
 
+use crate::FlatMap;
 use crate::context::MetaContext;
 use crate::error::RPLMetaError;
-use crate::utils::Ident;
 
 declare_arena!(
     [
@@ -19,11 +18,9 @@ declare_arena!(
 
 static ARENA: LazyLock<Arena<'static>> = LazyLock::new(Arena::default);
 
-pub type DiagSymbolTables<'i> = FxHashMap<Symbol, DiagSymbolTable<'i>>;
-
 #[derive(Default)]
 pub struct DiagSymbolTable<'i> {
-    diags: FxHashMap<Symbol, String>,
+    diags: FxHashMap<&'i str, String>,
     /// The lints that are registered in this diag symbol table.
     ///
     /// # Note
@@ -39,13 +36,13 @@ impl<'i> DiagSymbolTable<'i> {
         mctx: &MetaContext<'i>,
         diags: impl Iterator<Item = &'i pairs::diagBlockItem<'i>>,
         errors: &mut Vec<RPLMetaError<'i>>,
-    ) -> FxHashMap<Symbol, Self> {
-        let mut diag_symbols = FxHashMap::default();
+    ) -> FlatMap<&'i str, Self> {
+        let mut diag_symbols = FlatMap::default();
         for diag in diags {
             let name = diag.get_matched().0;
             let symbol_table = Self::collect_diag_symbol_table(mctx, diag, errors);
             _ = diag_symbols
-                .try_insert(Symbol::intern(name.span.as_str()), symbol_table)
+                .try_insert(name.span.as_str(), symbol_table)
                 .map_err(|entry| {
                     let ident = *entry.entry.key();
                     let err = RPLMetaError::SymbolAlreadyDeclared {
@@ -72,7 +69,7 @@ impl<'i> DiagSymbolTable<'i> {
             let messages = collect_elems_separated_by_comma!(messages);
             for message in messages {
                 let (ident, _, string) = message.get_matched();
-                diag_symbol_table.add_diag(mctx, &ident.into(), string.span.to_string(), errors);
+                diag_symbol_table.add_diag(mctx, ident, string.span.to_string(), errors);
             }
         }
 
@@ -153,20 +150,17 @@ impl<'i> DiagSymbolTable<'i> {
     fn add_diag(
         &mut self,
         mctx: &MetaContext<'i>,
-        ident: &Ident<'i>,
+        ident: &pairs::MetaVariable<'i>,
         message: String,
         errors: &mut Vec<RPLMetaError<'i>>,
     ) {
-        _ = self
-            .diags
-            .try_insert(Symbol::intern(ident.span.as_str()), message)
-            .map_err(|_entry| {
-                let err = RPLMetaError::SymbolAlreadyDeclared {
-                    ident: ident.name,
-                    span: SpanWrapper::new(ident.span, mctx.get_active_path()),
-                };
-                errors.push(err);
-            });
+        _ = self.diags.try_insert(ident.span.as_str(), message).map_err(|_entry| {
+            let err = RPLMetaError::SymbolAlreadyDeclared {
+                ident: ident.span.as_str(),
+                span: SpanWrapper::new(ident.span, mctx.get_active_path()),
+            };
+            errors.push(err);
+        });
     }
 
     pub(crate) fn collect_lints(&self) -> &[&'static Lint] {

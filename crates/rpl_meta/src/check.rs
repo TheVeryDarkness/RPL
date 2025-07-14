@@ -6,27 +6,28 @@ use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice7, Cho
 use parser::{SpanWrapper, pairs};
 use rpl_constraints::predicates::{PredicateConjunction, PredicateError};
 use rustc_data_structures::fx::FxHashMap;
-use rustc_span::Symbol;
 
+use crate::check::lang_item::is_lang_item;
 use crate::context::MetaContext;
 use crate::symbol_table::{
-    AdtPatType, EnumInner, FnInner, GetType as _, ImplInner, NonLocalMetaSymTab, SymbolTable, Variant, WithMetaTable,
-    WithPath, ident_is_primitive,
+    AdtPatType, AdtPats, EnumInner, FnInner, GetType as _, ImplInner, MetaVariable, NonLocalMetaSymTab, SymbolTable,
+    Variant, WithMetaTable, WithPath, ident_is_primitive,
 };
-use crate::utils::{Ident, Path, Record};
+use crate::utils::{Path, Record};
 use crate::{RPLMetaError, collect_elems_separated_by_comma};
 
 mod impls;
+mod lang_item;
 
 /// Used for checking any errors in RPL patterns.
 pub struct CheckCtxt<'i> {
-    pub(crate) name: Symbol,
+    pub(crate) name: &'i str,
     pub(crate) symbol_table: SymbolTable<'i>,
     pub(crate) errors: Vec<RPLMetaError<'i>>,
 }
 
 impl<'i> CheckCtxt<'i> {
-    pub fn new(name: Symbol) -> Self {
+    pub fn new(name: &'i str) -> Self {
         Self {
             name,
             symbol_table: SymbolTable::default(),
@@ -36,11 +37,16 @@ impl<'i> CheckCtxt<'i> {
 
     pub fn check_import(&mut self, mctx: &MetaContext<'i>, import: &'i pairs::UsePath<'i>) {
         let path = Path::from(import.Path());
-        let ident = path.ident();
-        if self.symbol_table.imports.try_insert(ident.name, import.Path()).is_err() {
+        let ident: &pairs::Identifier<'i> = path.ident();
+        if self
+            .symbol_table
+            .imports
+            .try_insert(ident.span.as_str(), import.Path())
+            .is_err()
+        {
             self.errors.push(RPLMetaError::SymbolAlreadyDeclared {
                 span: SpanWrapper::new(import.span, mctx.get_active_path()),
-                ident: ident.name,
+                ident: ident.span.as_str(),
             });
         }
     }
@@ -164,9 +170,10 @@ impl<'i> CheckCtxt<'i> {
     fn check_fn(&mut self, mctx: &MetaContext<'i>, rust_fn: &'i pairs::Fn<'i>) {
         let fn_name = rust_fn.FnSig().FnName();
         let fn_def = self.symbol_table.add_fn(mctx, fn_name, None, &mut self.errors);
-        if let Some((fn_def, imports)) = fn_def {
+        if let Some((fn_def, imports, adt_pats)) = fn_def {
             CheckFnCtxt {
                 meta_vars: fn_def.meta_vars.clone(),
+                adt_pats,
                 impl_def: None,
                 fn_def: &mut fn_def.inner,
                 imports,
@@ -180,7 +187,6 @@ impl<'i> CheckCtxt<'i> {
         let struct_name = rust_struct.get_matched().2;
         let struct_name = struct_name.into();
         self.symbol_table
-            .meta_vars
             .add_adt_pat(mctx, struct_name, AdtPatType::Struct, &mut self.errors);
         let struct_def = self.symbol_table.add_struct(mctx, struct_name, &mut self.errors);
         if let Some(struct_def) = struct_def {
@@ -197,7 +203,6 @@ impl<'i> CheckCtxt<'i> {
         let enum_name = rust_enum.get_matched().1;
         let enum_name = enum_name.into();
         self.symbol_table
-            .meta_vars
             .add_adt_pat(mctx, enum_name, AdtPatType::Enum, &mut self.errors);
         let enum_def = self.symbol_table.add_enum(mctx, enum_name, &mut self.errors);
         if let Some(enum_def) = enum_def {
@@ -213,9 +218,10 @@ impl<'i> CheckCtxt<'i> {
     fn check_impl(&mut self, mctx: &MetaContext<'i>, rust_impl: &'i pairs::Impl<'i>) {
         let meta_vars = self.symbol_table.meta_vars.clone();
         let impl_def = self.symbol_table.add_impl(mctx, rust_impl, &mut self.errors);
-        if let Some((impl_def, imports)) = impl_def {
+        if let Some((impl_def, imports, adt_pats)) = impl_def {
             CheckImplCtxt {
                 meta_vars,
+                adt_pats,
                 impl_def: &mut impl_def.inner,
                 imports,
                 errors: &mut self.errors,
@@ -227,14 +233,37 @@ impl<'i> CheckCtxt<'i> {
 
 struct CheckFnCtxt<'i, 'r> {
     meta_vars: Arc<NonLocalMetaSymTab<'i>>,
+    adt_pats: &'r AdtPats<'i>,
     #[allow(dead_code)]
     impl_def: Option<&'r ImplInner<'i>>,
     fn_def: &'r mut FnInner<'i>,
-    imports: &'r FxHashMap<Symbol, &'i pairs::Path<'i>>,
+    imports: &'r FxHashMap<&'i str, &'i pairs::Path<'i>>,
     errors: &'r mut Vec<RPLMetaError<'i>>,
 }
 
 impl<'i> CheckFnCtxt<'i, '_> {
+    fn get_non_local_meta_var(
+        &mut self,
+        mctx: &MetaContext<'i>,
+        meta_var: &pairs::MetaVariable<'i>,
+    ) -> Option<MetaVariable<'i>> {
+        self.meta_vars
+            .get_meta_var_from_name(meta_var.span.as_str())
+            .or_else(|| {
+                self.adt_pats
+                    .get(&meta_var.span.as_str())
+                    .map(|ty| MetaVariable::AdtPat(*ty, meta_var.span.as_str()))
+            })
+            .or_else(|| {
+                let err = RPLMetaError::NonLocalMetaVariableNotDeclared {
+                    meta_var: meta_var.span.as_str(),
+                    span: SpanWrapper::new(meta_var.span, mctx.get_active_path()),
+                };
+                self.errors.push(err);
+                None
+            })
+    }
+
     fn check_fn(mut self, mctx: &MetaContext<'i>, rust_fn: &'i pairs::Fn<'i>) {
         let (fn_sig, fn_body) = rust_fn.get_matched();
         self.check_fn_sig(mctx, fn_sig);
@@ -280,11 +309,11 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_normal_param(&mut self, mctx: &MetaContext<'i>, normal_param: &'i pairs::NormalParam<'i>) {
         let (_, ident, _, ty) = normal_param.get_matched();
-        let label = Some(Symbol::intern(ident.Word().span.as_str()));
+        let label = Some(ident.Word().span.as_str());
         let ident = ident.into();
         self.fn_def.add_param(mctx, label, ident, ty, self.errors);
         self.check_type(mctx, ty);
-        debug!(ident = ?ident.name, "checking normal param");
+        debug!(ident = ?ident.span.as_str(), "checking normal param");
     }
 
     fn check_fn_body(&mut self, mctx: &MetaContext<'i>, fn_body: &'i pairs::FnBody<'i>) {
@@ -443,7 +472,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
         let (label, _, _, local, _, ty, rvalue_or_call, _) = local_decl.get_matched();
         let label = label
             .as_ref()
-            .map(|label| Symbol::intern(label.get_matched().0.get_matched().1.span.as_str()));
+            .map(|label| label.get_matched().0.get_matched().1.span.as_str());
         self.fn_def.add_place_local(mctx, label, local, ty, self.errors);
         self.check_type(mctx, ty);
         if let Some(rvalue_or_call) = rvalue_or_call {
@@ -517,11 +546,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_mir_operand(&mut self, mctx: &MetaContext<'i>, operand: &'i pairs::MirOperand<'i>) {
         match operand.deref() {
             Choice6::_0(_) | Choice6::_1(_) => {},
-            Choice6::_2(meta_var) => {
-                _ = self
-                    .meta_vars
-                    .get_non_local_meta_var(mctx, meta_var.into(), self.errors)
-            },
+            Choice6::_2(meta_var) => _ = self.get_non_local_meta_var(mctx, meta_var.into()),
             Choice6::_3(op_move) => self.check_mir_place(mctx, op_move.MirPlace()),
             Choice6::_4(op_copy) => self.check_mir_place(mctx, op_copy.MirPlace()),
             Choice6::_5(op_const) => self.check_mir_const_operand(mctx, op_const),
@@ -535,7 +560,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
             Choice4::_1(lang_item) => self.check_lang_item_with_args(mctx, lang_item),
             Choice4::_2(path) => self.check_type_path(mctx, path),
             Choice4::_3(ident) => {
-                let _: Option<_> = self.meta_vars.get_non_local_meta_var(mctx, ident.into(), self.errors);
+                let _: Option<_> = self.get_non_local_meta_var(mctx, ident.into());
             },
         }
     }
@@ -677,9 +702,9 @@ impl<'i> CheckFnCtxt<'i, '_> {
                 }
             },
             Choice14::_8(ty_meta_var) => {
-                let ident = Ident::from(ty_meta_var.MetaVariable());
+                let ident = ty_meta_var.MetaVariable();
                 // debug!(?ident, ?self.meta_vars, "checking meta variable");
-                let _: Option<_> = self.meta_vars.get_non_local_meta_var(mctx, ident, self.errors);
+                let _: Option<_> = self.get_non_local_meta_var(mctx, ident);
             },
             Choice14::_9(_ty_self) => {},
             Choice14::_10(_primitive_types) => {},
@@ -702,8 +727,8 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_path(&mut self, mctx: &MetaContext<'i>, path: &'i pairs::Path<'i>) {
         let path: Path<'i> = path.into();
         if let Some(ident) = path.as_ident() {
-            if !ident_is_primitive(&ident) {
-                WithMetaTable::from((&*self.fn_def, self.meta_vars.clone()))
+            if !ident_is_primitive(&ident.span.as_str()) {
+                WithMetaTable::from((&*self.fn_def, self.meta_vars.clone(), self.adt_pats))
                     .get_type_or_path(&WithPath::with_ctx(mctx, ident))
                     .or_record(self.errors);
             }
@@ -753,12 +778,12 @@ impl<'i> CheckFnCtxt<'i, '_> {
         // remove the `""` around the item name
         let item_name = item_span.as_str();
         let item_name = item_name.trim_matches('"');
-        _ = rustc_hir::LangItem::from_name(rustc_span::Symbol::intern(item_name)).ok_or_else(|| {
+        if !is_lang_item(item_name) {
             self.errors.push(RPLMetaError::UnknownLangItem {
-                value: Symbol::intern(item_name),
+                value: item_name,
                 span: SpanWrapper::new(item_span, mctx.get_active_path()),
             });
-        });
+        }
 
         if let Some(args) = args {
             let (_, _, args, _) = args.get_matched();
@@ -795,11 +820,15 @@ impl<'i> CheckVariantCtxt<'i, '_> {
         let (ident, _, ty) = field.get_matched();
         let ident = ident.into();
         self.variant_def.add_field(mctx, ident, ty, self.errors);
-        self.check_ident(mctx, ident);
+        self.check_meta_var(mctx, ident);
         self.check_type(mctx, ty);
     }
 
-    fn check_ident(&mut self, _mctx: &MetaContext<'i>, _ident: Ident<'i>) {}
+    fn check_meta_var(&mut self, _mctx: &MetaContext<'i>, _ident: &pairs::MetaVariable<'i>) {}
+
+    // FIXME
+    #[expect(dead_code)]
+    fn check_ident(&mut self, _mctx: &MetaContext<'i>, _ident: &pairs::Identifier<'i>) {}
 
     fn check_type(&mut self, _mctx: &MetaContext<'i>, _ty: &'i pairs::Type<'i>) {}
 }
@@ -820,7 +849,7 @@ impl<'i> CheckEnumCtxt<'i, '_> {
                     Choice3::_0(variant) => {
                         let (ident, _, fields, _) = variant.get_matched();
                         (
-                            Ident::from(ident),
+                            ident,
                             fields
                                 .as_ref()
                                 .map(|fields| collect_elems_separated_by_comma!(fields).collect::<Vec<_>>()),
@@ -828,9 +857,9 @@ impl<'i> CheckEnumCtxt<'i, '_> {
                     },
                     Choice3::_1(variant) => {
                         let (ident, _, _ty, _) = variant.get_matched();
-                        (Ident::from(ident), None)
+                        (ident, None)
                     },
-                    Choice3::_2(ident) => (Ident::from(ident), None),
+                    Choice3::_2(ident) => (ident, None),
                 };
                 let variant_def = self.enum_def.add_variant(mctx, ident, self.errors);
                 if let Some(variant_def) = variant_def

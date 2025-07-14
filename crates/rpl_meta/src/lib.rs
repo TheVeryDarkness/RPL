@@ -17,7 +17,6 @@ extern crate rustc_index;
 extern crate rustc_lint;
 extern crate rustc_macros;
 extern crate rustc_middle;
-extern crate rustc_span;
 #[macro_use]
 extern crate tracing;
 extern crate either;
@@ -29,6 +28,7 @@ pub mod cli;
 pub mod context;
 pub mod error;
 pub mod idx;
+mod map;
 pub mod meta;
 pub mod symbol_table;
 pub mod utils;
@@ -39,6 +39,7 @@ use arena::Arena;
 use context::MetaContext;
 pub use error::RPLMetaError;
 use itertools::Itertools as _;
+pub use map::FlatMap;
 use meta::SymbolTables;
 
 pub fn parse_and_collect<'mcx>(

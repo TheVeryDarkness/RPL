@@ -45,11 +45,11 @@ pub struct ConstVar<'pcx> {
 
 impl<'pcx> ConstVar<'pcx> {
     #[expect(unused_variables, reason = "predicates on const variables are not handle yet")] //FIXME
-    pub(crate) fn from(
+    pub(crate) fn from<'mcx>(
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &impl GetType<'mcx>,
         idx: usize,
-        ty: WithPath<'pcx, &'pcx pairs::Type<'pcx>>,
+        ty: WithPath<'mcx, &'mcx pairs::Type<'mcx>>,
         pred: PredicateConjunction,
     ) -> Self {
         let name = Symbol::intern(ty.span.as_str());
@@ -118,10 +118,10 @@ impl<'pcx> NonLocalMetaVars<'pcx> {
         self.place_vars.push(place_var);
     }
 
-    pub fn from_meta_decls(
-        meta_decls: Option<WithPath<'pcx, &'pcx pairs::MetaVariableDeclList<'pcx>>>,
+    pub fn from_meta_decls<'mcx>(
+        meta_decls: Option<WithPath<'mcx, &'mcx pairs::MetaVariableDeclList<'mcx>>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx impl GetType<'pcx>,
+        fn_sym_tab: &'mcx impl GetType<'mcx>,
     ) -> Self {
         let mut meta = Self::default();
         if let Some(decls) = meta_decls

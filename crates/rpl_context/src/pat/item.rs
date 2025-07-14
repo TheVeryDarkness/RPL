@@ -208,10 +208,10 @@ impl<'pcx> FnPattern<'pcx> {
         }
     }
 
-    pub fn from_sig(
-        sig: WithPath<'pcx, &'pcx pairs::FnSig<'_>>,
+    pub fn from_sig<'mcx: 'pcx>(
+        sig: WithPath<'mcx, &'mcx pairs::FnSig<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+        fn_sym_tab: &FnSymbolTable<'mcx>,
     ) -> (Safety, Visibility, Symbol, Params<'pcx>, Option<Ty<'pcx>>) {
         let p = sig.path;
         let (visibility, unsafety, _, fn_name, _, params_pair, _, ret) = sig.get_matched();
@@ -270,10 +270,10 @@ pub struct Param<'pcx> {
 }
 
 impl<'pcx> Param<'pcx> {
-    pub fn from(
-        param: WithPath<'pcx, &'pcx pairs::FnParam<'_>>,
+    pub fn from<'mcx>(
+        param: WithPath<'mcx, &'mcx pairs::FnParam<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+        fn_sym_tab: &FnSymbolTable<'mcx>,
     ) -> (Option<Self>, bool) {
         let p = param.path;
         match param.inner.deref() {
@@ -334,10 +334,10 @@ impl<'pcx> FnPattern<'pcx> {
 }
 
 impl<'pcx> Params<'pcx> {
-    pub fn from(
-        pair: WithPath<'pcx, &'pcx pairs::FnParamsSeparatedByComma<'_>>,
+    pub fn from<'mcx>(
+        pair: WithPath<'mcx, &'mcx pairs::FnParamsSeparatedByComma<'mcx>>,
         pcx: PatCtxt<'pcx>,
-        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+        fn_sym_tab: &FnSymbolTable<'mcx>,
     ) -> Self {
         let p = pair.path;
         let params = collect_elems_separated_by_comma!(pair);

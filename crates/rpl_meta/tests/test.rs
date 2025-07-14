@@ -1,9 +1,20 @@
 #![feature(rustc_private)]
 extern crate rustc_span;
 
+use derive_more::derive::{Debug, Display};
 use pest_typed::ParsableTypedNode;
-use rpl_meta::utils::Path;
 use rpl_parser::pairs;
+
+#[derive(Clone, Copy, Debug, Display)]
+struct PathSeg<'i>(&'i str);
+
+impl<'i> From<&'i pairs::Identifier<'i>> for PathSeg<'i> {
+    fn from(ident: &'i pairs::Identifier<'i>) -> Self {
+        PathSeg(ident.span.as_str())
+    }
+}
+
+type Path<'i> = rpl_meta::utils::Path<'i, PathSeg<'i>>;
 
 #[test]
 fn path() {
