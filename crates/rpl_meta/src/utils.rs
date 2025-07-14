@@ -39,7 +39,7 @@ impl<'i, Ident: From<&'i pairs::Identifier<'i>>> From<&'i pairs::Path<'i>> for P
     }
 }
 
-impl<'i, Ident: Copy> Path<'i, Ident> {
+impl<Ident: Copy> Path<'_, Ident> {
     /// Returns `Some(ident)` if `self` is a single identifier.
     pub fn as_ident(&self) -> Option<Ident> {
         if self.leading.is_none() && self.segments.len() == 1 && self.segments[0].1.is_empty() {
