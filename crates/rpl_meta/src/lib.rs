@@ -17,6 +17,7 @@ extern crate rustc_index;
 extern crate rustc_lint;
 extern crate rustc_macros;
 extern crate rustc_middle;
+extern crate rustc_span;
 #[macro_use]
 extern crate tracing;
 extern crate either;
@@ -85,8 +86,9 @@ pub fn parse_and_collect<'mcx>(
     lints.sort_by(|a, b| a.name.cmp(b.name));
     //FIXME: show warnings if two lints share the same name but have different configs.
     lints.dedup_by(|a, b| a.name == b.name);
-    if lints.len() != prev_len {
-        info!("Some lints are duplicated, only the first one will be used.");
+    let len = lints.len();
+    if len != prev_len {
+        info!("Some lints are duplicated ({len} of {prev_len} are unique), only the first one will be used.");
     }
     mctx.lints = lints;
 
