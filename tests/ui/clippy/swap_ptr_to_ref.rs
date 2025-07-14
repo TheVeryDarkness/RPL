@@ -1,5 +1,7 @@
-//@compile-flags: -Z inline-mir=false
-use core::ptr::addr_of_mut;
+//@revisions: inline normal
+//@[inline]compile-flags: -Z inline-mir=true
+//@[normal]compile-flags: -Z inline-mir=false
+use std::ptr::addr_of_mut;
 
 // #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn main() {

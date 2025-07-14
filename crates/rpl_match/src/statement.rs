@@ -703,22 +703,36 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 if !self.match_local(pat_local, place.local) {
                     return false;
                 }
+                pat.projection.len() == place.projection.len()
+                    && std::iter::zip(
+                        iter_place_pat_proj_and_ty(self.pat(), pat, self.get_place_ty_from_base(pat.base)),
+                        iter_place_proj_and_ty(self.body(), self.tcx(), place),
+                    )
+                    .inspect(|((proj_pat, place_pat_ty), (proj, place_ty))| {
+                        trace!(?place_pat_ty, ?proj_pat, ?place_ty, ?proj, "match_place")
+                    })
+                    .all(|pair| self.match_place_elem(pair))
             },
-            pat::PlaceBase::Var(pat_var) => return self.match_place_var(pat_var, place),
-            //FIXME: maybe place meta variable can also have a projection
+            pat::PlaceBase::Var(pat_var) => {
+                let place_pat_proj_and_ty: Vec<_> =
+                    iter_place_pat_proj_and_ty(self.pat(), pat, self.get_place_ty_from_base(pat.base)).collect();
+                let mut place_mir_proj_and_ty: Vec<_> =
+                    iter_place_proj_and_ty(self.body(), self.tcx(), place).collect();
+                let mut place_stripping = place;
+                for (place_pat_proj, place_pat_ty) in place_pat_proj_and_ty.into_iter().rev() {
+                    if let Some((place_proj, place_ty)) = place_mir_proj_and_ty.pop() {
+                        if !self.match_place_elem(((place_pat_proj, place_pat_ty), (place_proj, place_ty))) {
+                            return false;
+                        }
+                        place_stripping.projection = place_stripping.projection.split_last().unwrap().1;
+                    } else {
+                        return false;
+                    }
+                }
+                self.match_place_var(pat_var, place_stripping)
+            },
             pat::PlaceBase::Any => return true,
         }
-        let matched = pat.projection.len() == place.projection.len()
-            && std::iter::zip(
-                iter_place_pat_proj_and_ty(self.pat(), pat, self.get_place_ty_from_base(pat.base)),
-                iter_place_proj_and_ty(self.body(), self.tcx(), place),
-            )
-            .inspect(|((proj_pat, place_pat_ty), (proj, place_ty))| {
-                trace!(?place_pat_ty, ?proj_pat, ?place_ty, ?proj, "match_place")
-            })
-            .all(|pair| self.match_place_elem(pair));
-        debug!(?pat, ?place, matched, "match_place");
-        matched
     }
 
     fn unmatch_place_ref(&self, pat: pat::Place<'pcx>, place: mir::PlaceRef<'tcx>) {
