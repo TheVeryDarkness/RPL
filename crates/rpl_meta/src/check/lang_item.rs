@@ -4,6 +4,7 @@
 //     };
 // }
 
+/// See [`rustc_hir::lang_items::LangItem`].
 // The actual lang items defined come at the end of this file in one handy table.
 // So you probably just want to nip down to the end.
 macro_rules! language_item_table {
