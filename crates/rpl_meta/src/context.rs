@@ -51,8 +51,6 @@ impl<'mcx> MetaContext<'mcx> {
         if let Some(&id) = self.path2id.get(path) {
             id
         } else {
-            // FIXME: Is this allocation necessary?
-            let path = self.arena.alloc(path);
             let id: RPLIdx = self.path2id.len().into();
             self.path2id.insert(path, id);
             debug_assert_eq!(self.id2path.next_index(), id);
