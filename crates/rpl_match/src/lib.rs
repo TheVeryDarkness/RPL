@@ -9,6 +9,7 @@
 #![feature(iter_chain)]
 #![feature(iterator_try_collect)]
 #![feature(cell_update)]
+#![cfg_attr(feature = "timing", feature(integer_atomics))]
 
 extern crate either;
 extern crate rustc_abi;

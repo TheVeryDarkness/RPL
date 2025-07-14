@@ -501,7 +501,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         #[cfg(feature = "timing")]
         static TOTAL: std::sync::atomic::AtomicU128 = std::sync::atomic::AtomicU128::new(0);
         #[cfg(feature = "timing")]
-        let mut start = std::time::Instant::now();
+        let start = std::time::Instant::now();
         self.build_candidates();
         self.matching.log_candidates();
         if !self.matching.has_empty_candidates(self.cx) {
