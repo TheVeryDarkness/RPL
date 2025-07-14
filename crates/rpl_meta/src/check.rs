@@ -81,7 +81,7 @@ impl<'i> CheckCtxt<'i> {
                 // unwrap here is safe because we check the meta decl list before checking the rust items
                 // so the Arc is not cloned
                 let meta_vars_ref = Arc::get_mut(&mut self.symbol_table.meta_vars).unwrap();
-                meta_vars_ref.add_non_local_meta_var(mctx, ident.into(), ty, preds, &mut self.errors);
+                meta_vars_ref.add_non_local_meta_var(mctx, ident, ty, preds, &mut self.errors);
             }
         }
     }
@@ -185,7 +185,6 @@ impl<'i> CheckCtxt<'i> {
 
     fn check_struct(&mut self, mctx: &MetaContext<'i>, rust_struct: &'i pairs::Struct<'i>) {
         let struct_name = rust_struct.get_matched().2;
-        let struct_name = struct_name.into();
         self.symbol_table
             .add_adt_pat(mctx, struct_name, AdtPatType::Struct, &mut self.errors);
         let struct_def = self.symbol_table.add_struct(mctx, struct_name, &mut self.errors);
@@ -201,7 +200,6 @@ impl<'i> CheckCtxt<'i> {
 
     fn check_enum(&mut self, mctx: &MetaContext<'i>, rust_enum: &'i pairs::Enum<'i>) {
         let enum_name = rust_enum.get_matched().1;
-        let enum_name = enum_name.into();
         self.symbol_table
             .add_adt_pat(mctx, enum_name, AdtPatType::Enum, &mut self.errors);
         let enum_def = self.symbol_table.add_enum(mctx, enum_name, &mut self.errors);
@@ -310,7 +308,6 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_normal_param(&mut self, mctx: &MetaContext<'i>, normal_param: &'i pairs::NormalParam<'i>) {
         let (_, ident, _, ty) = normal_param.get_matched();
         let label = Some(ident.Word().span.as_str());
-        let ident = ident.into();
         self.fn_def.add_param(mctx, label, ident, ty, self.errors);
         self.check_type(mctx, ty);
         debug!(ident = ?ident.span.as_str(), "checking normal param");
@@ -464,7 +461,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_mir_type_decl(&mut self, mctx: &MetaContext<'i>, type_decl: &'i pairs::MirTypeDecl<'i>) {
         let (_, ident, _, ty, _) = type_decl.get_matched();
-        self.fn_def.add_type_impl(mctx, ident.into(), ty.into(), self.errors);
+        self.fn_def.add_type_impl(mctx, ident, ty.into(), self.errors);
     }
 
     fn check_mir_local_decl(&mut self, mctx: &MetaContext<'i>, local_decl: &'i pairs::MirLocalDecl<'i>) {
@@ -546,7 +543,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_mir_operand(&mut self, mctx: &MetaContext<'i>, operand: &'i pairs::MirOperand<'i>) {
         match operand.deref() {
             Choice6::_0(_) | Choice6::_1(_) => {},
-            Choice6::_2(meta_var) => _ = self.get_non_local_meta_var(mctx, meta_var.into()),
+            Choice6::_2(meta_var) => _ = self.get_non_local_meta_var(mctx, meta_var),
             Choice6::_3(op_move) => self.check_mir_place(mctx, op_move.MirPlace()),
             Choice6::_4(op_copy) => self.check_mir_place(mctx, op_copy.MirPlace()),
             Choice6::_5(op_const) => self.check_mir_const_operand(mctx, op_const),
@@ -560,7 +557,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
             Choice4::_1(lang_item) => self.check_lang_item_with_args(mctx, lang_item),
             Choice4::_2(path) => self.check_type_path(mctx, path),
             Choice4::_3(ident) => {
-                let _: Option<_> = self.get_non_local_meta_var(mctx, ident.into());
+                let _: Option<_> = self.get_non_local_meta_var(mctx, ident);
             },
         }
     }
@@ -727,7 +724,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
     fn check_path(&mut self, mctx: &MetaContext<'i>, path: &'i pairs::Path<'i>) {
         let path: Path<'i> = path.into();
         if let Some(ident) = path.as_ident() {
-            if !ident_is_primitive(&ident.span.as_str()) {
+            if !ident_is_primitive(ident.span.as_str()) {
                 WithMetaTable::from((&*self.fn_def, self.meta_vars.clone(), self.adt_pats))
                     .get_type_or_path(&WithPath::with_ctx(mctx, ident))
                     .or_record(self.errors);
@@ -818,7 +815,6 @@ impl<'i> CheckVariantCtxt<'i, '_> {
 
     fn check_field(&mut self, mctx: &MetaContext<'i>, field: &'i pairs::Field<'i>) {
         let (ident, _, ty) = field.get_matched();
-        let ident = ident.into();
         self.variant_def.add_field(mctx, ident, ty, self.errors);
         self.check_meta_var(mctx, ident);
         self.check_type(mctx, ty);

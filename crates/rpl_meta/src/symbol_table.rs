@@ -290,7 +290,7 @@ impl<'i> SymbolTable<'i> {
             .map_err(|entry| {
                 let adt = entry.entry.key();
                 let err = RPLMetaError::SymbolAlreadyDeclared {
-                    ident: *adt,
+                    ident: adt,
                     span: SpanWrapper::new(ident.span, mctx.get_active_path()),
                 };
                 errors.push(err);
@@ -312,7 +312,7 @@ impl<'i> SymbolTable<'i> {
             .map_err(|entry| {
                 let adt = entry.entry.key();
                 let err = RPLMetaError::SymbolAlreadyDeclared {
-                    ident: *adt,
+                    ident: adt,
                     span: SpanWrapper::new(ident.span, mctx.get_active_path()),
                 };
                 errors.push(err);
@@ -338,7 +338,7 @@ impl<'i> SymbolTable<'i> {
                 .map_err(|entry| {
                     let ident = entry.entry.key();
                     let err = RPLMetaError::SymbolAlreadyDeclared {
-                        ident: *ident,
+                        ident,
                         span: SpanWrapper::new(fn_name.span(), mctx.get_active_path()),
                     };
                     errors.push(err);
@@ -438,7 +438,7 @@ impl<'i> SymbolTable<'i> {
             _ = symbol_tables.try_insert(name, symbols).map_err(|entry| {
                 let name = entry.entry.key();
                 let err = RPLMetaError::SymbolAlreadyDeclared {
-                    ident: *name,
+                    ident: name,
                     span: SpanWrapper::new(pat_item.Identifier().span, mctx.get_active_path()),
                 };
                 errors.push(err);
@@ -785,7 +785,7 @@ impl<'i> FnInner<'i> {
                     });
                 } else {
                     self.self_value = Some(ty);
-                    self.add_local(mctx, label, self_value.into(), ty, LocalSpecial::Self_, errors);
+                    self.add_local(mctx, label, self_value, ty, LocalSpecial::Self_, errors);
                 }
             },
             Choice4::_2(ret_value) => {
@@ -795,11 +795,11 @@ impl<'i> FnInner<'i> {
                     });
                 } else {
                     self.ret_value = Some(ty);
-                    self.add_local(mctx, label, ret_value.into(), ty, LocalSpecial::Return, errors);
+                    self.add_local(mctx, label, ret_value, ty, LocalSpecial::Return, errors);
                 }
             },
-            Choice4::_3(ident) => {
-                self.add_local(mctx, label, ident.into(), ty, LocalSpecial::None, errors);
+            Choice4::_3(meta_var) => {
+                self.add_local(mctx, label, meta_var, ty, LocalSpecial::None, errors);
             },
         }
     }
@@ -855,7 +855,7 @@ impl<'i> FnInner<'i> {
                 None
             }),
 
-            Choice4::_3(ident) => self.get_place_or_local(mctx, ident.into(), meta_vars, errors),
+            Choice4::_3(meta_var) => self.get_place_or_local(mctx, meta_var, meta_vars, errors),
             Choice4::_1(_) if self.self_value.is_none() && self.self_param.is_none() => {
                 errors.push(RPLMetaError::SelfNotDeclared {
                     span: SpanWrapper::new(local.span, mctx.get_active_path()),
@@ -1007,7 +1007,7 @@ impl<'i> GetType<'i> for Fn<'i> {
         &self,
         ident: &WithPath<'i, &pairs::Identifier<'i>>,
     ) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
-        FnInner::get_type_or_path(&self.inner, ident.path, &ident.inner)
+        FnInner::get_type_or_path(&self.inner, ident.path, ident.inner)
     }
     #[inline]
     fn force_get_meta_var(&self, ident: WithPath<'i, &pairs::MetaVariable<'i>>) -> MetaVariable<'i> {
@@ -1020,7 +1020,7 @@ impl<'i> GetType<'i> for WithMetaTable<'i, &'_ FnInner<'i>> {
         &self,
         ident: &WithPath<'i, &pairs::Identifier<'i>>,
     ) -> Result<TypeOrPath<'i>, RPLMetaError<'i>> {
-        FnInner::get_type_or_path(self.inner, ident.path, &ident.inner)
+        FnInner::get_type_or_path(self.inner, ident.path, ident.inner)
     }
     #[inline]
     fn force_get_meta_var(&self, ident: WithPath<'i, &pairs::MetaVariable<'i>>) -> MetaVariable<'i> {
