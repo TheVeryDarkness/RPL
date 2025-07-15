@@ -1,0 +1,10 @@
+digraph ControlFlowGraph {
+    bb0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb0</td></tr><tr><td align="left" balign="left">_?0 = move ?P0 as ?T1 (Transmute)<br/></td></tr><tr><td align="left">switchInt(copy _?1) -&gt; [0_usize: ?bb2, otherwise: ?bb3]</td></tr></table>>];
+    bb1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb1</td></tr><tr><td align="left">end</td></tr></table>>];
+    bb2 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb2</td></tr><tr><td align="left" balign="left">_ = #[lang = &quot;None&quot;]:: &lt; ?T0 &gt;<br/></td></tr><tr><td align="left">goto ?bb1</td></tr></table>>];
+    bb3 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1">?bb3</td></tr><tr><td align="left">#[lang = &quot;Some&quot;]:: &lt; ?T0 &gt;(move _?0) -&gt; ?bb1</td></tr></table>>];
+    bb0 -> bb2 [label="0"];
+    bb0 -> bb3 [label="otherwise"];
+    bb2 -> bb1 [label="goto"];
+    bb3 -> bb1 [label="return"];
+}

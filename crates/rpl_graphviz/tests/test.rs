@@ -437,6 +437,30 @@ test_case! {
 }
 
 test_case! {
+    fn and_then_inlined() {
+        let pattern = quote! {
+            #[diag = "eager_transmute"]
+            and_then_inline[$T: type, $U: type, $src: place($T)] = unsafe? fn _(..) {
+                'dst:
+                let $dst: $U = move $src as $U (Transmute);
+                let $cond: bool;
+                switchInt(copy $cond) {
+                    0_usize => {
+                        _ = #[lang = "None"]<$T>;
+                    }
+                    _ => {
+                        _ = #[lang = "Some"]<$T>(move $dst);
+                    }
+                }
+            } where {
+                !niche_ordered($T, $U)
+            }
+        }
+        .to_string();
+    }
+}
+
+test_case! {
     fn unchecked_ptr_offset_lt() {
         let pattern = quote!{
             p[$T: type, $U: type] = {
