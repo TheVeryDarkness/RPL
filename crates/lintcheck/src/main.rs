@@ -372,6 +372,10 @@ fn lintcheck(config: LintcheckConfig) {
             .collect_into(&mut lint_level_args);
     }
 
+    if config.timing && fs::exists(shared_target_dir("")).is_ok_and(|exists| exists) {
+        fs::remove_dir_all(shared_target_dir("")).unwrap();
+    }
+
     let crates: Vec<Crate> = crates
         .into_iter()
         .filter(|krate| {
