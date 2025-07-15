@@ -86,6 +86,11 @@ impl<'mcx> MetaContext<'mcx> {
             .iter()
             .flat_map(|symbol_table| symbol_table.collect_lints())
     }
+    pub fn add_lint(&mut self, lint: &'static rustc_lint::Lint) {
+        if let Err(idx) = self.lints.binary_search_by(|l| l.name.cmp(&lint.name)) {
+            self.lints.insert(idx, lint);
+        }
+    }
     /// Register the lints in the lint store.
     pub fn register_lints(&self, lint_store: &mut rustc_lint::LintStore) {
         lint_store.register_lints(&self.lints);

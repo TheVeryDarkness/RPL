@@ -130,6 +130,10 @@ tokio-util.workspace = true
 bytes.workspace = true
 # cassandra-cpp-sys.workspace = true
 
+[features]
+default = []
+timing = ["rpl_interface/timing"]
+
 [build-dependencies]
 rustc_tools_util.workspace = true
 

@@ -14,7 +14,8 @@ pub(crate) struct LintcheckConfig {
         value_name = "N",
         default_value_t = 0,
         default_value_if("perf", "true", Some("1")), // Limit jobs to 1 when benchmarking
-        conflicts_with("perf"),
+        default_value_if("timing", "true", Some("1")), // Limit jobs to 1 when benchmarking
+        conflicts_with_all(["perf", "timing"]),
         required = false,
         hide_default_value = true
     )]
@@ -56,6 +57,9 @@ pub(crate) struct LintcheckConfig {
     /// `target/lintcheck/sources/<package>-<version>/perf.data`
     #[clap(long)]
     pub perf: bool,
+    /// Enable `timing` feature, implies --jobs=1,
+    #[clap(long, conflicts_with_all(["max_jobs", "perf"]))]
+    pub timing: bool,
     #[command(subcommand)]
     pub subcommand: Option<Commands>,
 }
