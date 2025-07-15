@@ -1,4 +1,6 @@
-//@compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
+//@revisions: inline normal
+//@[inline]compile-flags: -Z mir-opt-level=0 -Z inline-mir=true
+//@[normal]compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
 #![allow(dead_code)]
 
 // Easy to lint because these only span one line.
@@ -42,5 +44,8 @@ fn issue_11485() {
 
 fn main() {
     one_liners();
+    //~[inline]^ transmute_null_to_fn
+    //~[inline]| transmute_null_to_fn
     transmute_const();
+    //~[inline]^ transmute_null_to_fn
 }
