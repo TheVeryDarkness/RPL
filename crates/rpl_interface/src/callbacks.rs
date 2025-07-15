@@ -109,11 +109,18 @@ impl rustc_driver::Callbacks for RplCallbacks {
         // let dcx = compiler.sess.dcx();
         let mut error_counter = 0;
         let mctx = MCTX.get_or_init(|| {
-            rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
+            let mctx = rpl_meta::parse_and_collect(mctx_arena, patterns_and_paths, |error| {
                 error_counter += 1;
                 eprintln!("{error_counter}. {error}"); //FIXME: this would mess up when running on a workspace with multiple crates
                 // let _ = dcx.emit_err(error.clone());
-            })
+            });
+
+            #[cfg(feature = "timing")]
+            let mut mctx = mctx;
+            #[cfg(feature = "timing")]
+            mctx.add_lint(crate::errors::TIMING);
+
+            mctx
         });
         // dcx.abort_if_errors();
         if error_counter > 0 {
@@ -181,6 +188,24 @@ impl rustc_driver::Callbacks for RplCallbacks {
             tcx.dcx().emit_fatal(ErrorFound);
         }
         PatternCtxt::entered(|pcx| rpl_driver::check_crate(tcx, pcx, mctx));
+
+        #[cfg(feature = "timing")]
+        {
+            use rustc_hir::def_id::CrateNum;
+
+            use crate::errors::TIMING;
+
+            let time = rpl_match::matches::TOTAL.load(std::sync::atomic::Ordering::Relaxed);
+            let hir_id = rustc_hir::hir_id::CRATE_HIR_ID;
+            let crate_name = tcx.crate_name(CrateNum::ZERO);
+            tcx.emit_node_span_lint(
+                TIMING,
+                hir_id,
+                tcx.hir().span(hir_id),
+                crate::errors::Timing { time, crate_name },
+            );
+        }
+
         rustc_driver::Compilation::Continue
     }
 }

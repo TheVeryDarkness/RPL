@@ -1595,6 +1595,7 @@ version = "0.1.0"
 dependencies = [
  "rpl_context",
  "rpl_driver",
+ "rpl_match",
  "rpl_meta",
  "rpl_utils",
  "sync-arena",
