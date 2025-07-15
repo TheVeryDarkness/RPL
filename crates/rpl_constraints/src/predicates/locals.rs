@@ -5,6 +5,9 @@ use rustc_middle::mir::{self};
 use rustc_middle::ty::{self, TyCtxt};
 
 pub struct BodyInfoCache {
+    /// `null[i]` is `Some(true)` if `i` is null, and `Some(false)` if `i` is not null,
+    /// `None` if the information is not available.
+    null: IndexVec<mir::Local, Option<bool>>,
     /// `product_of[i][j]` is `Some(true)` if `i` may be a product of `j`, `Some(false)` if `i` may
     /// be a quotient of `j`, and `None` if there is no relationship.
     product_of: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>>,
@@ -26,9 +29,40 @@ impl fmt::Debug for BodyInfoCache {
 }
 
 impl BodyInfoCache {
-    #[instrument(level = "debug", skip(body), ret)]
-    pub fn new(body: &mir::Body<'_>) -> Self {
+    fn ty_const_is_null<'tcx>(tcx: TyCtxt<'tcx>, const_: ty::Const<'tcx>) -> Option<bool> {
+        if let ty::ConstKind::Value(val) = const_.kind() {
+            if let mir::ConstValue::Scalar(scalar) = tcx.valtree_to_const_val(val) {
+                match scalar {
+                    mir::interpret::Scalar::Int(i) => return Some(i.is_null()),
+                    mir::interpret::Scalar::Ptr(_, _) => return Some(false),
+                }
+            }
+        }
+        None
+    }
+    fn mir_const_is_null<'tcx>(tcx: TyCtxt<'tcx>, const_: mir::Const<'tcx>) -> Option<bool> {
+        match const_ {
+            mir::Const::Ty(_, const_) => {
+                return Self::ty_const_is_null(tcx, const_);
+            },
+            mir::Const::Unevaluated(_, _) => None,
+            mir::Const::Val(value, _) => {
+                if let mir::ConstValue::Scalar(scalar) = value {
+                    match scalar {
+                        mir::interpret::Scalar::Int(i) => Some(i.is_null()),
+                        mir::interpret::Scalar::Ptr(_, _) => Some(false),
+                    }
+                } else {
+                    None
+                }
+            },
+        }
+    }
+    #[instrument(level = "debug", skip(tcx, body), ret)]
+    pub fn new<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>) -> Self {
         let n = body.local_decls.len();
+
+        let mut null: IndexVec<mir::Local, Option<bool>> = IndexVec::from_elem_n(None, n);
         // Track the product relationship among locals, true for product, false for quotient
         let mut product_of: IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>> =
             IndexVec::from_fn_n(|_| IndexVec::from_elem_n(None, n), n);
@@ -38,6 +72,25 @@ impl BodyInfoCache {
         }
         for local in body.basic_blocks.iter() {
             for stmt in &local.statements {
+                // Check if the statement is an assignment
+                if let mir::StatementKind::Assign(box (ref lhs, ref rhs)) = stmt.kind
+                    && let Some(lhs) = lhs.as_local()
+                {
+                    match rhs {
+                        mir::Rvalue::Use(mir::Operand::Constant(box c)) => {
+                            null[lhs] = Self::mir_const_is_null(tcx, c.const_)
+                        },
+                        mir::Rvalue::Cast(_, mir::Operand::Constant(box c), _) => {
+                            null[lhs] = Self::mir_const_is_null(tcx, c.const_)
+                        },
+                        mir::Rvalue::Use(mir::Operand::Copy(rhs) | mir::Operand::Move(rhs)) => {
+                            if let Some(rhs) = rhs.as_local() {
+                                null[lhs] = null[rhs];
+                            }
+                        },
+                        _ => {},
+                    }
+                }
                 // Check if the statement is a product or quotient
                 if let mir::StatementKind::Assign(box (ref lhs, ref rhs)) = stmt.kind
                     && let Some(lhs) = lhs.as_local()
@@ -104,8 +157,24 @@ impl BodyInfoCache {
                 }
             }
         }
-        Self { product_of }
+        Self { null, product_of }
     }
+}
+
+// FIX: consider a more general way for error handling
+pub type SingleLocalPredsFnPtr =
+    for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, &mir::Body<'tcx>, &BodyInfoCache, mir::Local) -> bool;
+
+/// Check if a local is null
+#[instrument(level = "debug", skip(cache), ret)]
+pub(crate) fn is_null<'tcx>(
+    _: TyCtxt<'tcx>,
+    _: ty::TypingEnv<'tcx>,
+    _: &mir::Body<'tcx>,
+    cache: &BodyInfoCache,
+    local: mir::Local,
+) -> bool {
+    cache.null[local].unwrap_or(false)
 }
 
 // FIX: consider a more general way for error handling

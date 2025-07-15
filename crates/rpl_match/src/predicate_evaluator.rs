@@ -163,6 +163,18 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
                 p(self.tcx, self.typing_env, self.body, self.body_cache, args)
             },
+            PredicateKind::SingleLocal(p) => {
+                assert!(
+                    arg_instance.len() == 1,
+                    "PredicateKind::SingleLocal should have exactly one argument"
+                );
+                match &arg_instance[0] {
+                    PredicateArgInstance::Local(local) => {
+                        p(self.tcx, self.typing_env, self.body, self.body_cache, *local)
+                    },
+                    _ => panic!("PredicateArgInstance::Local expected, got {:?}", arg_instance[0]),
+                }
+            },
         };
         if term.is_neg { !result } else { result }
     }

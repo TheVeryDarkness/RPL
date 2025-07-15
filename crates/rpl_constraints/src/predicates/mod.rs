@@ -75,6 +75,8 @@ pub const ALL_PREDICATES: &[&str] = &[
     "is_null_ptr",
     // multiple_consts_preds
     "usize_lt",
+    // single_local_preds
+    "is_null",
     // multiple_locals_preds
     "product_of",
 ];
@@ -89,6 +91,7 @@ pub enum PredicateKind {
     TyConst(TyConstPredsFnPtr),
     SingleConst(SingleConstPredsFnPtr),
     MultipleConsts(MultipleConstsPredsFnPtr),
+    SingleLocal(SingleLocalPredsFnPtr),
     MultipleLocals(MultipleLocalsPredsFnPtr),
 }
 
@@ -122,6 +125,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "is_null_ptr" => Self::SingleConst(is_null_ptr),
             "usize_lt" => Self::MultipleConsts(usize_lt),
             "product_of" => Self::MultipleLocals(product_of),
+            "is_null" => Self::SingleLocal(is_null),
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),
