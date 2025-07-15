@@ -87,7 +87,7 @@ impl<'mcx> MetaContext<'mcx> {
             .flat_map(|symbol_table| symbol_table.collect_lints())
     }
     pub fn add_lint(&mut self, lint: &'static rustc_lint::Lint) {
-        if let Err(idx) = self.lints.binary_search_by(|l| l.name.cmp(&lint.name)) {
+        if let Err(idx) = self.lints.binary_search_by(|l| l.name.cmp(lint.name)) {
             self.lints.insert(idx, lint);
         }
     }
