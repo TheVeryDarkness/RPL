@@ -2,7 +2,7 @@ use std::fmt;
 
 use rustc_index::IndexVec;
 use rustc_middle::mir::{self};
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::{self, TyCtxt, TypingEnv};
 
 pub struct BodyInfoCache {
     /// `null[i]` is `Some(true)` if `i` is null, and `Some(false)` if `i` is not null,
@@ -18,48 +18,61 @@ pub struct BodyInfoCache {
 
 impl fmt::Debug for BodyInfoCache {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list()
-            .entries(
-                self.product_of
-                    .iter_enumerated()
-                    .flat_map(|(i, j)| j.iter_enumerated().filter_map(move |(k, v)| v.map(|b| (i, k, b)))),
-            )
+        struct Null<'a>(&'a IndexVec<mir::Local, Option<bool>>);
+        impl fmt::Debug for Null<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list()
+                    .entries(self.0.iter().enumerate().filter_map(|(i, b)| b.map(|b| (i, b))))
+                    .finish()
+            }
+        }
+
+        struct ProductOf<'a>(&'a IndexVec<mir::Local, IndexVec<mir::Local, Option<bool>>>);
+        impl fmt::Debug for ProductOf<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list()
+                    .entries(
+                        self.0
+                            .iter_enumerated()
+                            .flat_map(|(i, j)| j.iter_enumerated().filter_map(move |(k, v)| v.map(|b| (i, k, b)))),
+                    )
+                    .finish()
+            }
+        }
+
+        f.debug_struct("BodyInfoCache")
+            .field("null", &Null(&self.null))
+            .field("product_of", &ProductOf(&self.product_of))
+            // .field("derive_from", &self.derive_from) // Uncomment if derive_from is implemented
             .finish()
     }
 }
 
 impl BodyInfoCache {
+    #[instrument(level = "trace", skip(tcx), ret)]
     fn ty_const_is_null<'tcx>(tcx: TyCtxt<'tcx>, const_: ty::Const<'tcx>) -> Option<bool> {
-        if let ty::ConstKind::Value(val) = const_.kind() {
-            if let mir::ConstValue::Scalar(scalar) = tcx.valtree_to_const_val(val) {
-                match scalar {
-                    mir::interpret::Scalar::Int(i) => return Some(i.is_null()),
-                    mir::interpret::Scalar::Ptr(_, _) => return Some(false),
-                }
-            }
-        }
-        None
-    }
-    fn mir_const_is_null<'tcx>(tcx: TyCtxt<'tcx>, const_: mir::Const<'tcx>) -> Option<bool> {
-        match const_ {
-            mir::Const::Ty(_, const_) => {
-                return Self::ty_const_is_null(tcx, const_);
-            },
-            mir::Const::Unevaluated(_, _) => None,
-            mir::Const::Val(value, _) => {
-                if let mir::ConstValue::Scalar(scalar) = value {
-                    match scalar {
-                        mir::interpret::Scalar::Int(i) => Some(i.is_null()),
-                        mir::interpret::Scalar::Ptr(_, _) => Some(false),
-                    }
-                } else {
-                    None
-                }
-            },
+        let val = const_.try_to_value()?;
+        let val = tcx.valtree_to_const_val(val);
+        let scalar = val.try_to_scalar()?;
+        match scalar {
+            mir::interpret::Scalar::Int(i) => Some(i.is_null()),
+            mir::interpret::Scalar::Ptr(_, _) => Some(false),
         }
     }
-    #[instrument(level = "debug", skip(tcx, body), ret)]
-    pub fn new<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>) -> Self {
+    #[instrument(level = "trace", skip(tcx), ret)]
+    fn mir_const_is_null<'tcx>(
+        tcx: TyCtxt<'tcx>,
+        typing_env: TypingEnv<'tcx>,
+        const_: mir::Const<'tcx>,
+    ) -> Option<bool> {
+        let scalar = const_.try_eval_scalar(tcx, typing_env)?;
+        match scalar {
+            mir::interpret::Scalar::Int(i) => Some(i.is_null()),
+            mir::interpret::Scalar::Ptr(_, _) => Some(false),
+        }
+    }
+    #[instrument(level = "debug", skip(tcx, body), fields(n = body.local_decls.len()), ret)]
+    pub fn new<'tcx>(tcx: TyCtxt<'tcx>, typing_env: TypingEnv<'tcx>, body: &mir::Body<'tcx>) -> Self {
         let n = body.local_decls.len();
 
         let mut null: IndexVec<mir::Local, Option<bool>> = IndexVec::from_elem_n(None, n);
@@ -77,13 +90,12 @@ impl BodyInfoCache {
                     && let Some(lhs) = lhs.as_local()
                 {
                     match rhs {
-                        mir::Rvalue::Use(mir::Operand::Constant(box c)) => {
-                            null[lhs] = Self::mir_const_is_null(tcx, c.const_)
+                        mir::Rvalue::Cast(_, mir::Operand::Constant(box c), _)
+                        | mir::Rvalue::Use(mir::Operand::Constant(box c)) => {
+                            null[lhs] = Self::mir_const_is_null(tcx, typing_env, c.const_)
                         },
-                        mir::Rvalue::Cast(_, mir::Operand::Constant(box c), _) => {
-                            null[lhs] = Self::mir_const_is_null(tcx, c.const_)
-                        },
-                        mir::Rvalue::Use(mir::Operand::Copy(rhs) | mir::Operand::Move(rhs)) => {
+                        mir::Rvalue::Cast(_, mir::Operand::Copy(rhs) | mir::Operand::Move(rhs), _)
+                        | mir::Rvalue::Use(mir::Operand::Copy(rhs) | mir::Operand::Move(rhs)) => {
                             if let Some(rhs) = rhs.as_local() {
                                 null[lhs] = null[rhs];
                             }

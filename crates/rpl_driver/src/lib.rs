@@ -441,12 +441,13 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         matched: &Matched<'tcx>,
     ) -> bool {
         let mut cache = self.body_caches.borrow_mut();
+        let typing_env = ty::TypingEnv::post_analysis(self.tcx, body.source.def_id());
         let cache = cache
             .entry(body.source.def_id())
-            .or_insert_with(|| BodyInfoCache::new(self.tcx, body));
+            .or_insert_with(|| BodyInfoCache::new(self.tcx, typing_env, body));
         let evaluator = PredicateEvaluator::new(
             self.tcx,
-            ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),
+            typing_env,
             body,
             &fn_pat.expect_body().labels,
             matched,
