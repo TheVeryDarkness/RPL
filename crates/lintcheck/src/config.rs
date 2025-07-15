@@ -57,7 +57,7 @@ pub(crate) struct LintcheckConfig {
     #[clap(long)]
     pub perf: bool,
     /// Enable `timing` feature, implies --jobs=1,
-    #[clap(long, conflicts_with_all(["max_jobs", "perf"]))]
+    #[clap(long, conflicts_with_all(["perf"]))]
     pub timing: bool,
     #[command(subcommand)]
     pub subcommand: Option<Commands>,
