@@ -443,7 +443,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         let mut cache = self.body_caches.borrow_mut();
         let cache = cache
             .entry(body.source.def_id())
-            .or_insert_with(|| BodyInfoCache::new(body));
+            .or_insert_with(|| BodyInfoCache::new(self.tcx, body));
         let evaluator = PredicateEvaluator::new(
             self.tcx,
             ty::TypingEnv::post_analysis(self.tcx, body.source.def_id()),

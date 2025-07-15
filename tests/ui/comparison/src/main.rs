@@ -16,6 +16,12 @@ pub mod cross_function {
     fn transmute_null_to_fn<T>() -> fn() -> T {
         unsafe { std::mem::transmute(null_ptr::<T>()) } //~ transmute_null_to_fn
     }
+    fn null_mut_ptr<T>() -> *mut T {
+        std::ptr::null_mut()
+    }
+    fn transmute_null_mut_to_fn<T>() -> fn() -> T {
+        unsafe { std::mem::transmute(null_mut_ptr::<T>()) } //~ transmute_null_to_fn
+    }
 
     pub fn run() {
         let mut a = [1, 2, 3];
@@ -24,6 +30,8 @@ pub mod cross_function {
 
         let x = transmute_null_to_fn::<i32>()(); //~ transmute_null_to_fn
         dbg!(x);
+        let y = transmute_null_mut_to_fn::<i32>()(); //~ transmute_null_to_fn
+        dbg!(y);
     }
 }
 
@@ -35,10 +43,18 @@ pub mod cross_statement {
         }
     }
 
+    fn transmute_null_to_fn<T>() -> fn() -> T {
+        let null_ptr: *const T = std::ptr::null();
+        unsafe { std::mem::transmute(null_ptr) } //~ transmute_null_to_fn
+    }
+
     pub fn run() {
         let mut a = [1, 2, 3];
         let b = [4, 5, 6];
         size_of_in_element_count(&mut a, &b); //~ size_of_in_element_count
+
+        let fn_ptr: fn() -> i32 = transmute_null_to_fn(); //~ transmute_null_to_fn
+        dbg!(fn_ptr);
     }
 }
 
