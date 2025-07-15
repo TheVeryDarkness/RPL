@@ -13,7 +13,7 @@ pub fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx
         .caller_bounds()
         .iter()
         .filter_map(|clause| clause.as_trait_clause())
-        .filter(|clause| clause.self_ty().no_bound_vars().expect("Unhandled bound vars") == ty)
+        .filter(|clause| clause.self_ty().no_bound_vars() == Some(ty))
         .map(|clause| clause.def_id())
         .filter(|&def_id| {
             tcx.get_diagnostic_name(def_id)
