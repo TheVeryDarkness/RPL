@@ -207,7 +207,7 @@ impl Crate {
         }
 
         // We don't want to keep target directories if benchmarking
-        if config.perf || config.timing {
+        if config.perf {
             let _ = fs::remove_dir_all(&shared_target_dir);
         }
 
