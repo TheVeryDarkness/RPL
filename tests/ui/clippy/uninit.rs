@@ -1,4 +1,6 @@
-//@compile-flags: -Z inline-mir=false
+//@revisions: inline normal
+//@[inline]compile-flags: -Z inline-mir=true -Z mir-opt-level=0
+//@[normal]compile-flags: -Z inline-mir=false
 #![feature(stmt_expr_attributes)]
 #![allow(clippy::let_unit_value, invalid_value)]
 

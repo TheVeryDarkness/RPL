@@ -23,6 +23,10 @@ pub mod cross_function {
         unsafe { std::mem::transmute(null_mut_ptr::<T>()) } //~ transmute_null_to_fn
     }
 
+    fn transmuting_ref<'a, T>(ptr: *const T) -> &'a T {
+        unsafe { std::mem::transmute(ptr) }
+    }
+
     pub fn run() {
         let mut a = [1, 2, 3];
         let b = [4, 5, 6];
@@ -32,6 +36,9 @@ pub mod cross_function {
         dbg!(x);
         let y = transmute_null_mut_to_fn::<i32>()(); //~ transmute_null_to_fn
         dbg!(y);
+
+        let x: &i32 = transmuting_ref(null_ptr()); //~ transmuting_null
+        dbg!(x);
     }
 }
 
