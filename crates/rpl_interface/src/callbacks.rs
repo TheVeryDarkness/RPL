@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use rpl_context::PatternCtxt;
-use rpl_driver::ErrorFound;
+use rpl_driver::{ERROR_FOUND, ErrorFound};
 use rpl_meta::cli::collect_file_from_string_args;
 // use rpl_middle::ty::RplConfig;
 use rustc_interface::interface;
@@ -115,8 +115,8 @@ impl rustc_driver::Callbacks for RplCallbacks {
                 // let _ = dcx.emit_err(error.clone());
             });
 
-            #[cfg(feature = "timing")]
             let mut mctx = mctx;
+            mctx.add_lint(ERROR_FOUND);
             #[cfg(feature = "timing")]
             mctx.add_lint(crate::errors::TIMING);
 
