@@ -1,10 +1,12 @@
+#!/usr/bin/env zsh
+
 clear
 
 set -eux
 
 export RUSTC_ICE=0
 export RUST_BACKTRACE=1
-RPL_ROOT="$(realpath $(realpath $0)/../..)"
+RPL_ROOT="$(realpath $(dirname $0)/..)"
 
 cd $RPL_ROOT
 
