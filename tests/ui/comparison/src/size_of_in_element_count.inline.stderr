@@ -8,7 +8,15 @@ LL |     unsafe { copy_nonoverlapping(x.as_mut_ptr(), y.as_mut_ptr(), size_of::<
    = note: `#[deny(rpl::size_of_in_element_count)]` on by default
 
 error: found a count of bytes instead of a count of elements of `u16`
-  --> tests/ui/comparison/src/size_of_in_element_count.rs:24:16
+  --> tests/ui/comparison/src/size_of_in_element_count.rs:29:66
+   |
+LL |     unsafe { copy_nonoverlapping(x.as_mut_ptr(), y.as_mut_ptr(), size()) };
+   |                                                                  ^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+
+error: found a count of bytes instead of a count of elements of `u16`
+  --> tests/ui/comparison/src/size_of_in_element_count.rs:39:16
    |
 LL |     let size = size_of::<u16>() * SIZE;
    |                ^^^^^^^^^^^^^^^^
@@ -16,7 +24,7 @@ LL |     let size = size_of::<u16>() * SIZE;
    = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
 
 error: found a count of bytes instead of a count of elements of `u16`
-  --> tests/ui/comparison/src/size_of_in_element_count.rs:32:5
+  --> tests/ui/comparison/src/size_of_in_element_count.rs:47:5
    |
 LL |     base_case();
    |     ^^^^^^^^^^^
@@ -24,12 +32,20 @@ LL |     base_case();
    = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
 
 error: found a count of bytes instead of a count of elements of `u16`
-  --> tests/ui/comparison/src/size_of_in_element_count.rs:34:5
+  --> tests/ui/comparison/src/size_of_in_element_count.rs:49:5
+   |
+LL |     cross_function();
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
+
+error: found a count of bytes instead of a count of elements of `u16`
+  --> tests/ui/comparison/src/size_of_in_element_count.rs:51:5
    |
 LL |     cross_statement();
    |     ^^^^^^^^^^^^^^^^^
    |
    = help: use a count of elements instead of a count of bytes, it already gets multiplied by the size of the type
 
-error: aborting due to 4 previous errors
+error: aborting due to 6 previous errors
 

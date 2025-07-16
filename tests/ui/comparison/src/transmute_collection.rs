@@ -1,5 +1,6 @@
 //@revisions: inline normal
 //@[normal] compile-flags: -Zinline-mir=false
+#![expect(clippy::missing_transmute_annotations)]
 use std::mem::transmute;
 
 #[cfg_attr(test, test)]

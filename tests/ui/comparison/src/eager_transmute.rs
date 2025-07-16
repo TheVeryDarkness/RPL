@@ -1,6 +1,8 @@
 //@revisions: inline normal
 //@[normal] compile-flags: -Zinline-mir=false
 //@[inline]check-pass: no pattern available
+#![expect(clippy::missing_transmute_annotations)]
+
 #[derive(Debug)]
 #[repr(u8)]
 #[expect(dead_code)]
