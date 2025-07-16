@@ -387,6 +387,7 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
         }
     }
 
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_item_path(&self, path: pat::ItemPath<'pcx>, def_id: DefId) -> Option<&'pcx [Symbol]> {
         let &[krate, ref in_crate @ ..] = path.0 else {
             // an empty `ItemPath`
