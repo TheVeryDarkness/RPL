@@ -1,3 +1,6 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
+
 /// Base cases
 #[cfg_attr(test, test)]
 fn base_case() {

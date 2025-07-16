@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 use std::mem::size_of;
 use std::ptr::copy_nonoverlapping;
 

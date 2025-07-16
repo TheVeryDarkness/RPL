@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[normal] compile-flags: -Zinline-mir=false
 #[cfg_attr(test, test)]
 pub(crate) fn base_case() {
     let x: [i32; 3] = [1_i32, 2, 3];

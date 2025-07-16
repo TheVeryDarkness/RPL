@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 #[cfg_attr(test, test)]
 fn base_case() {
     unsafe {

@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 pub fn base_case(p: *const u8) {
     dbg!(unsafe { *p });
     //~^ not_unsafe_ptr_arg_deref

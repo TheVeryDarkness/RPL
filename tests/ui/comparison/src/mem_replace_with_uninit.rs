@@ -1,4 +1,5 @@
-#![allow(rpl::uninit_assumed_init)]
+//@revisions: inline normal
+//@compile-flags: -A rpl::uninit_assumed_init
 use std::mem;
 
 fn might_panic<X>(x: X) -> X {

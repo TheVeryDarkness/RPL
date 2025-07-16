@@ -1,3 +1,4 @@
+//@revisions: inline normal
 #[derive(Debug)]
 #[repr(u8)]
 #[expect(dead_code)]

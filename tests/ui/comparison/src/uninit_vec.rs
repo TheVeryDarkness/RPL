@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 #[cfg_attr(test, test)]
 fn base_case() {
     // with_capacity() -> set_len() should be detected
@@ -30,7 +32,9 @@ fn cross_function_with_capacity() {
 #[cfg_attr(test, test)]
 fn cross_function_set_len() {
     unsafe fn set_len<T>(v: &mut Vec<T>, len: usize) {
-        v.set_len(len);
+        unsafe {
+            v.set_len(len);
+        }
     }
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = Vec::with_capacity(1000);
@@ -48,7 +52,9 @@ fn cross_function_both() {
         Vec::with_capacity(capacity)
     }
     unsafe fn set_len<T>(v: &mut Vec<T>, len: usize) {
-        v.set_len(len);
+        unsafe {
+            v.set_len(len);
+        }
     }
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = with_capacity(1000);
