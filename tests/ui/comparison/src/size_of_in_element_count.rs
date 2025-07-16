@@ -16,6 +16,21 @@ fn base_case() {
 }
 
 #[cfg_attr(test, test)]
+fn cross_function() {
+    const SIZE: usize = 128;
+    let mut x = [2u16; SIZE];
+    let mut y = [2u16; SIZE];
+
+    const fn size() -> usize {
+        size_of::<u16>() * SIZE
+    }
+
+    // Count expression involving multiplication of size_of (Should trigger the lint)
+    unsafe { copy_nonoverlapping(x.as_mut_ptr(), y.as_mut_ptr(), size()) };
+    //~[inline]^ size_of_in_element_count
+}
+
+#[cfg_attr(test, test)]
 fn cross_statement() {
     const SIZE: usize = 128;
     let mut x = [2u16; SIZE];
@@ -30,6 +45,8 @@ fn cross_statement() {
 
 pub(crate) fn main() {
     base_case();
+    //~[inline]^ size_of_in_element_count
+    cross_function();
     //~[inline]^ size_of_in_element_count
     cross_statement();
     //~[inline]^ size_of_in_element_count

@@ -1,6 +1,7 @@
 //@revisions: inline normal
 //@[normal] compile-flags: -Zinline-mir=false
 //@compile-flags: -A rpl::uninit_assumed_init
+#![expect(clippy::uninit_assumed_init)] // Non-related
 use std::mem;
 
 fn might_panic<X>(x: X) -> X {

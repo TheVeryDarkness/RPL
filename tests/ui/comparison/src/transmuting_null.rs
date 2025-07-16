@@ -1,5 +1,7 @@
 //@revisions: inline normal
 //@[normal] compile-flags: -Zinline-mir=false
+#![expect(clippy::zero_ptr, clippy::transmute_ptr_to_ref)]
+
 #[cfg_attr(test, test)]
 fn base_case() {
     unsafe {
