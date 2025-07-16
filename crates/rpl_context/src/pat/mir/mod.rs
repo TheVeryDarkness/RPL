@@ -1100,10 +1100,13 @@ impl<'pcx> AggKind<'pcx> {
                 (Self::Adt(path_or_lang_item, kind), op_list)
             },
             Choice6::_3(tuple) => {
-                let (_, _, _, _, path, _, operands, _) = tuple.get_matched();
+                let (_, _, _, _, path, operands) = tuple.get_matched();
                 let path = PathWithArgs::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
                 let operands = collect_operands(
-                    operands.as_ref().map(|operands| with_path(p, operands)),
+                    operands
+                        .as_ref()
+                        .and_then(|ops| ops.get_matched().1.as_ref())
+                        .map(|operands| with_path(p, operands)),
                     pcx,
                     fn_sym_tab,
                 );

@@ -646,9 +646,9 @@ impl<'i> CheckFnCtxt<'i, '_> {
                 }
             },
             Choice6::_3(adt_tuple) => {
-                let (_, _, _, _, path, _, ops, _) = adt_tuple.get_matched();
+                let (_, _, _, _, path, ops) = adt_tuple.get_matched();
                 self.check_path(mctx, path);
-                if let Some(ops) = ops {
+                if let Some(ops) = ops.as_ref().and_then(|ops| ops.get_matched().1.as_ref()) {
                     let ops = collect_elems_separated_by_comma!(ops).collect::<Vec<_>>();
                     for op in ops {
                         self.check_mir_operand(mctx, op);

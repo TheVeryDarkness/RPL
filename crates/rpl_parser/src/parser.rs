@@ -6313,7 +6313,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirAggregateAdtTuple , "Corresponds to expression: `(Hash ~ LeftBracket ~ kw_Ctor ~ RightBracket ~ Path ~ LeftParen ~ MirOperandsSeparatedByComma? ~ RightParen)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateAdtTuple , super :: super :: generics :: Seq8 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Hash :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_Ctor :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MirOperandsSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#MirAggregateAdtTuple , "Corresponds to expression: `(Hash ~ LeftBracket ~ kw_Ctor ~ RightBracket ~ Path ~ (LeftParen ~ MirOperandsSeparatedByComma? ~ RightParen)?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateAdtTuple , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Hash :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_Ctor :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MirOperandsSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirAggregateAdtTuple<'i, INHERITED> {
             #[doc = "A helper function to access [`Hash`]."]
             #[allow(non_snake_case)]
@@ -6335,11 +6335,19 @@ pub mod rules_impl {
             }
             #[doc = "A helper function to access [`LeftParen`]."]
             #[allow(non_snake_case)]
-            pub fn r#LeftParen<'s>(&'s self) -> &'s super::super::rules::r#LeftParen<'i, INHERITED> {
+            pub fn r#LeftParen<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#LeftParen<'i, INHERITED>> {
                 let res = &*self.content;
                 {
                     let res = &res.content.5.matched;
-                    res
+                    {
+                        let res = res.as_ref().map(|res| {
+                            let res = &res.content.0.matched;
+                            res
+                        });
+                        res
+                    }
                 }
             }
             #[doc = "A helper function to access [`MirOperandsSeparatedByComma`]."]
@@ -6350,9 +6358,18 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = &res.content.6.matched;
+                    let res = &res.content.5.matched;
                     {
-                        let res = res.as_ref().map(|res| res);
+                        let res = res
+                            .as_ref()
+                            .map(|res| {
+                                let res = &res.content.1.matched;
+                                {
+                                    let res = res.as_ref().map(|res| res);
+                                    res
+                                }
+                            })
+                            .flatten();
                         res
                     }
                 }
@@ -6377,11 +6394,19 @@ pub mod rules_impl {
             }
             #[doc = "A helper function to access [`RightParen`]."]
             #[allow(non_snake_case)]
-            pub fn r#RightParen<'s>(&'s self) -> &'s super::super::rules::r#RightParen<'i, INHERITED> {
+            pub fn r#RightParen<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#RightParen<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.7.matched;
-                    res
+                    let res = &res.content.5.matched;
+                    {
+                        let res = res.as_ref().map(|res| {
+                            let res = &res.content.2.matched;
+                            res
+                        });
+                        res
+                    }
                 }
             }
             #[doc = "A helper function to access [`kw_Ctor`]."]
