@@ -92,7 +92,15 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 block.terminator(),
             ),
             (false, false) => self.match_terminator(pat, loc, block_pat.terminator(), block.terminator()),
-            (false, true) => false,
+            (false, true) => {
+                debug!(
+                    ?pat,
+                    ?loc,
+                    block_len = ?block.statements.len(),
+                    "match_statement_or_terminator: pat is a terminator, but loc is not"
+                );
+                false
+            },
         }
     }
 
@@ -188,6 +196,17 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
+    fn match_switch_int(
+        &self,
+        operand: &pat::Operand<'pcx>,
+        discr: &mir::Operand<'tcx>,
+        loc_pat: pat::Location,
+        loc: mir::Location,
+    ) -> bool {
+        self.match_operand(operand, discr) && self.match_switch_targets(loc_pat.block, loc.block)
+    }
+
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_terminator(
         &self,
         loc_pat: pat::Location,
@@ -229,7 +248,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             (
                 pat::TerminatorKind::SwitchInt { operand, targets: _ },
                 mir::TerminatorKind::SwitchInt { discr, targets: _ },
-            ) => self.match_operand(operand, discr) && self.match_switch_targets(loc_pat.block, loc.block),
+            ) => self.match_switch_int(operand, discr, loc_pat, loc),
             (
                 pat::TerminatorKind::SwitchInt { .. }
                 | pat::TerminatorKind::Goto(_)
@@ -484,39 +503,53 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         MatchFnCtxt::new(self.tcx(), self.pcx(), self.pat(), fn_pat).match_fn(fn_did)
     }
 
-    #[allow(clippy::too_many_arguments)] // FIXME
     #[instrument(level = "trace", skip(self), ret)]
-    fn match_agg_adt(
+    fn match_agg_adt_variant(
         &self,
-        path_with_args: pat::PathWithArgs<'pcx>,
+        path: pat::Path<'pcx>,
         def_id: DefId,
-        variant_idx: VariantIdx,
+        variant: &ty::VariantDef,
+        adt: ty::AdtDef<'tcx>,
+    ) -> bool {
+        match path {
+            pat::Path::Item(path) => {
+                match adt.adt_kind() {
+                    ty::AdtKind::Struct | ty::AdtKind::Union => self.ty().match_item_path_by_def_path(path, def_id),
+                    ty::AdtKind::Enum => {
+                        if let [path @ .., variant_name] = path.0 {
+                            self.ty().match_item_path_by_def_path(pat::ItemPath(path), def_id)
+                                && *variant_name == variant.name
+                        } else {
+                            false
+                        }
+                    },
+                }
+                // self.ty().match_item_path_by_def_path(path, def_id)
+                //     || match self.ty().match_item_path(path, def_id) {
+                //         Some([]) => {
+                //             variant_idx.as_u32() == 0
+                //                 && matches!(adt.adt_kind(), ty::AdtKind::Struct |
+                // ty::AdtKind::Union)         },
+                //         Some(&[name]) => variant.name == name,
+                //         _ => false,
+                //     }
+            },
+            pat::Path::TypeRelative(_ty, _symbol) => false,
+            pat::Path::LangItem(lang_item) => self.tcx().is_lang_item(variant.def_id, lang_item),
+        }
+    }
+
+    #[instrument(level = "trace", skip(self), ret)]
+    fn match_agg_adt_fields(
+        &self,
+        variant: &ty::VariantDef,
+        adt: ty::AdtDef<'tcx>,
         adt_kind: &pat::AggAdtKind,
         field_idx: Option<FieldIdx>,
         operands_pat: &[pat::Operand<'pcx>],
         operands: &IndexSlice<FieldIdx, mir::Operand<'tcx>>,
-        gargs: GenericArgsRef<'tcx>,
     ) -> bool {
-        let adt = self.tcx().adt_def(def_id);
-        let variant = adt.variant(variant_idx);
-        let path = path_with_args.path;
-        let gargs_pat = path_with_args.args;
-        let variant_matched = match path {
-            pat::Path::Item(path) => {
-                self.ty().match_item_path_by_def_path(path, def_id)
-                    || match self.ty().match_item_path(path, def_id) {
-                        Some([]) => {
-                            variant_idx.as_u32() == 0
-                                && matches!(adt.adt_kind(), ty::AdtKind::Struct | ty::AdtKind::Union)
-                        },
-                        Some(&[name]) => variant.name == name,
-                        _ => false,
-                    }
-            },
-            pat::Path::TypeRelative(_ty, _symbol) => false,
-            pat::Path::LangItem(lang_item) => self.tcx().is_lang_item(variant.def_id, lang_item),
-        };
-        let fields_matched = match (adt_kind, field_idx, variant.ctor) {
+        match (adt_kind, field_idx, variant.ctor) {
             (pat::AggAdtKind::Unit, None, Some((CtorKind::Const, _)))
             | (pat::AggAdtKind::Tuple, None, Some((CtorKind::Fn, _))) => {
                 self.match_operands(operands_pat, &operands.raw)
@@ -539,19 +572,37 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                     })
             },
             (pat::AggAdtKind::Unit | pat::AggAdtKind::Tuple | pat::AggAdtKind::Struct(_), ..) => false,
-        };
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)] // FIXME
+    #[instrument(level = "trace", skip(self), ret)]
+    fn match_agg_adt(
+        &self,
+        path_with_args: pat::PathWithArgs<'pcx>,
+        def_id: DefId,
+        variant_idx: VariantIdx,
+        adt_kind: &pat::AggAdtKind,
+        field_idx: Option<FieldIdx>,
+        operands_pat: &[pat::Operand<'pcx>],
+        operands: &IndexSlice<FieldIdx, mir::Operand<'tcx>>,
+        gargs: GenericArgsRef<'tcx>,
+    ) -> bool {
+        let adt = self.tcx().adt_def(def_id);
+        let variant = adt.variant(variant_idx);
+        let path = path_with_args.path;
+        let gargs_pat = path_with_args.args;
         let generics = self.tcx().generics_of(def_id);
-        let gargs_matched = self.ty().match_generic_args(&gargs_pat, gargs, generics);
-        let matched = variant_matched && fields_matched && gargs_matched;
+
         debug!(
             ?path,
             ?variant.def_id,
-            ?operands_pat,
-            ?operands,
-            matched,
             "match_agg_adt",
         );
-        matched
+
+        self.match_agg_adt_variant(path, def_id, variant, adt)
+            && self.match_agg_adt_fields(variant, adt, adt_kind, field_idx, operands_pat, operands)
+            && self.ty().match_generic_args(&gargs_pat, gargs, generics)
     }
 
     fn match_aggregate(

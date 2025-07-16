@@ -250,7 +250,10 @@ fn non_local_item_children_by_name(tcx: TyCtxt<'_>, def_id: DefId, name: Symbol)
             .filter(|assoc_def_id| tcx.item_name(*assoc_def_id) == name)
             .map(|assoc_def_id| Res::Def(tcx.def_kind(assoc_def_id), assoc_def_id))
             .collect(),
-        _ => Vec::new(),
+        def_kind => {
+            trace!(?def_id, ?def_kind, "no children available for non local item");
+            Vec::new()
+        },
     }
 }
 
@@ -265,7 +268,10 @@ fn local_item_children_by_name(tcx: TyCtxt<'_>, local_id: LocalDefId, name: Symb
             &root_mod
         },
         Node::Item(item) => &item.kind,
-        _ => return Vec::new(),
+        node => {
+            trace!(?local_id, ?node, "no children available for local item");
+            return Vec::new();
+        },
     };
 
     // trace!(?item_kind);
