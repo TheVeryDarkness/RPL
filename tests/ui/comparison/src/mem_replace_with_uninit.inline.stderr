@@ -1,5 +1,5 @@
 error: replacing with `mem::uninitialized()`
-  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:19:23
+  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:20:23
    |
 LL |         let taken_v = mem::replace(&mut v, mem::MaybeUninit::uninit().assume_init());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
@@ -8,13 +8,13 @@ LL |         let taken_v = mem::replace(&mut v, mem::MaybeUninit::uninit().assum
    = help: to override `-D warnings` add `#[allow(rpl::mem_replace_with_uninit)]`
 
 error: replacing with `mem::uninitialized()`
-  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:36:23
+  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:37:23
    |
 LL |         let taken_v = mem::replace(&mut v, uninit());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
 
 error: replacing with `mem::uninitialized()`
-  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:51:23
+  --> tests/ui/comparison/src/mem_replace_with_uninit.rs:52:23
    |
 LL |         let taken_v = mem::replace(&mut v, u);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
