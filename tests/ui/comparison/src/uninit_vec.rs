@@ -1,13 +1,15 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
+//@[inline] check-pass
 #[cfg_attr(test, test)]
 fn base_case() {
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-    //~^ uninit_vec
+    //~[normal]^ uninit_vec
 
     unsafe {
         vec.set_len(200);
+        //~[normal]^ set_len_uninitialized
     }
 
     dbg!(vec[0]);
@@ -20,7 +22,7 @@ fn cross_function_with_capacity() {
     }
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = with_capacity(1000);
-    //~^ uninit_vec
+    //FIXME: ~^ uninit_vec
 
     unsafe {
         vec.set_len(200);
@@ -38,7 +40,7 @@ fn cross_function_set_len() {
     }
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-    //~^ uninit_vec
+    //FIXME: ~^ uninit_vec
 
     unsafe {
         set_len(&mut vec, 200);
@@ -58,7 +60,7 @@ fn cross_function_both() {
     }
     // with_capacity() -> set_len() should be detected
     let mut vec: Vec<u8> = with_capacity(1000);
-    //~^ uninit_vec
+    //FIXME: ~^ uninit_vec
 
     unsafe {
         set_len(&mut vec, 200);

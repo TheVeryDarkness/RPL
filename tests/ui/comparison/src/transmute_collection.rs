@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 use std::mem::transmute;
 
 #[cfg_attr(test, test)]
@@ -23,7 +23,7 @@ fn cross_function() {
     unsafe {
         // wrong size
         let v = transmute_vec::<u8, u32>(vec![0u8]);
-        //~^ unsound_collection_transmute
+        //~[inline]^ unsound_collection_transmute
 
         dbg!(v);
     }

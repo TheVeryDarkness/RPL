@@ -16,25 +16,7 @@ LL |         let x: fn() = std::mem::transmute(std::ptr::null::<u64>());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
-
-error: transmuting a known null pointer into a function pointer
-  --> tests/ui/comparison/src/transmute_null_to_fn.rs:25:23
-   |
-LL |         let x: fn() = std::mem::transmute(const_null_ptr::<u64>());
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
-
-error: transmuting a known null pointer into a function pointer
-  --> tests/ui/comparison/src/transmute_null_to_fn.rs:29:23
-   |
-LL |         let x: fn() = std::mem::transmute(null_ptr::<u64>());
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
+   = note: `std::ptr::null::<u64>()` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
 
 error: transmuting a known null pointer into a function pointer
   --> tests/ui/comparison/src/transmute_null_to_fn.rs:39:23
@@ -52,7 +34,7 @@ LL |         let x: fn() = std::mem::transmute(null_ptr);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: try wrapping your function pointer type in `Option<T>` instead, and using `None` as a null pointer value
-   = note: `null_ptr` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
+   = note: `std::ptr::null::<u64>()` is known to be a null pointer, so transmuting it into a function pointer is undefined behavior
 
-error: aborting due to 6 previous errors
+error: aborting due to 4 previous errors
 

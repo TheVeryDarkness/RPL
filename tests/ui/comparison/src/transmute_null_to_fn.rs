@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 #[cfg_attr(test, test)]
 fn base_case() {
     unsafe {
@@ -23,11 +23,11 @@ fn cross_function_null_ptr() {
     }
     unsafe {
         let x: fn() = std::mem::transmute(const_null_ptr::<u64>());
-        //~^ transmute_null_to_fn
+        //~[inline]^ transmute_null_to_fn
         dbg!(x);
 
         let x: fn() = std::mem::transmute(null_ptr::<u64>());
-        //~^ transmute_null_to_fn
+        //~[inline]^ transmute_null_to_fn
         dbg!(x);
     }
 }
