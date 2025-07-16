@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::RPLMetaError;
 
-pub fn collect_file_from_string_args(args: &[String]) -> Vec<(PathBuf, String)> {
+pub fn collect_file_from_string_args(args: &[String], handler: impl Fn() -> !) -> Vec<(PathBuf, String)> {
     let mut res = vec![];
     for arg in args {
         traverse_rpl(arg.into(), |path| {
@@ -23,7 +23,7 @@ pub fn collect_file_from_string_args(args: &[String]) -> Vec<(PathBuf, String)> 
                             error: Arc::new(err)
                         }
                     );
-                    return;
+                    handler(); // Call the handler to stop execution
                 },
             };
             res.push((path, buf));

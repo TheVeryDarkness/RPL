@@ -5,6 +5,7 @@
 #![feature(impl_trait_in_fn_trait_return)]
 #![feature(let_chains)]
 #![feature(macro_metavar_expr_concat)]
+#![feature(never_type)]
 
 extern crate rpl_parser as parser;
 extern crate rustc_arena;

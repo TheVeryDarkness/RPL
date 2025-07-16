@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use rpl_context::PatternCtxt;
@@ -92,6 +93,7 @@ static MCTX_ARENA: OnceLock<rpl_meta::arena::Arena<'_>> = OnceLock::new();
 ///
 /// [`MetaContext`]: rpl_meta::context::MetaContext
 static MCTX: OnceLock<rpl_meta::context::MetaContext<'_>> = OnceLock::new();
+static PATTERNS: OnceLock<Vec<(PathBuf, String)>> = OnceLock::new();
 
 impl rustc_driver::Callbacks for RplCallbacks {
     // JUSTIFICATION: necessary in RPL driver to set `mir_opt_level`
@@ -105,7 +107,11 @@ impl rustc_driver::Callbacks for RplCallbacks {
         config.locale_resources = crate::default_locale_resources();
 
         let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
-        let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
+        let patterns_and_paths = PATTERNS.get_or_init(|| {
+            collect_file_from_string_args(&self.pattern_paths, || {
+                EarlyDiagCtxt::new(config.opts.error_format).early_fatal(ErrorFound)
+            })
+        });
         // let dcx = compiler.sess.dcx();
         let mut error_counter = 0;
         let mctx = MCTX.get_or_init(|| {
@@ -173,7 +179,9 @@ impl rustc_driver::Callbacks for RplCallbacks {
     }
     fn after_analysis(&mut self, _: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
         let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
-        let patterns_and_paths = mctx_arena.alloc(collect_file_from_string_args(&self.pattern_paths));
+        let patterns_and_paths = PATTERNS
+            .get_or_init(|| collect_file_from_string_args(&self.pattern_paths, || tcx.dcx().emit_fatal(ErrorFound)));
+
         // let dcx = compiler.sess.dcx();
         let mut error_counter = 0;
         let mctx = MCTX.get_or_init(|| {
