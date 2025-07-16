@@ -57,7 +57,7 @@ fn main() {
     //~^ cast_slice_different_sizes
     //~| cast_slice_different_sizes
     //~| cast_slice_different_sizes
-        as *const [u8] as *const [u32];
+        as *const [u8] as *const [u32]; // Negative in clippy
 }
 
 // foo and foo2 should not fire, they're the same size

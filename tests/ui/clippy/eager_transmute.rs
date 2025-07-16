@@ -134,7 +134,7 @@ fn niche_tests(v1: u8, v2: NonZero<u8>, v3: NonZeroNonMaxU8) {
 
     // NonZero<u8> -> u8, don't lint, target type has no niche and therefore a higher validity range
     let _: Option<u8> =
-        (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) });
+        (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) }); // FIXME: false positive
     //~^ eager_transmute
 
     // NonZero<u8> -> NonMaxU8, do lint, different niche

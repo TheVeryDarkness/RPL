@@ -150,7 +150,7 @@ LL |        let long_chain_restore = r_x as *const [i32] as *const [u32] as *con
    |   ______________________________^
    |  |______________________________|
 ...  ||
-LL | ||         as *const [u8] as *const [u32];
+LL | ||         as *const [u8] as *const [u32]; // Negative in clippy
    | ||______________________-_______________^
    | |_______________________|
    |                         cast from this

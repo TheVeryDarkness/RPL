@@ -1,5 +1,5 @@
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:6:23
+  --> tests/ui/comparison/src/transmuting_null.rs:8:23
    |
 LL |         let x: &u64 = std::mem::transmute(0 as *const u64);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8,7 +8,7 @@ LL |         let x: &u64 = std::mem::transmute(0 as *const u64);
    = note: `#[deny(rpl::transmuting_null)]` on by default
 
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:10:23
+  --> tests/ui/comparison/src/transmuting_null.rs:12:23
    |
 LL |         let x: &u64 = std::mem::transmute(std::ptr::null::<u64>());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,7 +16,7 @@ LL |         let x: &u64 = std::mem::transmute(std::ptr::null::<u64>());
    = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:25:23
+  --> tests/ui/comparison/src/transmuting_null.rs:27:23
    |
 LL |         let x: &u64 = std::mem::transmute(const_null_ptr::<u64>());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -24,7 +24,7 @@ LL |         let x: &u64 = std::mem::transmute(const_null_ptr::<u64>());
    = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:29:23
+  --> tests/ui/comparison/src/transmuting_null.rs:31:23
    |
 LL |         let x: &u64 = std::mem::transmute(null_ptr::<u64>());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -32,7 +32,7 @@ LL |         let x: &u64 = std::mem::transmute(null_ptr::<u64>());
    = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:39:23
+  --> tests/ui/comparison/src/transmuting_null.rs:41:23
    |
 LL |         let x: &u64 = std::mem::transmute(null_ptr);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -40,7 +40,7 @@ LL |         let x: &u64 = std::mem::transmute(null_ptr);
    = note: `null_ptr` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
 error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:46:23
+  --> tests/ui/comparison/src/transmuting_null.rs:48:23
    |
 LL |         let x: &u64 = std::mem::transmute(null_ptr);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

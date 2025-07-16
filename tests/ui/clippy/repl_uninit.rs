@@ -1,6 +1,7 @@
+//@revisions: inline normal
+//@[normal]compile-flags: -Z inline-mir=false
+//@compile-flags: -A rpl::uninit_assumed_init
 #![allow(deprecated, invalid_value)]
-// FIXME: #[allow(rpl::uninit_assumed_init)]
-//@compile-flags: -Z inline-mir=false
 
 use std::mem;
 
@@ -15,7 +16,7 @@ fn main() {
     // the following is UB if `might_panic` panics
     unsafe {
         let taken_v = mem::replace(&mut v, mem::uninitialized());
-        //~^ mem_replace_with_uninit
+        //~[normal]^ mem_replace_with_uninit
 
         let new_v = might_panic(taken_v);
         std::mem::forget(mem::replace(&mut v, new_v));
@@ -24,7 +25,6 @@ fn main() {
     unsafe {
         let taken_v = mem::replace(&mut v, mem::MaybeUninit::uninit().assume_init());
         //~^ mem_replace_with_uninit
-        //~| uninit_assumed_init
 
         let new_v = might_panic(taken_v);
         std::mem::forget(mem::replace(&mut v, new_v));
@@ -32,7 +32,7 @@ fn main() {
 
     unsafe {
         let taken_v = mem::replace(&mut v, mem::zeroed());
-        //~^ mem_replace_with_uninit
+        //~[normal]^ mem_replace_with_uninit
 
         let new_v = might_panic(taken_v);
         std::mem::forget(mem::replace(&mut v, new_v));
@@ -46,7 +46,7 @@ fn main() {
 
     // this is still not OK, because uninit
     let taken_u = unsafe { mem::replace(uref, mem::uninitialized()) };
-    //FIXME~^ mem_replace_with_uninit
+    // FIXME: ~^ mem_replace_with_uninit
 
     *uref = taken_u + 1;
 }
