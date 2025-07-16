@@ -129,7 +129,7 @@ LL |     let _: Option<NonZero<u8>> = (v1 > 0).then_some(unsafe { std::mem::tran
 error: this transmute is always evaluated eagerly, even if the condition is false
   --> tests/ui/clippy/eager_transmute.rs:137:62
    |
-LL |         (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) });
+LL |         (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) }); // FIXME: false positive
    |                                                              ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: this transmute is always evaluated eagerly, even if the condition is false
