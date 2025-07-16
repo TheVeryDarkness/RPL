@@ -296,12 +296,12 @@ patt {
         let $discr: isize;
         loop {
             switchInt(move $cmp) {
-                false => $opt = #[lang = "None"],
+                false => $opt = #[Ctor] core::option::Option::None,
                 _ => {
                     $x1 = copy (*$iter_mut).start;
                     $x2 = core::iter::range::Step::forward_unchecked(copy $x1, const 1_usize);
                     (*$iter_mut).start = move $x2;
-                    $opt = #[lang = "Some"](copy $x1);
+                    $opt = #[Ctor] core::option::Option::Some(copy $x1);
                 }
             }
             $discr = discriminant($opt);
