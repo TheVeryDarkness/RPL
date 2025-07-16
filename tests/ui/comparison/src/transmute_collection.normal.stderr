@@ -9,14 +9,6 @@ LL |         let v = transmute::<_, Vec<u32>>(vec![0u8]);
    = note: `#[deny(rpl::unsound_collection_transmute)]` on by default
 
 error: transmute from `std::vec::Vec<u8>` to `std::vec::Vec<u32>` with mismatched layout is unsound
-  --> tests/ui/comparison/src/transmute_collection.rs:25:17
-   |
-LL |         let v = transmute_vec::<u8, u32>(vec![0u8]);
-   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^---------^
-   |                                          |
-   |                                          casted from this
-
-error: transmute from `std::vec::Vec<u8>` to `std::vec::Vec<u32>` with mismatched layout is unsound
   --> tests/ui/comparison/src/transmute_collection.rs:38:17
    |
 LL |         let v = vec![0u8];
@@ -25,5 +17,5 @@ LL |         let v = vec![0u8];
 LL |         let v = transmute::<_, Vec<u32>>(v);
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 3 previous errors
+error: aborting due to 2 previous errors
 

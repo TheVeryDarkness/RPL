@@ -1,5 +1,5 @@
 error: casts between raw pointers to slices with different element sizes
-  --> tests/ui/comparison/src/cast_slice_different_sizes.rs:8:13
+  --> tests/ui/comparison/src/cast_slice_different_sizes.rs:10:13
    |
 LL |     let a = r_x as *const [i32];
    |             ------------------- cast from this
@@ -10,7 +10,7 @@ LL |     let b = a as *const [u64];
    = note: `#[deny(rpl::cast_slice_different_sizes)]` on by default
 
 error: casts between raw pointers to slices with different element sizes
-  --> tests/ui/comparison/src/cast_slice_different_sizes.rs:27:27
+  --> tests/ui/comparison/src/cast_slice_different_sizes.rs:29:27
    |
 LL |     let b: *const [u64] = cast_slice(r_x);
    |                           ^^^^^^^^^^^---^

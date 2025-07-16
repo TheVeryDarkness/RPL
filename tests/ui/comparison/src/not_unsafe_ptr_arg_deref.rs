@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 pub fn base_case(p: *const u8) {
     dbg!(unsafe { *p });
     //~^ not_unsafe_ptr_arg_deref
@@ -13,7 +13,7 @@ pub fn cross_function(p: *const u8) {
         unsafe { *p }
     }
     dbg!(unsafe { deref(p) });
-    //~^ not_unsafe_ptr_arg_deref
+    //~[inline]^ not_unsafe_ptr_arg_deref
 }
 
 pub fn cast_mutability(p: *const u8) {

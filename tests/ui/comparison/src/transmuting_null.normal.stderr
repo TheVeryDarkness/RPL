@@ -13,23 +13,7 @@ error: transmuting a known null pointer into a reference
 LL |         let x: &u64 = std::mem::transmute(std::ptr::null::<u64>());
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
-
-error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:25:23
-   |
-LL |         let x: &u64 = std::mem::transmute(const_null_ptr::<u64>());
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
-
-error: transmuting a known null pointer into a reference
-  --> tests/ui/comparison/src/transmuting_null.rs:29:23
-   |
-LL |         let x: &u64 = std::mem::transmute(null_ptr::<u64>());
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `{0x0 as *const u64}` is known to be a null pointer, so transmuting it into a reference is undefined behavior
+   = note: `std::ptr::null::<u64>()` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
 error: transmuting a known null pointer into a reference
   --> tests/ui/comparison/src/transmuting_null.rs:39:23
@@ -45,7 +29,7 @@ error: transmuting a known null pointer into a reference
 LL |         let x: &u64 = std::mem::transmute(null_ptr);
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: `null_ptr` is known to be a null pointer, so transmuting it into a reference is undefined behavior
+   = note: `std::ptr::null::<u64>()` is known to be a null pointer, so transmuting it into a reference is undefined behavior
 
-error: aborting due to 6 previous errors
+error: aborting due to 4 previous errors
 

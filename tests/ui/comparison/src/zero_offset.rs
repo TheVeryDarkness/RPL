@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 
 /// Base cases
 #[cfg_attr(test, test)]
@@ -32,11 +32,11 @@ fn cross_function() {
         let m = &raw mut m;
 
         let n = offset(m, 0);
-        //~^ zst_offset
+        //~[inline]^ zst_offset
         dbg!(n);
 
         let n = wrapping_add(m, 0);
-        //~^ zst_offset
+        //~[inline]^ zst_offset
         dbg!(n);
     }
 }

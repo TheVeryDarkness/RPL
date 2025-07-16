@@ -27,7 +27,7 @@ pub(crate) fn cross_function() {
     // Check casting through multiple bindings
     // Because it's separate, it does not check the cast back to something of the same size
     let b: *const [u64] = cast_slice(r_x);
-    //~^ cast_slice_different_sizes
+    //~[inline]^ cast_slice_different_sizes
     dbg!(b);
 }
 

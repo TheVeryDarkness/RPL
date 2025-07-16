@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 use std::mem::MaybeUninit;
 
 #[cfg_attr(test, test)]
@@ -16,7 +16,7 @@ fn cross_function_uninit() {
         MaybeUninit::uninit()
     }
     let x: usize = unsafe { uninit().assume_init() };
-    //~^ uninit_assumed_init
+    //~[inline]^ uninit_assumed_init
     dbg!(x);
 }
 
@@ -26,7 +26,7 @@ fn cross_function_assume_init() {
         unsafe { maybe_uninit.assume_init() }
     }
     let x: usize = unsafe { assume_init(MaybeUninit::uninit()) };
-    //~^ uninit_assumed_init
+    //~[inline]^ uninit_assumed_init
     dbg!(x);
 }
 

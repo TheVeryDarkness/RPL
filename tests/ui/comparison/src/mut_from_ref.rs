@@ -1,5 +1,5 @@
 //@revisions: inline normal
-//@[inline] compile-flags: -Zinline-mir=false
+//@[normal] compile-flags: -Zinline-mir=false
 fn base_case(x: &u32) -> &mut u16 {
     //~^ mut_from_ref
 
