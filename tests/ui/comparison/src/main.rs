@@ -1,79 +1,29 @@
+//@ignore-on-host: check individual modules instead
 #![deny(clippy::correctness)]
-
-pub mod cross_function {
-    use std::mem::MaybeUninit;
-
-    fn size_of<T>() -> usize {
-        std::mem::size_of::<T>()
-    }
-    fn size_of_in_element_count<T: Copy, const N: usize>(p: *mut [T; N], q: *const [T; N]) {
-        unsafe {
-            p.copy_from(q, N * size_of::<[T; N]>()); //~ size_of_in_element_count
-        }
-    }
-
-    fn null_ptr<T>() -> *const T {
-        std::ptr::null()
-    }
-    fn transmute_null_to_fn<T>() -> fn() -> T {
-        unsafe { std::mem::transmute(null_ptr::<T>()) } //~ transmute_null_to_fn
-    }
-    fn null_mut_ptr<T>() -> *mut T {
-        std::ptr::null_mut()
-    }
-    fn transmute_null_mut_to_fn<T>() -> fn() -> T {
-        unsafe { std::mem::transmute(null_mut_ptr::<T>()) } //~ transmute_null_to_fn
-    }
-
-    fn maybe_uninit() -> MaybeUninit<i32> {
-        MaybeUninit::uninit()
-    }
-
-    pub fn run() {
-        let mut a = [1, 2, 3];
-        let b = [4, 5, 6];
-        size_of_in_element_count(&mut a, &b); //~ size_of_in_element_count
-
-        let x = transmute_null_to_fn::<i32>()(); //~ transmute_null_to_fn
-        dbg!(x);
-        let y = transmute_null_mut_to_fn::<i32>()(); //~ transmute_null_to_fn
-        dbg!(y);
-
-        let x = unsafe { maybe_uninit().assume_init() }; //~ uninit_assumed_init
-        dbg!(x);
-    }
-}
-
-pub mod cross_statement {
-    use std::mem::MaybeUninit;
-
-    fn size_of_in_element_count<T: Copy, const N: usize>(p: *mut [T; N], q: *const [T; N]) {
-        let count = N * std::mem::size_of::<[T; N]>(); //~ size_of_in_element_count
-        unsafe {
-            p.copy_from(q, count);
-        }
-    }
-
-    fn transmute_null_to_fn<T>() -> fn() -> T {
-        let null_ptr: *const T = std::ptr::null();
-        unsafe { std::mem::transmute(null_ptr) } //~ transmute_null_to_fn
-    }
-
-    pub fn run() {
-        let mut a = [1, 2, 3];
-        let b = [4, 5, 6];
-        size_of_in_element_count(&mut a, &b); //~ size_of_in_element_count
-
-        let fn_ptr: fn() -> i32 = transmute_null_to_fn(); //~ transmute_null_to_fn
-        dbg!(fn_ptr);
-
-        let x = MaybeUninit::uninit();
-        let y: usize = unsafe { x.assume_init() }; //~ uninit_assumed_init
-        dbg!(y);
-    }
-}
+#![allow(internal_features)]
+#![feature(rustc_attrs)]
+mod eager_transmute;
+mod mem_replace_with_uninit;
+mod mut_from_ref;
+mod not_unsafe_ptr_arg_deref;
+mod size_of_in_element_count;
+mod transmute_collection;
+mod transmute_null_to_fn;
+mod transmuting_null;
+mod uninit_assumed_init;
+mod uninit_vec;
+mod zero_offset;
 
 fn main() {
-    cross_function::run();
-    cross_statement::run();
+    eager_transmute::main();
+    mem_replace_with_uninit::main();
+    mut_from_ref::main();
+    not_unsafe_ptr_arg_deref::main();
+    size_of_in_element_count::main();
+    transmute_collection::main();
+    transmuting_null::main();
+    transmute_null_to_fn::main();
+    uninit_assumed_init::main();
+    uninit_vec::main();
+    zero_offset::main();
 }
