@@ -16,7 +16,7 @@ class Info:
 def main():
     input = sys.argv[1] if len(sys.argv) > 1 else "/home/rpl/.VSCodeCounter/2025-07-15_11-27-53/results.md"
     crates_input = sys.argv[2] if len(sys.argv) > 2 else "/home/rpl/RPL-Pest/crates/lintcheck/1000.toml"
-    check_output = sys.argv[3] if len(sys.argv) > 3 else "/home/rpl/RPL-Pest/lintcheck-logs/perf_logs.txt"
+    check_output = sys.argv[3] if len(sys.argv) > 3 else "/home/rpl/RPL-Pest/lintcheck-logs/1000_logs.txt"
     info_list: list[Info] = []
     crates = toml.load(crates_input)
     crates_dict: dict[str, str] = {}
