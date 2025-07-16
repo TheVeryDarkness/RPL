@@ -673,12 +673,8 @@ MirAggregateAdtStruct = {
     PathOrLangItem ~ LeftBrace ~ MirAggregateAdtStructFieldsSeparatedByComma? ~ RightBrace
 }
 
-MirAggregateAdtTuple = {
+MirAggregateAdtTupleOrUnit = {
     Hash ~ LeftBracket ~ kw_Ctor ~ RightBracket ~ Path ~ (LeftParen ~ MirOperandsSeparatedByComma? ~ RightParen)?
-}
-
-MirAggregateAdtUnit = {
-    PathOrLangItem
 }
 
 MirAggregateRawPtr = {
@@ -689,8 +685,7 @@ MirRvalueAggregate = {
     MirAggregateArray
   | MirAggregateTuple
   | MirAggregateAdtStruct
-  | MirAggregateAdtTuple
-  | MirAggregateAdtUnit
+  | MirAggregateAdtTupleOrUnit
   | MirAggregateRawPtr
 }
 

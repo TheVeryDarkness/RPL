@@ -1060,7 +1060,7 @@ impl<'pcx> AggKind<'pcx> {
     ) -> (Self, List<Operand<'pcx>>) {
         let p = agg.path;
         match agg.inner.deref() {
-            Choice6::_0(array) => {
+            Choice5::_0(array) => {
                 let (_, operands, _) = array.get_matched();
                 let operands = collect_operands(
                     operands.as_ref().map(|operands| with_path(p, operands)),
@@ -1069,7 +1069,7 @@ impl<'pcx> AggKind<'pcx> {
                 );
                 (Self::Array, operands.into_boxed_slice())
             },
-            Choice6::_1(tuple) => {
+            Choice5::_1(tuple) => {
                 let (_, operands, _) = tuple.get_matched();
                 let operands = collect_operands(
                     operands.as_ref().map(|operands| with_path(p, operands)),
@@ -1078,7 +1078,7 @@ impl<'pcx> AggKind<'pcx> {
                 );
                 (Self::Tuple, operands.into_boxed_slice())
             },
-            Choice6::_2(adt_struct) => {
+            Choice5::_2(adt_struct) => {
                 let (path_or_lang_item, _, fields, _) = adt_struct.get_matched();
                 let path_or_lang_item =
                     PathWithArgs::from_path_or_lang_item(WithPath::new(p, path_or_lang_item), pcx, fn_sym_tab);
@@ -1099,8 +1099,13 @@ impl<'pcx> AggKind<'pcx> {
                 let kind = AggAdtKind::Struct(symbol_list);
                 (Self::Adt(path_or_lang_item, kind), op_list)
             },
-            Choice6::_3(tuple) => {
+            Choice5::_3(tuple) => {
                 let (_, _, _, _, path, operands) = tuple.get_matched();
+                let adt_kind = if operands.is_some() {
+                    AggAdtKind::Tuple
+                } else {
+                    AggAdtKind::Unit
+                };
                 let path = PathWithArgs::from_path(WithPath::new(p, path), pcx, fn_sym_tab);
                 let operands = collect_operands(
                     operands
@@ -1110,14 +1115,9 @@ impl<'pcx> AggKind<'pcx> {
                     pcx,
                     fn_sym_tab,
                 );
-                (Self::Adt(path, AggAdtKind::Tuple), operands.into_boxed_slice())
+                (Self::Adt(path, adt_kind), operands.into_boxed_slice())
             },
-            Choice6::_4(unit) => {
-                let unit = unit.deref();
-                let path_or_lang_item = PathWithArgs::from_path_or_lang_item(WithPath::new(p, unit), pcx, fn_sym_tab);
-                (Self::Adt(path_or_lang_item, AggAdtKind::Unit), Box::new([]))
-            },
-            Choice6::_5(raw_ptr) => {
+            Choice5::_4(raw_ptr) => {
                 let (ty_ptr, _, _, op1, _, op2, _) = raw_ptr.get_matched();
                 let (_, ptr_mutability, ty) = ty_ptr.get_matched();
                 let ty = Ty::from(WithPath::new(p, ty), pcx, fn_sym_tab);

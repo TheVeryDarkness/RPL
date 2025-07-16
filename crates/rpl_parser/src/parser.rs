@@ -231,8 +231,7 @@ pub enum Rule {
     r#MirAggregateAdtStructField,
     r#MirAggregateAdtStructFieldsSeparatedByComma,
     r#MirAggregateAdtStruct,
-    r#MirAggregateAdtTuple,
-    r#MirAggregateAdtUnit,
+    r#MirAggregateAdtTupleOrUnit,
     r#MirAggregateRawPtr,
     r#MirRvalueAggregate,
     r#MirRvalue,
@@ -6313,8 +6312,8 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirAggregateAdtTuple , "Corresponds to expression: `(Hash ~ LeftBracket ~ kw_Ctor ~ RightBracket ~ Path ~ (LeftParen ~ MirOperandsSeparatedByComma? ~ RightParen)?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateAdtTuple , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Hash :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_Ctor :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MirOperandsSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
-        impl<'i, const INHERITED: ::core::primitive::usize> r#MirAggregateAdtTuple<'i, INHERITED> {
+        :: pest_typed :: rule ! (r#MirAggregateAdtTupleOrUnit , "Corresponds to expression: `(Hash ~ LeftBracket ~ kw_Ctor ~ RightBracket ~ Path ~ (LeftParen ~ MirOperandsSeparatedByComma? ~ RightParen)?)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateAdtTupleOrUnit , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Hash :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_Ctor :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBracket :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Path :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#MirOperandsSeparatedByComma :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        impl<'i, const INHERITED: ::core::primitive::usize> r#MirAggregateAdtTupleOrUnit<'i, INHERITED> {
             #[doc = "A helper function to access [`Hash`]."]
             #[allow(non_snake_case)]
             pub fn r#Hash<'s>(&'s self) -> &'s super::super::rules::r#Hash<'i, INHERITED> {
@@ -6419,15 +6418,6 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirAggregateAdtUnit , "Corresponds to expression: `PathOrLangItem`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateAdtUnit , super :: super :: rules :: r#PathOrLangItem :: < 'i , INHERITED > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
-        impl<'i, const INHERITED: ::core::primitive::usize> r#MirAggregateAdtUnit<'i, INHERITED> {
-            #[doc = "A helper function to access [`PathOrLangItem`]."]
-            #[allow(non_snake_case)]
-            pub fn r#PathOrLangItem<'s>(&'s self) -> &'s super::super::rules::r#PathOrLangItem<'i, INHERITED> {
-                let res = &*self.content;
-                res
-            }
-        }
         :: pest_typed :: rule ! (r#MirAggregateRawPtr , "Corresponds to expression: `(TypePtr ~ kw_from ~ LeftParen ~ MirOperand ~ Comma ~ MirOperand ~ RightParen)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirAggregateRawPtr , super :: super :: generics :: Seq7 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#TypePtr :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_from :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperand :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Comma :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperand :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirAggregateRawPtr<'i, INHERITED> {
             #[doc = "A helper function to access [`Comma`]."]
@@ -6499,7 +6489,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirRvalueAggregate , "Corresponds to expression: `(MirAggregateArray | MirAggregateTuple | MirAggregateAdtStruct | MirAggregateAdtTuple | MirAggregateAdtUnit | MirAggregateRawPtr)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirRvalueAggregate , super :: super :: generics :: Choice6 :: < super :: super :: rules :: r#MirAggregateArray :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateTuple :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateAdtStruct :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateAdtTuple :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateAdtUnit :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateRawPtr :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#MirRvalueAggregate , "Corresponds to expression: `(MirAggregateArray | MirAggregateTuple | MirAggregateAdtStruct | MirAggregateAdtTupleOrUnit | MirAggregateRawPtr)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirRvalueAggregate , super :: super :: generics :: Choice5 :: < super :: super :: rules :: r#MirAggregateArray :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateTuple :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateAdtStruct :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateAdtTupleOrUnit :: < 'i , INHERITED > , super :: super :: rules :: r#MirAggregateRawPtr :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirRvalueAggregate<'i, INHERITED> {
             #[doc = "A helper function to access [`MirAggregateAdtStruct`]."]
             #[allow(non_snake_case)]
@@ -6513,27 +6503,15 @@ pub mod rules_impl {
                     res
                 }
             }
-            #[doc = "A helper function to access [`MirAggregateAdtTuple`]."]
+            #[doc = "A helper function to access [`MirAggregateAdtTupleOrUnit`]."]
             #[allow(non_snake_case)]
-            pub fn r#MirAggregateAdtTuple<'s>(
+            pub fn r#MirAggregateAdtTupleOrUnit<'s>(
                 &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MirAggregateAdtTuple<'i, INHERITED>>
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MirAggregateAdtTupleOrUnit<'i, INHERITED>>
             {
                 let res = &*self.content;
                 {
                     let res = res._3().map(|res| res);
-                    res
-                }
-            }
-            #[doc = "A helper function to access [`MirAggregateAdtUnit`]."]
-            #[allow(non_snake_case)]
-            pub fn r#MirAggregateAdtUnit<'s>(
-                &'s self,
-            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MirAggregateAdtUnit<'i, INHERITED>>
-            {
-                let res = &*self.content;
-                {
-                    let res = res._4().map(|res| res);
                     res
                 }
             }
@@ -6557,7 +6535,7 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = res._5().map(|res| res);
+                    let res = res._4().map(|res| res);
                     res
                 }
             }
