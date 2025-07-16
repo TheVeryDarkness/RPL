@@ -1,6 +1,8 @@
 #![deny(clippy::correctness)]
 
 pub mod cross_function {
+    use std::mem::MaybeUninit;
+
     fn size_of<T>() -> usize {
         std::mem::size_of::<T>()
     }
@@ -23,8 +25,8 @@ pub mod cross_function {
         unsafe { std::mem::transmute(null_mut_ptr::<T>()) } //~ transmute_null_to_fn
     }
 
-    fn transmuting_ref<'a, T>(ptr: *const T) -> &'a T {
-        unsafe { std::mem::transmute(ptr) }
+    fn maybe_uninit() -> MaybeUninit<i32> {
+        MaybeUninit::uninit()
     }
 
     pub fn run() {
@@ -37,12 +39,14 @@ pub mod cross_function {
         let y = transmute_null_mut_to_fn::<i32>()(); //~ transmute_null_to_fn
         dbg!(y);
 
-        let x: &i32 = transmuting_ref(null_ptr()); //~ transmuting_null
+        let x = unsafe { maybe_uninit().assume_init() }; //~ uninit_assumed_init
         dbg!(x);
     }
 }
 
 pub mod cross_statement {
+    use std::mem::MaybeUninit;
+
     fn size_of_in_element_count<T: Copy, const N: usize>(p: *mut [T; N], q: *const [T; N]) {
         let count = N * std::mem::size_of::<[T; N]>(); //~ size_of_in_element_count
         unsafe {
@@ -62,6 +66,10 @@ pub mod cross_statement {
 
         let fn_ptr: fn() -> i32 = transmute_null_to_fn(); //~ transmute_null_to_fn
         dbg!(fn_ptr);
+
+        let x = MaybeUninit::uninit();
+        let y: usize = unsafe { x.assume_init() }; //~ uninit_assumed_init
+        dbg!(y);
     }
 }
 
