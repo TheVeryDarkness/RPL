@@ -1,4 +1,7 @@
-//@compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
+//@revisions: inline normal
+//@[inline]compile-flags: -Z mir-opt-level=0 -Z inline-mir=true
+//@[inline]ignore-on-host
+//@[normal]compile-flags: -Z mir-opt-level=0 -Z inline-mir=false
 #![feature(rustc_attrs)]
 #![allow(internal_features)]
 use std::num::NonZero;
@@ -15,7 +18,7 @@ struct Data {
     foo: &'static [u8],
     bar: &'static [u8],
 }
-
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
 fn int_to_opcode(op: u8) -> Option<Opcode> {
     (op < 4).then_some(unsafe { std::mem::transmute(op) })
     //~^ eager_transmute
