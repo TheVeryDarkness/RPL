@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 use std::mem::transmute;
 
 #[cfg_attr(test, test)]

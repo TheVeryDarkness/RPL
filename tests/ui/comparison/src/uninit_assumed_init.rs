@@ -1,3 +1,5 @@
+//@revisions: inline normal
+//@[inline] compile-flags: -Zinline-mir=false
 use std::mem::MaybeUninit;
 
 #[cfg_attr(test, test)]
