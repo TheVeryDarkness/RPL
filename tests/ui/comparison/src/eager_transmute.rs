@@ -1,5 +1,6 @@
 //@revisions: inline normal
-//@check-pass: no pattern available
+//@[normal] compile-flags: -Zinline-mir=false
+//@[inline]check-pass: no pattern available
 #[derive(Debug)]
 #[repr(u8)]
 #[expect(dead_code)]
@@ -12,7 +13,7 @@ enum Opcode {
 
 fn base_case(op: u8) -> Option<Opcode> {
     (op < 4).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) })
-    //FIXME: ~^ eager_transmute
+    //~[normal]^ eager_transmute
 }
 
 fn cross_function_cond(op: u8) -> Option<Opcode> {
@@ -20,7 +21,7 @@ fn cross_function_cond(op: u8) -> Option<Opcode> {
         op < 4
     }
     check_op(op).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) })
-    //FIXME: ~^ eager_transmute
+    //~[normal]^ eager_transmute
 }
 
 fn cross_function_value(op: u8) -> Option<Opcode> {
@@ -34,7 +35,7 @@ fn cross_function_value(op: u8) -> Option<Opcode> {
 fn cross_statement_cond(op: u8) -> Option<Opcode> {
     let cond = op < 4;
     cond.then_some(unsafe { std::mem::transmute::<_, Opcode>(op) })
-    //FIXME: ~^ eager_transmute
+    //~[normal]^ eager_transmute
 }
 
 #[cfg_attr(test, test)]

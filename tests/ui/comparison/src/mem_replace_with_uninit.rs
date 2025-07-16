@@ -1,4 +1,5 @@
 //@revisions: inline normal
+//@[normal] compile-flags: -Zinline-mir=false
 //@compile-flags: -A rpl::uninit_assumed_init
 use std::mem;
 
@@ -34,7 +35,7 @@ pub(crate) fn cross_function() {
     // the following is UB if `might_panic` panics
     unsafe {
         let taken_v = mem::replace(&mut v, uninit());
-        //~^ mem_replace_with_uninit
+        //~[inline]^ mem_replace_with_uninit
 
         let new_v = might_panic(taken_v);
         std::mem::forget(mem::replace(&mut v, new_v));
@@ -49,7 +50,7 @@ pub(crate) fn cross_statement() {
         let u = mem::MaybeUninit::uninit();
         let u = u.assume_init();
         let taken_v = mem::replace(&mut v, u);
-        //~^ mem_replace_with_uninit
+        //~[inline]^ mem_replace_with_uninit
 
         let new_v = might_panic(taken_v);
         std::mem::forget(mem::replace(&mut v, new_v));
