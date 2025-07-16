@@ -617,7 +617,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
         mir_rvalue_aggregate: &'i pairs::MirRvalueAggregate<'i>,
     ) {
         match mir_rvalue_aggregate.deref() {
-            Choice6::_0(array) => {
+            Choice5::_0(array) => {
                 let (_, ops, _) = array.get_matched();
                 if let Some(ops) = ops {
                     let ops = collect_elems_separated_by_comma!(ops).collect::<Vec<_>>();
@@ -626,7 +626,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
                     }
                 }
             },
-            Choice6::_1(tuple) => {
+            Choice5::_1(tuple) => {
                 let (_, ops, _) = tuple.get_matched();
                 if let Some(ops) = ops {
                     let ops = collect_elems_separated_by_comma!(ops).collect::<Vec<_>>();
@@ -635,7 +635,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
                     }
                 }
             },
-            Choice6::_2(adt_struct) => {
+            Choice5::_2(adt_struct) => {
                 let (path_or_lang_item, _, ops, _) = adt_struct.get_matched();
                 self.check_path_or_lang_item(mctx, path_or_lang_item);
                 if let Some(ops) = ops {
@@ -645,7 +645,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
                     }
                 }
             },
-            Choice6::_3(adt_tuple) => {
+            Choice5::_3(adt_tuple) => {
                 let (_, _, _, _, path, ops) = adt_tuple.get_matched();
                 self.check_path(mctx, path);
                 if let Some(ops) = ops.as_ref().and_then(|ops| ops.get_matched().1.as_ref()) {
@@ -655,11 +655,7 @@ impl<'i> CheckFnCtxt<'i, '_> {
                     }
                 }
             },
-            Choice6::_4(adt_unit) => {
-                let path_or_lang_item = adt_unit.PathOrLangItem();
-                self.check_path_or_lang_item(mctx, path_or_lang_item);
-            },
-            Choice6::_5(raw_ptr) => {
+            Choice5::_4(raw_ptr) => {
                 let (ty, _, _, ptr, _, meta_data, _) = raw_ptr.get_matched();
                 self.check_type(mctx, ty.Type());
                 self.check_mir_operand(mctx, ptr);

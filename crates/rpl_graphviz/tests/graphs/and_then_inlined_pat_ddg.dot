@@ -22,13 +22,13 @@ subgraph cluster_bb2 {
 subgraph cluster_bb3 {
     bb3IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb3[IN]</td></tr></table>>];
     bb3OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb3[OUT]</td></tr></table>>];
-    bb3stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">#[lang = &quot;Some&quot;]:: &lt; ?T0 &gt;(move _?0) -&gt; ?bb1</td></tr></table>>];
+    bb3stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_ = core::option::Option:: &lt; ?T0 &gt;(move _?0)</td></tr></table>>];
     bb3IN -> bb3stmt0 [label="_?0"];
     bb3IN -> bb3OUT [label="_?1"];
 }
     bb0OUT -> bb2IN [label="0"];
     bb0OUT -> bb3IN [label="otherwise"];
     bb2OUT -> bb1IN [label="goto"];
-    bb3OUT -> bb1IN [label="return"];
+    bb3OUT -> bb1IN [label="goto"];
     bb0stmt0 -> bb3stmt0 [label="_?0"];
 }

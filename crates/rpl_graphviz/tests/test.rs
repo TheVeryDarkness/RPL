@@ -133,7 +133,7 @@ test_case! {
                 let $len: usize;
                 let $x1: usize;
                 let $x2: usize;
-                let $opt: #[lang = "Option"]<usize>;
+                let $opt: core::option::Option<usize>;
                 let $discr: isize;
                 let $x: usize;
                 let $start_ref: &usize;
@@ -159,12 +159,12 @@ test_case! {
                     $end = copy *$end_ref;
                     $cmp = Lt(move $start, move $end);
                     switchInt(move $cmp) {
-                        false => $opt = #[lang = "None"],
+                        false => $opt = #[Ctor] core::option::Option::None,
                         _ => {
                             $x1 = copy (*$iter_mut).start;
                             $x2 = core::iter::range::Step::forward_unchecked(copy $x1, const 1_usize);
                             (*$iter_mut).start = move $x2;
-                            $opt = #[lang = "Some"](copy $x1);
+                            $opt = #[Ctor] core::option::Option::Some(copy $x1);
                         }
                     }
                     $discr = discriminant($opt);
@@ -446,10 +446,10 @@ test_case! {
                 let $cond: bool;
                 switchInt(copy $cond) {
                     0_usize => {
-                        _ = #[lang = "None"]<$T>;
+                        _ = #[Ctor] core::option::Option::<$T>;
                     }
                     _ => {
-                        _ = #[lang = "Some"]<$T>(move $dst);
+                        _ = #[Ctor] core::option::Option::<$T>(move $dst);
                     }
                 }
             } where {
