@@ -1,34 +1,44 @@
-#[allow(clippy::borrow_as_ptr)]
+/// Base cases
 #[cfg_attr(test, test)]
-pub(crate) fn main() {
+fn base_case() {
     unsafe {
-        let m = &mut () as *mut ();
-        m.offset(0);
-        //~^ zst_offset
+        let mut m = ();
+        let m = &raw mut m;
 
-        m.wrapping_add(0);
+        let n = m.offset(0);
         //~^ zst_offset
+        dbg!(n);
 
-        m.sub(0);
+        let n = m.wrapping_add(0);
         //~^ zst_offset
-
-        m.wrapping_sub(0);
-        //~^ zst_offset
-
-        let c = &() as *const ();
-        c.offset(0);
-        //~^ zst_offset
-
-        c.wrapping_add(0);
-        //~^ zst_offset
-
-        c.sub(0);
-        //~^ zst_offset
-
-        c.wrapping_sub(0);
-        //~^ zst_offset
-
-        let sized = &1 as *const i32;
-        sized.offset(0);
+        dbg!(n);
     }
+}
+
+/// Cross-function cases
+#[cfg_attr(test, test)]
+fn cross_function() {
+    unsafe fn offset<T>(m: *mut T, n: isize) -> *mut T {
+        unsafe { m.offset(n) }
+    }
+    fn wrapping_add<T>(m: *mut T, n: usize) -> *mut T {
+        m.wrapping_add(n)
+    }
+    unsafe {
+        let mut m = ();
+        let m = &raw mut m;
+
+        let n = offset(m, 0);
+        //~^ zst_offset
+        dbg!(n);
+
+        let n = wrapping_add(m, 0);
+        //~^ zst_offset
+        dbg!(n);
+    }
+}
+
+pub(crate) fn main() {
+    base_case();
+    cross_function();
 }

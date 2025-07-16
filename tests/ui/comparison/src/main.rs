@@ -1,7 +1,10 @@
 //@ignore-on-host: check individual modules instead
+#![feature(rustc_attrs)]
+#![feature(register_tool)]
+#![register_tool(rpl)]
 #![deny(clippy::correctness)]
 #![allow(internal_features)]
-#![feature(rustc_attrs)]
+mod cast_slice_different_sizes;
 mod eager_transmute;
 mod mem_replace_with_uninit;
 mod mut_from_ref;
@@ -15,6 +18,7 @@ mod uninit_vec;
 mod zero_offset;
 
 fn main() {
+    cast_slice_different_sizes::main();
     eager_transmute::main();
     mem_replace_with_uninit::main();
     mut_from_ref::main();

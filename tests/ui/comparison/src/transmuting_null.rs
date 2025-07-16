@@ -1,37 +1,54 @@
-#![allow(dead_code)]
-#![warn(clippy::transmuting_null)]
-#![allow(clippy::zero_ptr)]
-#![allow(clippy::transmute_ptr_to_ref)]
-#![allow(clippy::eq_op, clippy::missing_transmute_annotations)]
-#![allow(clippy::manual_dangling_ptr)]
-
-// Easy to lint because these only span one line.
-fn one_liners() {
+#[cfg_attr(test, test)]
+fn base_case() {
     unsafe {
-        let _: &u64 = std::mem::transmute(0 as *const u64);
+        let x: &u64 = std::mem::transmute(0 as *const u64);
         //~^ transmuting_null
+        dbg!(x);
 
-        let _: &u64 = std::mem::transmute(std::ptr::null::<u64>());
+        let x: &u64 = std::mem::transmute(std::ptr::null::<u64>());
         //~^ transmuting_null
-    }
-}
-
-pub const ZPTR: *const usize = 0 as *const _;
-pub const NOT_ZPTR: *const usize = 1 as *const _;
-
-fn transmute_const() {
-    unsafe {
-        // Should raise a lint.
-        let _: &u64 = std::mem::transmute(ZPTR);
-        //~^ transmuting_null
-
-        // Should NOT raise a lint.
-        let _: &u64 = std::mem::transmute(NOT_ZPTR);
+        dbg!(x);
     }
 }
 
 #[cfg_attr(test, test)]
+fn cross_function_null_ptr() {
+    const fn const_null_ptr<T>() -> *const T {
+        std::ptr::null()
+    }
+    fn null_ptr<T>() -> *const T {
+        std::ptr::null()
+    }
+    unsafe {
+        let x: &u64 = std::mem::transmute(const_null_ptr::<u64>());
+        //~^ transmuting_null
+        dbg!(x);
+
+        let x: &u64 = std::mem::transmute(null_ptr::<u64>());
+        //~^ transmuting_null
+        dbg!(x);
+    }
+}
+
+#[cfg_attr(test, test)]
+fn cross_statement() {
+    let null_ptr = 0 as *const u64;
+    unsafe {
+        let x: &u64 = std::mem::transmute(null_ptr);
+        //~^ transmuting_null
+        dbg!(x);
+    }
+
+    let null_ptr = std::ptr::null::<u64>();
+    unsafe {
+        let x: &u64 = std::mem::transmute(null_ptr);
+        //~^ transmuting_null
+        dbg!(x);
+    }
+}
+
 pub(crate) fn main() {
-    one_liners();
-    transmute_const();
+    base_case();
+    cross_function_null_ptr();
+    cross_statement();
 }
