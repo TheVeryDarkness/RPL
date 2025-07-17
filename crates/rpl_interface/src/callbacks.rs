@@ -178,6 +178,9 @@ impl rustc_driver::Callbacks for RplCallbacks {
         config.opts.unstable_opts.flatten_format_args = false;
     }
     fn after_analysis(&mut self, _: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
+        #[cfg(feature = "timing")]
+        let start = std::time::Instant::now();
+
         let mctx_arena = MCTX_ARENA.get_or_init(rpl_meta::arena::Arena::default);
         let patterns_and_paths = PATTERNS
             .get_or_init(|| collect_file_from_string_args(&self.pattern_paths, || tcx.dcx().emit_fatal(ErrorFound)));
@@ -203,7 +206,7 @@ impl rustc_driver::Callbacks for RplCallbacks {
 
             use crate::errors::TIMING;
 
-            let time = rpl_match::matches::TOTAL.load(std::sync::atomic::Ordering::Relaxed);
+            let time = start.elapsed().try_into().unwrap();
             let hir_id = rustc_hir::hir_id::CRATE_HIR_ID;
             let crate_name = tcx.crate_name(CrateNum::ZERO);
             tcx.emit_node_span_lint(

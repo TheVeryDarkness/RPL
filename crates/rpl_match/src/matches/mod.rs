@@ -23,9 +23,6 @@ use crate::ty::MatchTy as _;
 pub mod artifact;
 mod color;
 
-#[cfg(feature = "timing")]
-pub static TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
 #[derive(Debug)]
 pub struct Matched<'tcx> {
     pub basic_blocks: IndexVec<pat::BasicBlock, MatchedBlock>,
@@ -501,25 +498,11 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     #[instrument(level = "info", skip(self), fields(?pat_name = self.cx.pat_name, ?fn_name = self.cx.fn_pat.name))]
     fn do_match(&mut self) {
-        #[cfg(feature = "timing")]
-        let start = std::time::Instant::now();
         self.build_candidates();
         self.matching.log_candidates();
         if !self.matching.has_empty_candidates(self.cx) {
             self.match_candidates();
             self.log_matched();
-        }
-        #[cfg(feature = "timing")]
-        {
-            let duration = start.elapsed();
-            let duration = duration.as_nanos().try_into().unwrap();
-            let total = TOTAL.fetch_add(duration, std::sync::atomic::Ordering::SeqCst);
-            trace!(
-                "total do_match time: {:?} + {:?} = {:?} ns",
-                total,
-                duration,
-                total + duration,
-            );
         }
     }
     fn log_matched(&self) {
