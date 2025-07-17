@@ -16,7 +16,7 @@ rpl_utils.workspace = true
 sync-arena.workspace = true
 
 [features]
-timing = ["rpl_match/timing"]
+timing = []
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]

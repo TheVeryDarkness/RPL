@@ -20,7 +20,6 @@ rpl_meta.workspace = true
 default = ["interblock_edges"]
 strict = []
 interblock_edges = ["rpl_mir_graph/interblock_edges"]
-timing = []
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]
