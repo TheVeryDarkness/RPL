@@ -45,6 +45,12 @@ use rustc_session::declare_tool_lint;
 use rustc_span::symbol::Ident;
 use rustc_span::{Span, Symbol};
 
+#[cfg(feature = "timing")]
+mod errors;
+
+#[cfg(feature = "timing")]
+pub use errors::{TIMING, Timing};
+
 declare_tool_lint! {
     /// The `rpl::error_found` lint detects an error.
     ///
@@ -84,11 +90,40 @@ fn registered_tools(tcx: TyCtxt<'_>, (): ()) -> RegisteredTools {
 }
 
 pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>, mctx: &'mcx MetaContext<'mcx>) {
+    #[cfg(feature = "timing")]
+    let start = std::time::Instant::now();
+
     pcx.add_parsed_patterns(mctx);
+
+    #[cfg(feature = "timing")]
+    {
+        use rustc_hir::def_id::CrateNum;
+
+        use crate::errors::TIMING;
+
+        let time = start.elapsed().as_nanos().try_into().unwrap();
+        let hir_id = rustc_hir::hir_id::CRATE_HIR_ID;
+        let crate_name = tcx.crate_name(CrateNum::ZERO);
+        tcx.emit_node_span_lint(
+            TIMING,
+            hir_id,
+            tcx.hir().span(hir_id),
+            Timing {
+                time,
+                stage: "add_parsed_patterns",
+                crate_name,
+            },
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    let start = std::time::Instant::now();
+
     // _ = tcx.hir_crate_items(()).par_items(|item_id| {
     //     check_item(tcx, pcx, item_id);
     //     Ok(())
     // });
+
     let mut check_ctxt = CheckFnCtxt {
         tcx,
         pcx,
@@ -96,6 +131,27 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
     };
     tcx.hir().walk_toplevel_module(&mut check_ctxt);
     rpl_utils::visit_crate(tcx);
+
+    #[cfg(feature = "timing")]
+    {
+        use rustc_hir::def_id::CrateNum;
+
+        use crate::errors::TIMING;
+
+        let time = start.elapsed().as_nanos().try_into().unwrap();
+        let hir_id = rustc_hir::hir_id::CRATE_HIR_ID;
+        let crate_name = tcx.crate_name(CrateNum::ZERO);
+        tcx.emit_node_span_lint(
+            TIMING,
+            hir_id,
+            tcx.hir().span(hir_id),
+            Timing {
+                time,
+                stage: "do_match",
+                crate_name,
+            },
+        );
+    }
 }
 
 // pub fn check_item(tcx: TyCtxt<'_>, pcx: PatCtxt<'_>, item_id: hir::ItemId) {

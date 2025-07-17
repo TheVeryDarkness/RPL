@@ -3,6 +3,8 @@ use std::sync::OnceLock;
 
 use rpl_context::PatternCtxt;
 use rpl_driver::{ERROR_FOUND, ErrorFound};
+#[cfg(feature = "timing")]
+use rpl_driver::{TIMING, Timing};
 use rpl_meta::cli::collect_file_from_string_args;
 // use rpl_middle::ty::RplConfig;
 use rustc_interface::interface;
@@ -124,7 +126,7 @@ impl rustc_driver::Callbacks for RplCallbacks {
             let mut mctx = mctx;
             mctx.add_lint(ERROR_FOUND);
             #[cfg(feature = "timing")]
-            mctx.add_lint(crate::errors::TIMING);
+            mctx.add_lint(TIMING);
 
             mctx
         });
@@ -177,7 +179,7 @@ impl rustc_driver::Callbacks for RplCallbacks {
         // Disable flattening and inlining of format_args!(), so the HIR matches with the AST.
         config.opts.unstable_opts.flatten_format_args = false;
     }
-    fn after_analysis(&mut self, _: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
+    fn after_analysis(&mut self, compiler: &interface::Compiler, tcx: TyCtxt<'_>) -> rustc_driver::Compilation {
         #[cfg(feature = "timing")]
         let start = std::time::Instant::now();
 
@@ -198,24 +200,28 @@ impl rustc_driver::Callbacks for RplCallbacks {
         if error_counter > 0 {
             tcx.dcx().emit_fatal(ErrorFound);
         }
-        PatternCtxt::entered(|pcx| rpl_driver::check_crate(tcx, pcx, mctx));
 
         #[cfg(feature = "timing")]
         {
             use rustc_hir::def_id::CrateNum;
 
-            use crate::errors::TIMING;
-
-            let time = start.elapsed().try_into().unwrap();
+            let time = start.elapsed().as_nanos().try_into().unwrap();
             let hir_id = rustc_hir::hir_id::CRATE_HIR_ID;
             let crate_name = tcx.crate_name(CrateNum::ZERO);
             tcx.emit_node_span_lint(
                 TIMING,
                 hir_id,
                 tcx.hir().span(hir_id),
-                crate::errors::Timing { time, crate_name },
+                Timing {
+                    time,
+                    stage: "parse_and_collect",
+                    crate_name,
+                },
             );
         }
+        compiler.sess.time("check_crate", || {
+            PatternCtxt::entered(|pcx| rpl_driver::check_crate(tcx, pcx, mctx));
+        });
 
         rustc_driver::Compilation::Continue
     }
