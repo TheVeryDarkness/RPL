@@ -8,4 +8,4 @@ export RUSTC_LOG_COLOR=always
 export RUSTC_LOG="${3:-rpl=info}"
 export RPL_PATS="$1"
 
-cargo run --bin rpl-driver -- -L target/debug/deps -Z no-codegen "$2" -W unconditional_panic -A unused ${@:4} 2>&1 | tee .ansi
+cargo run --bin rpl-driver -- -L target/debug/deps --color=always -Z no-codegen "$2" -W unconditional_panic -A unused ${@:4} 2>&1 | tee .ansi
