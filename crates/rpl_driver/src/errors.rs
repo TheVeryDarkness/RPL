@@ -9,9 +9,12 @@ declare_tool_lint!(
 );
 
 #[derive(Diagnostic, LintDiagnostic)]
-#[diag(rpl_interface_timing)]
-pub(crate) struct Timing {
+#[diag(rpl_driver_timing)]
+pub struct Timing {
     /// Used time in nanoseconds
-    pub(crate) time: u64,
-    pub(crate) crate_name: Symbol,
+    pub time: u64,
+    /// The stage of the checking process
+    pub stage: &'static str,
+    /// The name of the crate being processed
+    pub crate_name: Symbol,
 }

@@ -15,6 +15,7 @@ rpl_utils.workspace = true
 rpl_constraints.workspace = true
 
 [features]
+timing = []
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)]
