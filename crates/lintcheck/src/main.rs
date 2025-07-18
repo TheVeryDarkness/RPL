@@ -23,9 +23,6 @@ mod output;
 mod popular_crates;
 mod recursive;
 
-use crate::config::{Commands, LintcheckConfig, OutputFormat};
-use crate::recursive::LintcheckServer;
-
 use std::env::consts::EXE_SUFFIX;
 use std::io::{self};
 use std::path::{Path, PathBuf};
@@ -37,6 +34,9 @@ use cargo_metadata::Message;
 use input::read_crates;
 use output::{RPLCheckOutput, RPLWarning, RustcIce};
 use rayon::prelude::*;
+
+use crate::config::{Commands, LintcheckConfig, OutputFormat};
+use crate::recursive::LintcheckServer;
 
 #[must_use]
 pub fn target_dir() -> String {
@@ -259,19 +259,20 @@ fn normalize_diag(
     message
 }
 /// Builds RPL inside the repo to make sure we have a RPL executable we can use.
-fn build_rpl(release_build: bool) -> String {
+fn build_rpl(release_build: bool, profile: bool, timing: bool) -> String {
     let mut build_cmd = Command::new("cargo");
     build_cmd.args([
         "run",
         "--bin=rpl-driver",
         "--manifest-path",
         "Cargo.toml",
+        if timing { "--features=timing" } else { "" },
         if release_build { "-r" } else { "" },
         "--",
         "--version",
     ]);
 
-    if release_build {
+    if release_build && profile {
         build_cmd.env("CARGO_PROFILE_RELEASE_DEBUG", "true");
     }
 
@@ -307,20 +308,32 @@ fn main() {
 
 #[allow(clippy::too_many_lines)]
 fn lintcheck(config: LintcheckConfig) {
-    let rpl_ver = build_rpl(config.perf);
+    let release_build = config.perf || config.timing;
     let rpl_driver_path = fs::canonicalize(format!(
         "{}/{}/rpl-driver{EXE_SUFFIX}",
         target_dir(),
-        if config.perf { "release" } else { "debug" }
+        if release_build { "release" } else { "debug" }
     ))
     .unwrap();
+
+    if rpl_driver_path.exists() {
+        eprintln!("Removing existing RPL driver at {}", rpl_driver_path.display());
+        fs::remove_file(&rpl_driver_path).unwrap();
+    } else {
+        eprintln!(
+            "RPL driver not found at {}, building it now...",
+            rpl_driver_path.display()
+        );
+    }
+
+    let rpl_ver = build_rpl(release_build, config.perf, config.timing);
 
     // assert that RPL is found
     assert!(
         rpl_driver_path.is_file(),
         "{}/{}/rpl-driver binary not found! {}",
         target_dir(),
-        if config.perf { "release" } else { "debug" },
+        if release_build { "release" } else { "debug" },
         rpl_driver_path.display()
     );
 
@@ -357,6 +370,10 @@ fn lintcheck(config: LintcheckConfig) {
                 filter
             })
             .collect_into(&mut lint_level_args);
+    }
+
+    if config.timing && fs::exists(shared_target_dir("")).is_ok_and(|exists| exists) {
+        fs::remove_dir_all(shared_target_dir("")).unwrap();
     }
 
     let crates: Vec<Crate> = crates

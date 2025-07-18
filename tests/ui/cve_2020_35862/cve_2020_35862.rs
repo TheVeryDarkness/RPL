@@ -2,12 +2,12 @@
 //@compile-flags: -Zinline-mir-forwarder-threshold=200
 //@compile-flags: -Zinline-mir-hint-threshold=200
 
-use core::slice;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::Deref;
 use std::ptr::NonNull;
+use std::slice;
 
 pub trait BitStore: Copy {
     /// The width, in bits, of this type.
@@ -190,6 +190,10 @@ where
         //~^ ERROR: it usually isn't necessary to apply #[inline] to generic functions
         //~| HELP: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
         //~| NOTE: generic functions are always `#[inline]` (monomorphization)
+        //~| ERROR: mutable borrow from immutable input(s)
+        //~| NOTE: immutable borrow here
+        //~| NOTE: `-D rpl::mut-from-ref` implied by `-D warnings`
+        //~| HELP: to override `-D warnings` add `#[allow(rpl::mut_from_ref)]`
         unsafe { slice::from_raw_parts_mut(self.pointer().w, self.elements()) }
     }
 
@@ -523,3 +527,5 @@ where
         self.into_vec().into_boxed_slice()
     }
 }
+
+fn main() {}

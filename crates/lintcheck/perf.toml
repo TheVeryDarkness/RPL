@@ -1,0 +1,199 @@
+[crates.equivalent]
+name = "equivalent"
+version = "1.0.2"
+
+[crates.stable_deref_trait]
+name = "stable_deref_trait"
+version = "1.2.0"
+
+[crates.bzip2-sys]
+name = "bzip2-sys"
+version = "0.1.13+1.0.8"
+
+[crates.atty]
+name = "atty"
+version = "0.2.14"
+
+[crates.num-conv]
+name = "num-conv"
+version = "0.1.0"
+
+[crates.adler32]
+name = "adler32"
+version = "1.2.0"
+
+[crates.want]
+name = "want"
+version = "0.3.1"
+
+[crates.clap_lex]
+name = "clap_lex"
+version = "0.7.5"
+
+[crates.phf_shared]
+name = "phf_shared"
+version = "0.12.1"
+
+[crates.tap]
+name = "tap"
+version = "1.0.1"
+
+[crates.tokio-io-timeout]
+name = "tokio-io-timeout"
+version = "1.2.0"
+
+[crates.wasm-bindgen-futures]
+name = "wasm-bindgen-futures"
+version = "0.4.50"
+
+[crates.anstyle-wincon]
+name = "anstyle-wincon"
+version = "3.0.9"
+
+[crates.libz-rs-sys]
+name = "libz-rs-sys"
+version = "0.5.1"
+
+[crates.fallible-streaming-iterator]
+name = "fallible-streaming-iterator"
+version = "0.1.9"
+
+[crates.thread_local]
+name = "thread_local"
+version = "1.1.9"
+
+[crates.aws-credential-types]
+name = "aws-credential-types"
+version = "1.2.3"
+
+[crates.fragile]
+name = "fragile"
+version = "2.0.1"
+
+[crates.webpki-roots]
+name = "webpki-roots"
+version = "1.0.1"
+
+[crates.difflib]
+name = "difflib"
+version = "0.4.0"
+
+[crates.cexpr]
+name = "cexpr"
+version = "0.6.0"
+
+[crates.aws-smithy-eventstream]
+name = "aws-smithy-eventstream"
+version = "0.60.9"
+
+[crates.libloading]
+name = "libloading"
+version = "0.8.8"
+
+[crates.validator]
+name = "validator"
+version = "0.20.0"
+
+[crates.tiny-keccak]
+name = "tiny-keccak"
+version = "2.0.2"
+
+[crates.structopt-derive]
+name = "structopt-derive"
+version = "0.4.18"
+
+[crates.num-integer]
+name = "num-integer"
+version = "0.1.46"
+
+[crates.zstd]
+name = "zstd"
+version = "0.13.3"
+
+[crates.textwrap]
+name = "textwrap"
+version = "0.16.2"
+
+[crates.stringprep]
+name = "stringprep"
+version = "0.1.5"
+
+[crates.serde_derive_internals]
+name = "serde_derive_internals"
+version = "0.29.1"
+
+[crates.crossbeam-utils]
+name = "crossbeam-utils"
+version = "0.8.21"
+
+[crates.erased-serde]
+name = "erased-serde"
+version = "0.4.6"
+
+[crates.zopfli]
+name = "zopfli"
+version = "0.8.2"
+
+[crates.metrics-util]
+name = "metrics-util"
+version = "0.20.0"
+
+[crates.tungstenite]
+name = "tungstenite"
+version = "0.27.0"
+
+[crates.quinn]
+name = "quinn"
+version = "0.11.8"
+
+[crates.minimal-lexical]
+name = "minimal-lexical"
+version = "0.2.1"
+
+[crates.arrow-schema]
+name = "arrow-schema"
+version = "55.2.0"
+
+[crates.const-oid]
+name = "const-oid"
+version = "0.10.1"
+
+[crates.arrow-json]
+name = "arrow-json"
+version = "55.2.0"
+
+[crates.lexical-write-float]
+name = "lexical-write-float"
+version = "1.0.5"
+
+[crates.pyo3-macros-backend]
+name = "pyo3-macros-backend"
+version = "0.25.1"
+
+[crates.aws-sdk-ssooidc]
+name = "aws-sdk-ssooidc"
+version = "1.75.0"
+
+[crates.num-bigint-dig]
+name = "num-bigint-dig"
+version = "0.8.4"
+
+[crates.async-std]
+name = "async-std"
+version = "1.13.1"
+
+[crates.actix-web]
+name = "actix-web"
+version = "4.11.0"
+
+[crates.openssl]
+name = "openssl"
+version = "0.10.73"
+
+[crates.pyo3]
+name = "pyo3"
+version = "0.25.1"
+
+[crates.windows]
+name = "windows"
+version = "0.61.3"

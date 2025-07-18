@@ -1,8 +1,8 @@
+use std::fmt;
+
 use rustc_middle::mir;
-use rustc_span::symbol::kw;
 
 use super::*;
-use std::fmt;
 
 impl fmt::Debug for ItemPath<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -61,13 +61,13 @@ impl fmt::Debug for Ty<'_> {
 
 impl fmt::Debug for TyKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
+        match self {
             Self::TyVar(ty_var) => ty_var.fmt(f),
             Self::Array(ty, len) => write!(f, "[{ty:?}; {len:?}]"),
             Self::Slice(ty) => write!(f, "[{ty:?}]"),
             Self::Tuple(tys) => {
                 f.write_str("(")?;
-                for ty in tys {
+                for ty in tys.iter() {
                     write!(f, "{ty:?}, ")?;
                 }
                 f.write_str(")")
@@ -84,6 +84,7 @@ impl fmt::Debug for TyKind<'_> {
             Self::Str => f.write_str("str"),
             Self::Char => f.write_str("char"),
             Self::AdtPat(adt_var) => write!(f, "${adt_var}"),
+            Self::Self_ => f.write_str("Self"),
             Self::Any => f.write_str("_"),
         }
     }
@@ -148,13 +149,13 @@ impl fmt::Debug for IntValue {
     }
 }
 
-impl fmt::Debug for TyVar<'_> {
+impl fmt::Debug for TyVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.idx.fmt(f)
     }
 }
 
-impl fmt::Display for TyVar<'_> {
+impl fmt::Display for TyVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self, f)
     }
@@ -162,7 +163,7 @@ impl fmt::Display for TyVar<'_> {
 
 impl fmt::Debug for ConstVar<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({:?}: {:?})", self.idx, self.ty)
+        write!(f, "const {:?}: {:?};", self.idx, self.ty)
     }
 }
 
@@ -172,22 +173,19 @@ impl fmt::Display for ConstVar<'_> {
     }
 }
 
-impl fmt::Display for Fn<'_> {
+impl fmt::Display for FnPattern<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self.name {
-            kw::Underscore => "_".to_string(),
-            name => format!("${name}"),
-        };
         write!(
             f,
             "fn {name}{params:?} -> {ret:?}",
+            name = self.name,
             params = self.params,
             ret = self.ret,
         )
     }
 }
 
-impl fmt::Debug for Fn<'_> {
+impl fmt::Debug for FnPattern<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.body {
             None => write!(f, "{self};"),
@@ -212,22 +210,8 @@ impl fmt::Debug for Params<'_> {
 
 impl fmt::Debug for Param<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.ident {
-            kw::Empty => {},
-            _ => write!(f, "{}{:?}: ", self.mutability.prefix_str(), self.ident)?,
-        }
+        write!(f, "{}{:?}: ", self.mutability.prefix_str(), self.ident)?;
         write!(f, "{:?}", self.ty)
-    }
-}
-
-impl fmt::Debug for FnBody<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mir(mir_body) => {
-                f.write_str(" = mir!")?;
-                f.debug_set().entry(mir_body).finish()
-            },
-        }
     }
 }
 

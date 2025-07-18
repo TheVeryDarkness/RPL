@@ -1,0 +1,69 @@
+pattern mem-replace-with-uninit
+
+patt {
+    use std::mem::ManuallyDrop;
+    use std::mem::MaybeUninit;
+    use std::mem::replace;
+    use std::mem::uninitialized;
+    use std::mem::zeroed;
+    
+    #[diag = "mem_replace_with_uninit"]
+    #[const(value = "mem::uninitialized()")]
+    mem_replace_with_uninit_uninitialized_inline[$T: type where !can_be_uninit(self)] = unsafe? fn _(..) {
+        'with:
+        let $with: &mut $T = _;
+        let $maybe_uninit: MaybeUninit<$T> = MaybeUninit::<$T> { uninit: _ };
+        let $manually_drop: ManuallyDrop<$T> = move ($maybe_uninit.value);
+        'uninitialized:
+        let $uninitialized: $T = move ($manually_drop.value);
+        'replace:
+        *$with = copy $uninitialized;
+    }
+
+    #[diag = "mem_replace_with_uninit"]
+    #[const(value = "mem::uninitialized()")]
+    mem_replace_with_uninit_uninitialized[$T: type] = unsafe? fn _(..) {
+        'with:
+        let $with: &mut $T = _;
+        'uninitialized:
+        let $uninitialized: $T = uninitialized::<$T>();
+        'replace:
+        _ = replace::<$T>(copy $with, move $uninitialized);
+    }
+    
+    #[diag = "mem_replace_with_uninit"]
+    #[const(value = "mem::MaybeUninit::uninit().assume_init()")]
+    mem_replace_with_uninit_uninit_assume_init[$T: type] = unsafe? fn _(..) {
+        'with:
+        let $with: &mut $T = _;
+        let $maybe_uninit: MaybeUninit<$T> = MaybeUninit::uninit::<$T>();
+        // FIXME: check if there are modifications on $maybe_uninit
+        'uninitialized:
+        let $uninitialized: $T = MaybeUninit::assume_init(move $maybe_uninit);
+        'replace:
+        _ = replace::<$T>(copy $with, move $uninitialized);
+    }
+    
+    #[diag = "mem_replace_with_uninit"]
+    #[const(value = "mem::zeroed()")]
+    mem_replace_with_uninit_zeroed[$T: type where !is_primitive(self)] = unsafe? fn _(..) {
+        'with:
+        let $with: &mut $T = _;
+        'uninitialized:
+        let $uninitialized: $T = zeroed::<$T>();
+        'replace:
+        _ = replace::<$T>(copy $with, move $uninitialized);
+    }
+}
+
+diag {
+    mem_replace_with_uninit = {
+        primary(replace)                                                                                  = "replacing with `{$value}`",
+        suggestion(code = "std::ptr::read({$with})", span = "replace", applicability = "maybe_incorrect") = "consider using",
+        // help(replace) = "?",
+        // help(with) = "!",
+        // help(uninitialized) = "~",
+        name                                                                                              = "mem_replace_with_uninit",
+        level                                                                                             = "warn",
+    }
+}

@@ -40,6 +40,8 @@ base64 = { name = 'base64', version = '0.22.1' }
 once_cell = { name = 'once_cell', version = '1.19.0' }
 tokio = { name = 'tokio', version = '1.38.1' }
 
+comparison = { name = 'comparison', path = 'tests/ui/comparison' }
+
 # [recursive]
 # ignore = [
 #     # Takes ~30s to lint

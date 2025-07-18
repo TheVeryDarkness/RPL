@@ -1,0 +1,36 @@
+[package]
+name = "rpl_meta"
+version.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+edition.workspace = true
+
+[dependencies]
+rpl_parser.workspace = true
+rpl_constraints.workspace = true
+
+pest.workspace = true
+pest_generator.workspace = true
+pest_derive.workspace = true
+pest_typed.workspace = true
+pest_typed_generator.workspace = true
+pest_typed_derive.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+
+colored.workspace = true
+derive_more.workspace = true
+error-enum.workspace = true
+schemars.workspace = true
+sync-arena.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+[package.metadata.rust-analyzer]
+# This crate uses #[feature(rustc_private)]
+rustc_private = true

@@ -3,8 +3,8 @@
 //@[inline100] compile-flags: -Z inline-mir=true -Z inline-mir-threshold=100
 //@[regular] compile-flags: -Z inline-mir=false
 
-use core::task::{RawWaker, RawWakerVTable, Waker};
 use std::cell::UnsafeCell;
+use std::task::{RawWaker, RawWakerVTable, Waker};
 
 fn noop_waker() -> Waker {
     unsafe fn clone(_data: *const ()) -> RawWaker {
@@ -40,3 +40,5 @@ pub fn static_ref() -> &'static i32 {
     let _ret = THREAD_LOCAL.with(|l| unsafe { &*l.get() });
     &0
 }
+
+fn main() {}

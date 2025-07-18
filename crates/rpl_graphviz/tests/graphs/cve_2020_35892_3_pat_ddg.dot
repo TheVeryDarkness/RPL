@@ -52,7 +52,7 @@ subgraph cluster_bb3 {
 subgraph cluster_bb4 {
     bb4IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb4[IN]</td></tr></table>>];
     bb4OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb4[OUT]</td></tr></table>>];
-    bb4stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?4 = #[lang = &quot;None&quot;]</td></tr></table>>];
+    bb4stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?4 = core::option::Option::None</td></tr></table>>];
     bb4stmt0 -> bb4OUT [label="_?4"];
     bb4IN -> bb4OUT [label="_?0,_?1,_?2,_?3,_?5,_?6,_?7,_?8,_?9,_?10,_?11,_?12,_?13,_?14,_?15,_?16,_?17"];
 }
@@ -71,7 +71,7 @@ subgraph cluster_bb6 {
     bb6IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb6[IN]</td></tr></table>>];
     bb6OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb6[OUT]</td></tr></table>>];
     bb6stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">((*_?13).start) = move _?3</td></tr></table>>];
-    bb6stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?4 = #[lang = &quot;Some&quot;](copy _?2)</td></tr></table>>];
+    bb6stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?4 = core::option::Option::Some(copy _?2)</td></tr></table>>];
     bb6IN -> bb6stmt0 [label="_?3"];
     bb6IN -> bb6stmt0 [label="_?13"];
     bb6IN -> bb6stmt1 [label="_?2"];

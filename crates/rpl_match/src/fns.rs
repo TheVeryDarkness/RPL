@@ -5,20 +5,22 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::ty::{self, TyCtxt};
 
 use crate::MatchTyCtxt;
+use crate::ty::MatchTy as _;
 
 pub struct MatchFnCtxt<'a, 'pcx, 'tcx> {
     ty: MatchTyCtxt<'pcx, 'tcx>,
-    fn_pat: &'a pat::Fn<'pcx>,
+    fn_pat: &'a pat::FnPattern<'pcx>,
 }
 
 impl<'a, 'pcx, 'tcx> MatchFnCtxt<'a, 'pcx, 'tcx> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
-        pat: &'pcx pat::Pattern<'pcx>,
-        fn_pat: &'a pat::Fn<'pcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
+        fn_pat: &'a pat::FnPattern<'pcx>,
     ) -> Self {
-        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &fn_pat.meta); // FIXME
+        // FIXME: `self_ty` should be passed from the caller.
+        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), None, pat, &fn_pat.meta); // FIXME
         Self { ty, fn_pat }
     }
 

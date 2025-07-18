@@ -22,6 +22,11 @@ mir_dump
 
 # mdbook
 /docs/book/book
+/docs/reference/book
+tmp/
+
+# rustc ICEs
+rustc-ice-*
 
 # lintcheck
 lintcheck-logs

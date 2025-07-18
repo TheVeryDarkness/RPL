@@ -49,3 +49,5 @@ where
         }
     }
 }
+
+fn main() {}

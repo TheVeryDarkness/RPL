@@ -8,6 +8,7 @@ use rustc_index::{Idx, IndexSlice, IndexVec};
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Symbol;
 
+use crate::ty::MatchTy as _;
 use crate::{CountedMatch, MatchTyCtxt};
 
 pub struct MatchAdtCtxt<'a, 'pcx, 'tcx> {
@@ -19,10 +20,11 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
-        pat: &'pcx pat::Pattern<'pcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
         adt_pat: &'a pat::Adt<'pcx>,
     ) -> Self {
-        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), pat, &adt_pat.meta);
+        // FIXME: `self_ty` should be passed from the caller.
+        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), None, pat, &adt_pat.meta);
         Self { ty, adt_pat }
     }
 
@@ -163,6 +165,9 @@ impl<I: Idx> Candidates<I> {
         false
     }
     pub fn unmatch(&self, name: Symbol, idx: I) {
+        debug_assert!(self.matches.contains_key(&name));
+        debug_assert!(self.matches[&name].get().is_some());
+        debug_assert!(self.matches[&name].get().is_some_and(|matched| matched == idx));
         if self.matches[&name].get().is_some_and(|matched| matched == idx) {
             self.matches[&name].unmatch();
         }

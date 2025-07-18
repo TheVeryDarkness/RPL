@@ -1,0 +1,75 @@
+pattern uninit-vec
+
+patt {
+    use std::vec::Vec;
+    use std::default::Default;
+
+    #[diag = "uninit_vec"]
+    #[const(msg = "calling `set_len()` immediately after reserving a buffer creates uninitialized values")]
+    with_capacity[$T: type where !can_be_uninit(self), $vec: place(Vec<$T>)] = unsafe? fn _(..) -> _ {
+        let $vec_ref: &mut Vec<$T>;
+
+        'reserve:
+        $vec = Vec::with_capacity(_);
+        $vec_ref = &mut $vec;
+        'set_len:
+        _ = Vec::set_len(move $vec_ref, _);
+    }
+    #[diag = "uninit_vec"]
+    #[const(msg = "calling `set_len()` immediately after reserving a buffer creates uninitialized values")]
+    assign_with_capacity[$T: type where !can_be_uninit(self), $vec: place(Vec<$T>)] = unsafe? fn _(..) -> _ {
+        let $vec_ref: &mut Vec<$T>;
+        let $new_vec: Vec<$T>;
+
+        $new_vec = Vec::with_capacity(_);
+        'reserve:
+        $vec = move $new_vec;
+        $vec_ref = &mut $vec;
+        'set_len:
+        _ = Vec::set_len(move $vec_ref, _);
+    }
+    #[diag = "uninit_vec"]
+    #[const(msg = "calling `set_len()` immediately after reserving a buffer creates uninitialized values")]
+    reserve[$T: type where !can_be_uninit(self), $vec: place(Vec<$T>)] = unsafe? fn _(..) -> _ {
+        let $vec_ref_1: &mut Vec<$T>;
+        let $vec_ref_2: &mut Vec<$T>;
+
+        $vec_ref_1 = &mut $vec;
+        'reserve:
+        _ = Vec::reserve(move $vec_ref_1, _);
+        $vec_ref_2 = &mut $vec;
+        'set_len:
+        _ = Vec::set_len(move $vec_ref_2, _);
+    }
+
+    #[diag = "uninit_vec"]
+    #[const(msg = "calling `set_len()` on empty `Vec` creates out-of-bound values")]
+    new[$T: type where !can_be_uninit(self), $vec: place(Vec<$T>)] = unsafe? fn _(..) -> _ {
+        let $vec_ref: &mut Vec<$T>;
+
+        'reserve:
+        $vec = Vec::new();
+        $vec_ref = &mut $vec;
+        'set_len:
+        _ = Vec::set_len(move $vec_ref, _);
+    }
+    #[diag = "uninit_vec"]
+    #[const(msg = "calling `set_len()` on empty `Vec` creates out-of-bound values")]
+    default_default[$T: type where !can_be_uninit(self), $vec: place(Vec<$T>)] = unsafe? fn _(..) -> _ {
+        let $vec_ref: &mut Vec<$T>;
+
+        'reserve:
+        $vec = Default::default();
+        $vec_ref = &mut $vec;
+        'set_len:
+        _ = Vec::set_len(move $vec_ref, _);
+    }
+}
+
+diag {
+    uninit_vec = {
+        primary(reserve, set_len) = "{$msg}",
+        help                      = "initialize the buffer or wrap the content in `MaybeUninit`",
+        name                      = "uninit_vec",
+    }
+}

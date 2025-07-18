@@ -1,0 +1,111 @@
+pattern manually-drop
+
+patt {
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "drop", fn_2 = "drop")]
+    double_drop[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $drop_1: () = core::mem::ManuallyDrop::drop(copy $mut_ref_1);
+
+            let $mut_ref_2: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_2:
+            let $drop_2: () = core::mem::ManuallyDrop::drop(copy $mut_ref_2);
+        }
+    
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "take", fn_2 = "take")]
+    double_take[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $take_1: $T = core::mem::ManuallyDrop::take(copy $mut_ref_1);
+
+            let $mut_ref_2: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_2:
+            let $take_2: $T = core::mem::ManuallyDrop::take(copy $mut_ref_2);
+        }
+    
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "drop", fn_2 = "take")]
+    drop_after_take[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $drop_1: () = core::mem::ManuallyDrop::drop(copy $mut_ref_1);
+
+            let $mut_ref_2: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_2:
+            let $take_2: $T = core::mem::ManuallyDrop::take(copy $mut_ref_2);
+        }
+    
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "take", fn_2 = "drop")]
+    take_after_drop[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $take_1: $T = core::mem::ManuallyDrop::take(copy $mut_ref_1);
+
+            let $mut_ref_2: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_2:
+            let $take_2: () = core::mem::ManuallyDrop::drop(copy $mut_ref_2);
+        }
+    
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "take", fn_2 = "into_inner")]
+    into_inner_after_take[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $take_1: $T = core::mem::ManuallyDrop::take(copy $mut_ref_1);
+
+            let $manually_drop_2: core::mem::ManuallyDrop<$T> = move $manually_drop;
+            'call_2:
+            let $take_2: $T = core::mem::ManuallyDrop::into_inner(move $manually_drop_2);
+        }
+    
+    #[diag = "manually_drop"]
+    #[const(fn_1 = "drop", fn_2 = "into_inner")]
+    into_inner_after_drop[$T: type] = 
+        unsafe? fn _(..) -> _ {
+            'create:
+            let $manually_drop: core::mem::ManuallyDrop<$T> = _;
+
+            let $mut_ref_1: &mut core::mem::ManuallyDrop<$T> = &mut $manually_drop;
+            'call_1:
+            let $drop_1: () = core::mem::ManuallyDrop::drop(copy $mut_ref_1);
+
+            let $manually_drop_2: core::mem::ManuallyDrop<$T> = move $manually_drop;
+            'call_2:
+            let $take_2: $T = core::mem::ManuallyDrop::into_inner(move $manually_drop_2);
+        }
+    
+}
+
+diag {
+    manually_drop = {
+        primary(call_2) = "invalid sequence of operations on `core::mem::ManuallyDrop`: `{$fn_1}` and `{$fn_2}`",
+        label(create)   = "created here",
+        label(call_1)   = "first call here",
+        label(call_2)   = "second call here",
+        help            = "See https://doc.rust-lang.org/std/mem/struct.ManuallyDrop.html#method.{$fn_2}",
+        name            = "bad_manually_drop_operation_sequence",
+    }
+}

@@ -6,7 +6,11 @@
             "request": "launch",
             "name": "Debug executable 'rpl-driver'",
             "cargo": {
-                "args": ["build", "--bin=rpl-driver", "--package=rpl"],
+                "args": [
+                    "build",
+                    "--bin=rpl-driver",
+                    "--package=rpl"
+                ],
                 "filter": {
                     "name": "rpl-driver",
                     "kind": "bin"
@@ -22,9 +26,13 @@
                 // as it uses a hash in the file name.
                 // "--extern",
                 // "libc=${workspaceFolder}/target/debug/deps/liblibc-f5b3b8a882fe8188.rlib",
-                "tests/ui/cve_2020_35888_simplified/cve_2020_35888_simplified.rs"
+                "tests/ui/clippy/eager_transmute.rs",
+                "-Zmir-opt-level=0",
+                "-Zinline-mir=false"
             ],
             "env": {
+                // "RPL_PATS": "${workspaceFolder}/docs/patterns",
+                "RPL_PATS": "${workspaceFolder}/docs/patterns-pest/clippy/eager-transmute.rpl",
                 "DYLD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-apple-darwin/lib",
                 "LD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-unknown-linux-gnu/lib"
             },

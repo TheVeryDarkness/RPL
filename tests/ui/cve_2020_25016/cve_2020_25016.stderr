@@ -16,6 +16,21 @@ LL |         let slice = self.as_slice();
    |                     ^^^^^^^^^^^^^^^
    = note: `#[deny(rpl::unsound_slice_cast)]` on by default
 
+error: it usually isn't necessary to apply #[inline] to generic functions
+  --> tests/ui/cve_2020_25016/cve_2020_25016.rs:18:5
+   |
+LL |       #[inline]
+   |       --------- `#[inline]` here
+LL | /     fn as_bytes(&self) -> &[u8] {
+...  |
+LL | |     }
+   | |_____^ `#[inline]` applied here
+   |
+   = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
+   = note: generic functions are always `#[inline]` (monomorphization)
+   = note: `-D rpl::generic-function-marked-inline` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::generic_function_marked_inline)]`
+
 error: it is unsound to cast any slice `&mut [T]` to a byte slice `&mut [u8]`
   --> tests/ui/cve_2020_25016/cve_2020_25016.rs:44:13
    |
@@ -31,21 +46,6 @@ note: trying to cast from this value of `&mut [T]` type
    |
 LL |         let slice = self.as_mut_slice();
    |                     ^^^^^^^^^^^^^^^^^^^
-
-error: it usually isn't necessary to apply #[inline] to generic functions
-  --> tests/ui/cve_2020_25016/cve_2020_25016.rs:18:5
-   |
-LL |       #[inline]
-   |       --------- `#[inline]` here
-LL | /     fn as_bytes(&self) -> &[u8] {
-...  |
-LL | |     }
-   | |_____^ `#[inline]` applied here
-   |
-   = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
-   = note: generic functions are always `#[inline]` (monomorphization)
-   = note: `-D rpl::generic-function-marked-inline` implied by `-D warnings`
-   = help: to override `-D warnings` add `#[allow(rpl::generic_function_marked_inline)]`
 
 error: it usually isn't necessary to apply #[inline] to generic functions
   --> tests/ui/cve_2020_25016/cve_2020_25016.rs:37:5

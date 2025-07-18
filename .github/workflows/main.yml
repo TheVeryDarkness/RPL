@@ -2,14 +2,14 @@ name: Rust CI
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, pest ]
     paths-ignore:
       - 'docs/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - '.vscode/**'
   pull_request:
-    branches: [ master ]
+    branches: [ master, pest ]
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -26,9 +26,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Unsetting this would make so that any malicious package could get our Github Token
+          persist-credentials: false
       - run: cargo fmt --check
       - run: cargo test --all
+        env:
+          RPL_PATS: docs/patterns-pest
       - run: cargo clippy -- -D warnings
       - run: cargo install --path .
-      - run: cargo rpl
+      - run: cargo rpl --workspace --all-targets
+        env:
+          RPL_PATS: docs/patterns-pest
       # - uses: actions-rust-lang/audit@v1.2.4

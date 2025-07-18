@@ -1,6 +1,6 @@
 [workspace]
 members = ["./crates/rpl_*", "./crates/lintcheck"]
-exclude = ["./target/lintcheck/sources/"]
+exclude = ["./target/lintcheck/sources/", "./tests"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,19 +14,16 @@ repository = "https://github.com/RPL-Toolchain/RPL"
 [workspace.dependencies]
 rpl_context = { path = "./crates/rpl_context" }
 rpl_driver = { path = "./crates/rpl_driver" }
+rpl_parser = { path = "./crates/rpl_parser" }
 rpl_graphviz = { path = "./crates/rpl_graphviz" }
 rpl_interface = { path = "./crates/rpl_interface" }
-rpl_macros = { path = "./crates/rpl_macros" }
-rpl_match = { path = "./crates/rpl_match" }
-rpl_mir = { path = "./crates/rpl_mir" }
+rpl_match = { path = "./crates/rpl_match", features = ["interblock_edges"] }
 rpl_mir_graph = { path = "./crates/rpl_mir_graph" }
 rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
-rpl_pat_expand = { path = "./crates/rpl_pat_expand" }
-rpl_pat_syntax = { path = "./crates/rpl_pat_syntax" }
-rpl_patterns = { path = "./crates/rpl_patterns" }
 rpl_utils = { path = "./crates/rpl_utils" }
-rpl_parser = { path = "./crates/rpl_parser" }
-rpl_predicates = { path = "./crates/rpl_predicates" }
+rpl_meta = { path = "./crates/rpl_meta" }
+rpl_constraints = { path = "./crates/rpl_constraints" }
+rpl_resolve = { path = "./crates/rpl_resolve" }
 rustc_tools_util = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
@@ -35,7 +32,8 @@ arrayvec = { version = "0.7", default-features = false }
 itertools = "0.12"
 rustc-semver = "1.1"
 walkdir = "2.3"
-quote = "1.0"
+quote = "1.0.38"
+sync-arena = { version = "0.1.6", features = ["std-reentrant-lock"] }
 syn = { version = "2.0", features = ["full"] }
 proc-macro2 = "1.0"
 tracing = "0.1.28"
@@ -44,23 +42,35 @@ pretty_assertions = "1.4"
 gsgdt = "0.1.2"
 syn_derive = "0.2"
 derive_more = { version = "1.0", features = [
-    "from",
-    "into_iterator",
+    "as_ref",
     "debug",
     "deref",
+    "deref_mut",
     "display",
+    "from",
+    "into_iterator",
 ] }
 libc = "0.2"
 byte-slice-cast = "1.0.0"
 num-derive = "0.3"
 num-rational = "0.3.0"
 num-traits = "0.2.8"
+pest = { version = "2.7.10", features = ["std"] }
+pest_generator = { version = "2.7.10", features = ["grammar-extras"] }
+pest_derive = { version = "2.7.10", features = ["grammar-extras"] }
+pest_typed = { version = "0.17.2", features = ["std"] }
+pest_typed_generator = { version = "0.17.2", features = ["grammar-extras"] }
+pest_typed_derive = { version = "0.17.2", features = ["grammar-extras"] }
+colored = "3.0.0"
+error-enum = "0.4.1"
+schemars = "0.8.21"
 memmap = "0.5.0"
 pin-project = "1.0"
 radium = "0.3"
-tokio = "1.43"
+tokio = { version = "0.2.25", features = ["io-util"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 bytes = "1.10"
+log = "0.4"
 # cassandra-cpp-sys = "1.1.1"
 
 [package]
@@ -79,6 +89,7 @@ path = "src/driver.rs"
 
 [dependencies]
 rpl_interface.workspace = true
+rpl_meta.workspace = true
 rustc_tools_util.workspace = true
 color-print = "0.3.4"
 anstream = "0.6.0"
@@ -101,7 +112,7 @@ syn = { workspace = true, features = ["full"] }
 futures = "0.3"
 parking_lot = "0.12"
 tracing.workspace = true
-log = "0.4"
+log.workspace = true
 libc.workspace = true
 scoped_threadpool = "0.1"
 serde_json.workspace = true
@@ -118,6 +129,10 @@ tokio.workspace = true
 tokio-util.workspace = true
 bytes.workspace = true
 # cassandra-cpp-sys.workspace = true
+
+[features]
+default = []
+timing = ["rpl_interface/timing"]
 
 [build-dependencies]
 rustc_tools_util.workspace = true

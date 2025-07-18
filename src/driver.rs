@@ -6,6 +6,7 @@
 #![warn(rust_2018_idioms, unused_lifetimes)]
 // warn on rustc internal lints
 #![warn(rustc::internal)]
+#![recursion_limit = "256"]
 
 // FIXME: switch to something more ergonomic here, once available.
 // (Currently there is no way to opt into sysroot crates without `extern crate`.)
@@ -15,10 +16,6 @@ extern crate rustc_session;
 #[allow(unused_extern_crates)]
 extern crate tracing;
 
-use rpl_interface::{DefaultCallbacks, RplCallbacks, RustcCallbacks};
-use rustc_session::EarlyDiagCtxt;
-use rustc_session::config::ErrorOutputType;
-
 use std::env;
 use std::fs::read_to_string;
 use std::ops::Deref;
@@ -26,6 +23,9 @@ use std::path::Path;
 use std::process::exit;
 
 use anstream::println;
+use rpl_interface::{DefaultCallbacks, RplCallbacks, RustcCallbacks};
+use rustc_session::EarlyDiagCtxt;
+use rustc_session::config::ErrorOutputType;
 
 /// If a command-line option matches `find_arg`, then apply the predicate `pred` on its value. If
 /// true, then return it. The parameter is assumed to be either `--arg=value` or `--arg value`.
@@ -64,6 +64,37 @@ fn test_arg_value() {
     assert_eq!(arg_value(args, "--foo", |_| true), None);
 }
 
+#[allow(unused)]
+fn consume_arg_values(args: &mut Vec<String>, find_arg: &str) -> Vec<String> {
+    let mut found_values = Vec::new();
+    let find_arg_with_eq = format!("{}=", find_arg);
+    let mut i = 0;
+
+    while i < args.len() {
+        let arg = args[i].clone();
+        if let Some(stripped) = arg.strip_prefix(&find_arg_with_eq) {
+            args.remove(i);
+            found_values.push(stripped.to_string());
+        } else if arg == find_arg {
+            args.remove(i);
+            if i < args.len() {
+                found_values.push(args.remove(i));
+            }
+        } else {
+            i += 1;
+        }
+    }
+    found_values
+}
+
+#[test]
+fn test_consume_arg_values() {
+    let args = ["--foo=bar", "--bar", "x", "--foo", "baz", "--foo=qux"];
+    let mut args = args.iter().map(ToString::to_string).collect();
+    assert_eq!(consume_arg_values(&mut args, "--foo"), vec!["bar", "baz", "qux"]);
+    assert_eq!(args, vec!["--bar", "x"]);
+}
+
 #[allow(clippy::ignored_unit_patterns)]
 fn display_help() {
     println!("{}", help_message());
@@ -75,18 +106,26 @@ fn logger_config() -> rustc_log::LoggerConfig {
     let mut cfg = rustc_log::LoggerConfig::from_env("RUSTC_LOG");
 
     if let Ok(var) = env::var("RPL_LOG") {
-        // RPL_LOG serves as default for RUSTC_LOG, if that is not set.
-        if matches!(cfg.filter, Err(env::VarError::NotPresent)) {
-            // We try to be a bit clever here: if `RPL_LOG` is just a single level
-            // used for everything, we only apply it to the parts of rustc that are
-            // CTFE-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
-            // This way, if you set `RPL_LOG=info`, you get only the right parts of
-            // rustc traced, but you can also do `RPL_LOG=rpl=info,rustc_const_eval::interpret=debug`.
-            if var.parse::<tracing::Level>().is_ok() {
-                cfg.filter = Ok(format!("rpl={var}"));
-            } else {
-                cfg.filter = Ok(var);
+        if let Ok(level) = var.parse::<tracing::Level>() {
+            // RPL_LOG serves as default for RUSTC_LOG, if that is not set.
+            match cfg.filter {
+                Err(env::VarError::NotPresent | env::VarError::NotUnicode(_)) => {
+                    // We try to be a bit clever here: if `RPL_LOG` is just a single level
+                    // used for everything, we only apply it to the parts of rustc that are
+                    // CTFE-related. Otherwise, we use it verbatim for `RUSTC_LOG`.
+                    // This way, if you set `RPL_LOG=info`, you get only the right parts of
+                    // rustc traced, but you can also do `RPL_LOG=rpl=info,rustc_const_eval::interpret=debug`.
+                    cfg.filter = Ok(format!("rpl={level}"));
+                },
+                Ok(ref mut filter) => {
+                    filter.push_str(",rpl=");
+                    filter.push_str(&var);
+                },
             }
+        } else {
+            EarlyDiagCtxt::new(ErrorOutputType::default()).early_fatal(format!(
+                "RPL_LOG must be a valid tracing level, like `info` or `debug`: {var}"
+            ));
         }
     }
     cfg
@@ -113,7 +152,7 @@ pub fn main() {
     });
 
     exit(rustc_driver::catch_with_exit_code(move || {
-        let mut orig_args: Vec<String> = env::args().collect();
+        let mut orig_args: Vec<String> = rustc_driver::args::raw_args(&early_dcx);
 
         let has_sysroot_arg = |args: &mut [String]| -> bool {
             if arg_value(args, "--sysroot", |_| true).is_some() {
@@ -168,7 +207,6 @@ pub fn main() {
         // Setting RUSTC_WRAPPER causes Cargo to pass 'rustc' as the first argument.
         // We're invoking the compiler programmatically, so we ignore this/
         let wrapper_mode = orig_args.get(1).map(Path::new).and_then(Path::file_stem) == Some("rustc".as_ref());
-
         if wrapper_mode {
             // we still want to be able to invoke it normally though
             orig_args.remove(1);
@@ -181,6 +219,12 @@ pub fn main() {
 
         let mut args: Vec<String> = orig_args.clone();
         pass_sysroot_env_if_given(&mut args, sys_root_env);
+
+        let pattern_paths = env::var("RPL_PATS").unwrap_or_else(|_| {
+            early_dcx.early_fatal(
+                "RPL_PATS is not set properly. Pass pattern path to RPL by setting the `RPL_PATS` environment variable.",
+            )
+        });
 
         let mut no_deps = false;
         let rpl_args_var = env::var(rpl_interface::RPL_ARGS_ENV).ok();
@@ -214,11 +258,14 @@ pub fn main() {
             /* rustc_driver::RunCompiler::new(&args, &mut RplCallbacks::new(rpl_args_var))
             .set_using_internal_features(using_internal_features)
             .run() */
-            rustc_driver::run_compiler(&args, &mut RplCallbacks::new(rpl_args_var))
+            rustc_driver::run_compiler(
+                &args,
+                &mut RplCallbacks::new(
+                    rpl_args_var,
+                    pattern_paths.split(':').map(ToString::to_string).collect(),
+                ),
+            )
         } else {
-            /* rustc_driver::RunCompiler::new(&args, &mut RustcCallbacks::new(rpl_args_var))
-            .set_using_internal_features(using_internal_features)
-            .run() */
             rustc_driver::run_compiler(&args, &mut RustcCallbacks::new(rpl_args_var))
         }
     }))
@@ -231,7 +278,7 @@ fn help_message() -> &'static str {
 Run <cyan>rpl-driver</> with the same arguments you use for <cyan>rustc</>
 
 <green,bold>Usage</>:
-    <cyan,bold>rpl-driver</> <cyan>[OPTIONS] INPUT</>
+    <cyan,bold>RPL_PATS=path/to/patterns rpl-driver</> <cyan>[OPTIONS] INPUT</>
 
 <green,bold>Common options:</>
     <cyan,bold>-h</>, <cyan,bold>--help</>               Print this message

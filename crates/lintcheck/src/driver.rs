@@ -1,9 +1,9 @@
-use crate::recursive::{DriverInfo, deserialize_line, serialize_line};
-
 use std::io::{self, BufReader, Write};
 use std::net::TcpStream;
 use std::process::{self, Command, Stdio};
 use std::{env, mem};
+
+use crate::recursive::{DriverInfo, deserialize_line, serialize_line};
 
 /// 1. Sends [`DriverInfo`] to the [`crate::recursive::LintcheckServer`] running on `addr`
 /// 2. Receives [bool] from the server, if `false` returns `None`

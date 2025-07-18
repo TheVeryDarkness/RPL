@@ -1,0 +1,125 @@
+pattern zst-offset
+
+patt {
+    #[diag = "zst_offset"]
+    zst_offset_const_inline[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = Offset(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_mut_inline[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = Offset(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_const_inline[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = core::intrinsics::arith_offset::<()>(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_mut_inline[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = core::intrinsics::arith_offset::<()>(copy $from, _);
+    }
+
+    #[diag = "zst_offset"]
+    zst_offset_offset_const[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = const_ptr::offset(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_offset_mut[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = mut_ptr::offset(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_add_const[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = const_ptr::add(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_add_mut[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = mut_ptr::add(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_sub_const[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = const_ptr::sub(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_sub_mut[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = mut_ptr::sub(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_add_const[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = const_ptr::wrapping_add(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_add_mut[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = mut_ptr::wrapping_add(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_sub_const[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *const $T = _;
+        'offset:
+        let $to: *const $T = const_ptr::wrapping_sub(copy $from, _);
+    }
+    #[diag = "zst_offset"]
+    zst_offset_wrapping_sub_mut[
+        $T: type where is_zst(self),
+    ] = fn _(..) {
+        let $from: *mut $T = _;
+        'offset:
+        let $to: *mut $T = mut_ptr::wrapping_sub(copy $from, _);
+    }
+}
+
+diag {
+    zst_offset = {
+        primary(offset) = "offset calculation on zero-sized value",
+        note            = "`{$T}` is a zero-sized type, offsetting a pointer to it will always yield the same address",
+        name            = "zst_offset",
+    }
+}

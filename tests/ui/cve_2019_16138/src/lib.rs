@@ -197,7 +197,7 @@ mod hdr {
                 let uszwidth = self.width as usize;
 
                 let pixel_count = self.width as usize * self.height as usize;
-                let mut ret = Vec::with_capacity(pixel_count);
+                let mut ret = Vec::with_capacity(pixel_count); //~[regular] uninit_vec
                 unsafe {
                     // RGBE8Pixel doesn't implement Drop, so it's Ok to drop half-initialized ret
                     ret.set_len(pixel_count);
@@ -210,7 +210,7 @@ mod hdr {
 
                     (pool.scoped(|scope| {
                         for chunk in chunks_iter {
-                            let mut buf = Vec::<RGBE8Pixel>::with_capacity(uszwidth);
+                            let mut buf = Vec::<RGBE8Pixel>::with_capacity(uszwidth); //~[regular] uninit_vec
                             unsafe {
                                 buf.set_len(uszwidth);
                                 //~[regular]^ERROR: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
@@ -263,8 +263,8 @@ mod hdr {
             // Advances counter to the next pixel
             #[inline]
             fn advance(&mut self) {
-            //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
-            //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
+                //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
+                //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
                 self.col += 1;
                 if self.col == self.buf.len() {
                     self.col = 0;
@@ -348,8 +348,8 @@ mod hdr {
 
         #[inline(always)]
         fn read_byte<R: BufRead>(r: &mut R) -> io::Result<u8> {
-        //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
-        //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
+            //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
+            //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
             let mut buf = [0u8];
             r.read_exact(&mut buf[..])?;
             Ok(buf[0])
@@ -358,8 +358,8 @@ mod hdr {
         // Guarantees that first parameter of set_component will be within pos .. pos+width
         #[inline]
         fn decode_component<R: BufRead, S: FnMut(usize, u8)>(
-        //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
-        //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
+            //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
+            //~|ERROR: it usually isn't necessary to apply #[inline] to generic functions
             r: &mut R,
             width: usize,
             mut set_component: S,
@@ -423,8 +423,7 @@ mod hdr {
             // returns run length if pixel is a run length marker
             #[inline]
             fn rl_marker(pix: RGBE8Pixel) -> Option<usize> {
-            //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
-            //~|ERROR: it usually isn't necessary to apply #[inline] to private functions
+                //~^ERROR: it usually isn't necessary to apply #[inline] to private functions
                 if pix.c == [1, 1, 1] {
                     Some(pix.e as usize)
                 } else {

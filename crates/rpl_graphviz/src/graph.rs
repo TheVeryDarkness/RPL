@@ -2,8 +2,8 @@ use std::iter::Iterator;
 use std::ops::Not;
 
 use gsgdt::{Edge, Graph, GraphvizSettings, Node, NodeStyle};
-use rpl_mir::graph::{mir_control_flow_graph, mir_data_dep_graph, pat_control_flow_graph, pat_data_dep_graph};
-use rpl_mir::pat;
+use rpl_match::graph::{mir_control_flow_graph, mir_data_dep_graph, pat_control_flow_graph, pat_data_dep_graph};
+use rpl_match::mir::pat;
 use rpl_mir_graph::{ControlFlowGraph, DataDepGraph, TerminatorEdges};
 use rustc_index::{Idx, IndexSlice};
 use rustc_middle::mir;
@@ -27,8 +27,8 @@ impl<'a, 'tcx, L: BlockLabel> CfgBuilderImpl<'a, mir::Body<'tcx>, L> {
         }
     }
 }
-impl<'a, 'pcx, L: BlockLabel> CfgBuilderImpl<'a, pat::MirPattern<'pcx>, L> {
-    pub fn from_patterns(patterns: &'a pat::MirPattern<'pcx>, pointer_bytes: u64, node_style: NodeStyle) -> Self {
+impl<'a, 'pcx, L: BlockLabel> CfgBuilderImpl<'a, pat::FnPatternBody<'pcx>, L> {
+    pub fn from_patterns(patterns: &'a pat::FnPatternBody<'pcx>, pointer_bytes: u64, node_style: NodeStyle) -> Self {
         CfgBuilderImpl {
             basic_blocks: patterns,
             cfg: pat_control_flow_graph(patterns, pointer_bytes),
@@ -67,9 +67,9 @@ impl<'a, 'tcx> DdgBuilder<'a, mir::Body<'tcx>> {
         }
     }
 }
-impl<'a, 'pcx> DdgBuilder<'a, pat::MirPattern<'pcx>> {
+impl<'a, 'pcx> DdgBuilder<'a, pat::FnPatternBody<'pcx>> {
     pub fn from_patterns(
-        patterns: &'a pat::MirPattern<'pcx>,
+        patterns: &'a pat::FnPatternBody<'pcx>,
         pointer_bytes: u64,
         node_style: NodeStyle,
         config: DdgConfig,
@@ -256,7 +256,10 @@ impl MultiGraph {
 impl<B: HasBasicBlocks + HasLocals> DdgBuilder<'_, B> {
     pub fn build(&self) -> MultiGraph {
         let blocks = self.build_blocks();
-        let mut edges = self.cfg_builder.build_edges();
+        let edges = self.cfg_builder.build_edges();
+        #[cfg(feature = "interblock_edges")]
+        let mut edges = edges;
+        #[cfg(feature = "interblock_edges")]
         self.build_interblock_edges(&mut edges);
         MultiGraph::new("DataDependencyGraph".into(), blocks, edges)
     }
@@ -345,6 +348,7 @@ impl<B: HasBasicBlocks + HasLocals> DdgBuilder<'_, B> {
         )
         .collect()
     }
+    #[cfg(feature = "interblock_edges")]
     fn build_interblock_edges(&self, edges: &mut Vec<Edge>) {
         edges.extend(
             self.ddg
@@ -386,7 +390,7 @@ impl<'tcx> HasBasicBlocks for mir::Body<'tcx> {
         &self.basic_blocks
     }
 }
-impl<'pcx> HasBasicBlocks for pat::MirPattern<'pcx> {
+impl<'pcx> HasBasicBlocks for pat::FnPatternBody<'pcx> {
     type BasicBlock = pat::BasicBlock;
 
     type BasicBlockData = pat::BasicBlockData<'pcx>;
@@ -399,7 +403,7 @@ impl<'pcx> HasBasicBlocks for pat::MirPattern<'pcx> {
 impl HasLocals for mir::Body<'_> {
     type Local = mir::Local;
 }
-impl HasLocals for pat::MirPattern<'_> {
+impl HasLocals for pat::FnPatternBody<'_> {
     type Local = pat::Local;
 }
 

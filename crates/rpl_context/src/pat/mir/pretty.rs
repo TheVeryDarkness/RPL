@@ -54,10 +54,28 @@ fn fmt_projection<'pcx>(f: &mut fmt::Formatter<'_>, place: Place<'pcx>, proj: &P
     }
 }
 
+impl fmt::Debug for CopyNonOverlapping<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { src, dst, count } = self;
+        write!(f, "copy_non_overlapping({src:?}, {dst:?}, {count:?})")
+    }
+}
+
+impl fmt::Debug for NonDivergingIntrinsic<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CopyNonOverlapping(copy) => {
+                write!(f, "{copy:?}")
+            },
+        }
+    }
+}
+
 impl fmt::Debug for StatementKind<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Assign(place, rvalue) => write!(f, "{place:?} = {rvalue:?}"),
+            Self::Intrinsic(intrinsic) => write!(f, "{intrinsic:?}"),
         }
     }
 }
@@ -225,7 +243,7 @@ impl fmt::Debug for FieldAcc {
     }
 }
 
-impl fmt::Debug for MirPattern<'_> {
+impl fmt::Debug for FnPatternBody<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let new_line = if f.alternate() { "\n" } else { " " };
         let indent = if f.alternate() { "    " } else { "" };

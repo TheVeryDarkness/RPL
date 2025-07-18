@@ -304,7 +304,7 @@ impl CrateWithSource {
                     let metadata = entry_path.symlink_metadata().unwrap();
 
                     if metadata.is_dir() {
-                        fs::create_dir(dest_path).unwrap();
+                        fs::create_dir_all(dest_path).unwrap();
                     } else if metadata.is_file() {
                         fs::copy(entry_path, dest_path).unwrap();
                     }

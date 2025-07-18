@@ -1,0 +1,23 @@
+error: replacing with `mem::uninitialized()`
+  --> tests/ui/clippy/repl_uninit.rs:18:23
+   |
+LL |         let taken_v = mem::replace(&mut v, mem::uninitialized());
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
+   |
+   = note: `-D rpl::mem-replace-with-uninit` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::mem_replace_with_uninit)]`
+
+error: replacing with `mem::MaybeUninit::uninit().assume_init()`
+  --> tests/ui/clippy/repl_uninit.rs:26:23
+   |
+LL |         let taken_v = mem::replace(&mut v, mem::MaybeUninit::uninit().assume_init());
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
+
+error: replacing with `mem::zeroed()`
+  --> tests/ui/clippy/repl_uninit.rs:34:23
+   |
+LL |         let taken_v = mem::replace(&mut v, mem::zeroed());
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using: `std::ptr::read(&mut v)`
+
+error: aborting due to 3 previous errors
+
