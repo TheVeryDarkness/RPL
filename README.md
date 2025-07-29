@@ -31,7 +31,7 @@ The toolchain of RPL, which is a custom configuration of Rust compiler, enables 
 
 -   Run RPL analysis on your Rust project:
     -   `cargo +nightly-2025-02-14 rpl` (using built-in RPL pattern definitions based on inline MIR)
-    -   `RUSTFLAGS="-Zinline-mir=false" cargo +nightly-2025-02-14 rpl` (using built-in RPL pattern definitions based on MIR)
+    -   `RUSTFLAGS="-Zinline-mir=false" cargo +nightly-2025-02-14 rpl` (using built-in RPL pattern definitions based on MIR) or `cargo +nightly-2025-02-14 rpl -- -Zinline-mir=false`
 
 > Just like using `cargo clippy` to check your Rust code.
 
