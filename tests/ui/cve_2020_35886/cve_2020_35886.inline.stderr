@@ -1,21 +1,5 @@
-error: dropped an possibly-uninitialized value
-  --> tests/ui/cve/cve_2020_35887/cve_2020_35887.rs:64:17
-   |
-LL |         let ptr = unsafe { alloc(layout) as *mut T };
-   |                            ------------- memory allocated here
-...
-LL |                 (*(ptr.wrapping_offset(i as isize))) = template.clone();
-   |                 ^^^^^^^---------------------------^^
-   |                 |      |
-   |                 |      a maybe-relative pointer created here
-   |                 original value is dropped here
-   |                 the new value is assigned to here
-   |
-   = help: assigning to a dereferenced pointer will cause previous value to be dropped, and try using `ptr::write` instead
-   = note: `#[deny(rpl::drop_uninit_value)]` on by default
-
 error: it is an undefined behavior to offset a pointer using an unchecked integer
-  --> tests/ui/cve/cve_2020_35887/cve_2020_35887.rs:78:27
+  --> tests/ui/cve_2020_35886/cve_2020_35886.rs:36:27
    |
 LL |         unsafe { self.ptr.wrapping_offset(idx as isize).as_ref() }.unwrap()
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -29,7 +13,7 @@ LL |         unsafe { self.ptr.wrapping_offset(idx as isize).as_ref() }.unwrap()
    = help: to override `-D warnings` add `#[allow(rpl::unchecked_pointer_offset)]`
 
 error: it is an undefined behavior to offset a pointer using an unchecked integer
-  --> tests/ui/cve/cve_2020_35887/cve_2020_35887.rs:85:27
+  --> tests/ui/cve_2020_35886/cve_2020_35886.rs:43:27
    |
 LL |         unsafe { self.ptr.wrapping_offset(idx as isize).as_mut() }.unwrap()
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -40,5 +24,5 @@ LL |         unsafe { self.ptr.wrapping_offset(idx as isize).as_mut() }.unwrap()
    = help: check whether it's in bound before offsetting
    = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
 
-error: aborting due to 3 previous errors
+error: aborting due to 2 previous errors
 

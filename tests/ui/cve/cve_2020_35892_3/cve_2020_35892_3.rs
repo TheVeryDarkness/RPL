@@ -26,7 +26,9 @@ impl<T> Index<usize> for Slab<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
         unsafe { &(*(self.mem.offset(index as isize))) }
-        // FIXME: should report error
+        //~^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+        //~|HELP:  check whether it's in bound before offsetting
+        //~|HELP:  to override `-D warnings` add `#[allow(rpl::unchecked_pointer_offset)]`
     }
 }
 
@@ -45,6 +47,8 @@ impl<T> Slab<T> {
 
         unsafe {
             elem_ptr = self.mem.offset(offset as isize);
+            //~^ ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+            //~| HELP: check whether it's in bound before offsetting
             last_elem_ptr = self.mem.offset(self.len as isize);
             //~^ HELP: this is because `self.len` exceeds the container's length by one
             //~| HELP: did you mean this

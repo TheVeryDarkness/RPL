@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
+use rpl_constraints::Const;
 use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{LabelMap, Spanned};
 use rpl_mir_graph::TerminatorEdges;
@@ -11,7 +12,7 @@ use rustc_hir::FnDecl;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::PlaceContext;
-use rustc_middle::mir::{self, Const, PlaceRef};
+use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
@@ -60,7 +61,7 @@ impl Matched<'_> {
         }
     }
 
-    fn span_spanned<'tcx>(&self, spanned: Spanned, body: &rustc_middle::mir::Body<'tcx>, decl: &FnDecl<'tcx>) -> Span {
+    fn span_spanned<'tcx>(&self, spanned: Spanned, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>) -> Span {
         match spanned {
             Spanned::Location(location) => self[location].span_no_inline(body),
             Spanned::Local(local) => body.local_decls[self[local]].source_info.span,
@@ -75,7 +76,7 @@ impl Matched<'_> {
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
-    fn span(&self, body: &rustc_middle::mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
         let MatchedWithLabelMap(labels, matched, attr) = self;
         let name = Symbol::intern(name);
         labels
@@ -348,6 +349,19 @@ impl StatementMatch {
         }
         source_info.span
     }
+
+    pub fn is_arg(self, body: &mir::Body<'_>) -> bool {
+        match self {
+            StatementMatch::Arg(local) => local_is_arg(local, body),
+            StatementMatch::Location(_) => false,
+        }
+    }
+}
+
+#[inline]
+#[instrument(level = "trace", skip(body), ret)]
+pub fn local_is_arg(local: mir::Local, body: &mir::Body<'_>) -> bool {
+    local.as_usize() > 0 && local.as_usize() < body.arg_count + 1
 }
 
 struct MatchCtxt<'a, 'pcx, 'tcx> {
@@ -1048,8 +1062,8 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         self.matching[ty_var].matched.r#match(ty)
     }
     #[instrument(level = "debug", skip(self), ret)]
-    fn match_const_var(&self, const_var: pat::ConstVarIdx, ty: Const<'tcx>) -> bool {
-        self.matching[const_var].matched.r#match(ty)
+    fn match_const_var(&self, const_var: pat::ConstVarIdx, konst: Const<'tcx>) -> bool {
+        self.matching[const_var].matched.r#match(konst)
     }
     #[instrument(level = "debug", skip(self), ret)]
     fn match_place_var(&self, place_var: pat::PlaceVarIdx, place: PlaceRef<'tcx>) -> bool {
