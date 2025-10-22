@@ -8,7 +8,7 @@ use ui_test::{Config, Match, error_on_output_conflict};
 
 #[test]
 fn normalize_stderr() {
-    let mut cfg = Config::rustc(env!("CARGO_MANIFEST_DIR"));
+    let mut cfg = Config::dummy();
     let normalize_stderr = &mut cfg.comment_defaults.base().normalize_stderr;
     normalize_stderr.push((Match::PathBackslash, b"/".to_vec()));
     let stderr_path = Path::new("tests/normalizer.stderr");
