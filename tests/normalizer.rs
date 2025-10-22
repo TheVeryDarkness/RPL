@@ -17,6 +17,7 @@ fn normalize_stderr() {
     assert!(text.contains('/'));
     text = text.replace("/", "\\");
     text = text.replace("\r", "");
+    eprintln!("Stderr: {text:?}\n{text}", text = text);
     let mut errors = Vec::new();
     let test_cfg = TestConfig::one_off_runner(cfg, test_path.to_path_buf());
     error_on_output_conflict(stderr_path, text.as_bytes(), &mut errors, &test_cfg);
@@ -24,8 +25,8 @@ fn normalize_stderr() {
         eprintln!("Error: {:?}", error);
         match error {
             ui_test::Error::OutputDiffers { actual, expected, .. } => {
-                eprintln!("Actual output:\n{}", String::from_utf8_lossy(actual));
-                eprintln!("Expected output:\n{}", String::from_utf8_lossy(expected));
+                eprintln!("Actual output: {s:?}\n{s}", s = String::from_utf8_lossy(actual));
+                eprintln!("Expected output: {s:?}\n{s}", s = String::from_utf8_lossy(expected));
             },
             _ => {},
         }
