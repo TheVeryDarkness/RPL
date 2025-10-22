@@ -75,6 +75,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tracing",
     "tokio",
     "tokio_util",
+    "winapi",
     // "cassandra_cpp_sys", for cve_2024_27284
     #[cfg(target_os = "windows")]
     "winapi",
