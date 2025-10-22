@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - run: cargo fmt --check
       - run: cargo test --test normalizer
-      - run: cargo test --test compile-tests
+      - run: cargo test --test compile-test
       # - run: cargo test --all
       # - run: cargo test --all
       #   env:
