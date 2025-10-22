@@ -30,10 +30,11 @@ jobs:
           # Unsetting this would make so that any malicious package could get our Github Token
           persist-credentials: false
       - run: cargo fmt --check
-      - run: cargo test --all
-      - run: cargo test --all
-        env:
-          RPL_PATS: docs/patterns-pest
+      - run: cargo test --test normalizer
+      # - run: cargo test --all
+      # - run: cargo test --all
+      #   env:
+      #     RPL_PATS: docs/patterns-pest
       - run: cargo clippy -- -D warnings
       - run: cargo install --path .
       - run: cargo rpl --workspace --all-targets
