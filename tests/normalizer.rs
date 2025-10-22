@@ -6,11 +6,7 @@ use std::path::Path;
 use ui_test::per_test_config::TestConfig;
 use ui_test::{Config, Match, error_on_output_conflict};
 
-#[test]
-fn normalize_stderr() {
-    let mut cfg = Config::dummy();
-    let normalize_stderr = &mut cfg.comment_defaults.base().normalize_stderr;
-    normalize_stderr.push((Match::PathBackslash, b"/".to_vec()));
+fn test_generic(cfg: Config) {
     let stderr_path = Path::new("tests/normalizer.stderr");
     let test_path = Path::new("tests/normalizer.rs");
     let mut text = read_to_string(stderr_path).unwrap();
@@ -31,4 +27,18 @@ fn normalize_stderr() {
         }
     }
     assert!(errors.is_empty(), "Expected no errors, got {} errors", errors.len());
+}
+
+#[test]
+fn basic() {
+    let mut cfg = Config::dummy();
+    let normalize_stderr = &mut cfg.comment_defaults.base().normalize_stderr;
+    normalize_stderr.push((Match::PathBackslash, b"/".to_vec()));
+    test_generic(cfg);
+}
+
+#[test]
+fn rustc() {
+    let cfg = Config::rustc(env!("CARGO_MANIFEST_DIR"));
+    test_generic(cfg);
 }
