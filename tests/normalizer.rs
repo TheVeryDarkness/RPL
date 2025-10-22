@@ -16,7 +16,6 @@ fn normalize_stderr() {
     let mut text = read_to_string(stderr_path).unwrap();
     assert!(text.contains('/'));
     text = text.replace("/", "\\");
-    text = text.replace("\r", "");
     eprintln!("Stderr: {text:?}\n{text}", text = text);
     let mut errors = Vec::new();
     let test_cfg = TestConfig::one_off_runner(cfg, test_path.to_path_buf());
