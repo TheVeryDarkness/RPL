@@ -71,6 +71,7 @@ tokio = { version = "0.2.25", features = ["io-util"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 bytes = "1.10"
 log = "0.4"
+winapi = "0.2.8"
 # cassandra-cpp-sys = "1.1.1"
 
 [package]
@@ -128,6 +129,7 @@ radium.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 bytes.workspace = true
+winapi.workspace = true
 # cassandra-cpp-sys.workspace = true
 
 [features]

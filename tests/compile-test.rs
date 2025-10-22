@@ -39,6 +39,7 @@ extern crate smallvec;
 extern crate syn;
 extern crate tokio;
 extern crate tokio_util;
+extern crate winapi;
 
 mod test_utils;
 
@@ -69,6 +70,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tracing",
     "tokio",
     "tokio_util",
+    "winapi",
     // "cassandra_cpp_sys", for cve_2024_27284
 ];
 
