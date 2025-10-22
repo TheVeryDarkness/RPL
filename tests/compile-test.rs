@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use ui_test::custom_flags::edition::Edition;
 use ui_test::custom_flags::rustfix::RustfixMode;
 use ui_test::spanned::Spanned;
-use ui_test::{Args, Config, error_on_output_conflict, status_emitter};
+use ui_test::status_emitter::StatusEmitter;
+use ui_test::{Args, Config, error_on_output_conflict};
 
 // Test dependencies may need an `extern crate` here to ensure that they show up
 // in the depinfo file (otherwise cargo thinks they are unused)
@@ -207,7 +208,7 @@ fn run_ui(cx: &TestContext) {
         vec![config],
         ui_test::default_file_filter,
         ui_test::default_per_file_config,
-        status_emitter::Text::from(cx.args.format),
+        Box::<dyn StatusEmitter>::from(cx.args.format),
     )
     .unwrap();
 }
