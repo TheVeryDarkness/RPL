@@ -1,4 +1,5 @@
 #![feature(rustc_private)]
+#![recursion_limit = "256"]
 
 pub mod error;
 mod macros;
