@@ -542,3 +542,90 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
         })
     }
 }
+
+pub struct SimpleTyMatcher<'pcx, 'tcx> {
+    pub tcx: TyCtxt<'tcx>,
+    pub pcx: PatCtxt<'pcx>,
+    pub pat: &'pcx pat::RustItems<'pcx>,
+    pub typing_env: TypingEnv<'tcx>,
+    pub self_ty: Option<ty::Ty<'tcx>>,
+    pub ty_vars: IndexVec<pat::TyVarIdx, RefCell<Option<ty::Ty<'tcx>>>>,
+    pub adt_matches: RefCell<FxHashMap<Symbol, FxHashMap<DefId, AdtMatch<'tcx>>>>,
+}
+
+impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for SimpleTyMatcher<'pcx, 'tcx> {
+    fn self_ty(&self) -> Option<ty::Ty<'tcx>> {
+        self.self_ty
+    }
+    fn pat(&self) -> &'pcx pat::RustItems<'pcx> {
+        self.pat
+    }
+    fn pcx(&self) -> PatCtxt<'pcx> {
+        self.pcx
+    }
+    fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+    fn typing_env(&self) -> TypingEnv<'tcx> {
+        self.typing_env
+    }
+
+    fn match_ty_var(&self, ty_var: pat::TyVar, ty: ty::Ty<'tcx>) -> bool {
+        let mut matched = self.ty_vars[ty_var.idx].borrow_mut();
+        match &mut *matched {
+            Some(matched) => *matched == ty,
+            None => {
+                *matched = Some(ty);
+                true
+            },
+        }
+    }
+
+    fn match_ty_const_var(&self, _const_var: pat::ConstVar<'pcx>, _konst: ty::Const<'tcx>) -> bool {
+        false
+    }
+
+    fn match_mir_const_var(&self, _const_var: pat::ConstVar<'pcx>, _konst: mir::Const<'tcx>) -> bool {
+        false
+    }
+
+    fn match_adt_matches(&self, pat: Symbol, adt_match: AdtMatch<'tcx>) -> bool {
+        self.adt_matches
+            .borrow_mut()
+            .entry(pat)
+            .or_default()
+            .entry(adt_match.adt.did())
+            .or_insert(adt_match);
+        true
+    }
+
+    fn adt_matched(&self, adt_pat: Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&AdtMatch<'tcx>)) {
+        let adt_matches = self.adt_matches.borrow();
+        adt_matches
+            .get(&adt_pat)
+            .and_then(|adt_match| adt_match.get(&adt.did()))
+            .map(f);
+    }
+}
+
+impl<'pcx, 'tcx> SimpleTyMatcher<'pcx, 'tcx> {
+    #[instrument(level = "trace", skip(tcx, pcx, typing_env, pat))]
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        pcx: PatCtxt<'pcx>,
+        typing_env: TypingEnv<'tcx>,
+        self_ty: Option<ty::Ty<'tcx>>,
+        pat: &'pcx pat::RustItems<'pcx>,
+        meta: &pat::NonLocalMetaVars<'pcx>,
+    ) -> Self {
+        Self {
+            tcx,
+            pcx,
+            pat,
+            typing_env,
+            self_ty,
+            ty_vars: IndexVec::from_elem(RefCell::new(None), &meta.ty_vars),
+            adt_matches: Default::default(),
+        }
+    }
+}

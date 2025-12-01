@@ -50,7 +50,8 @@ pub struct DynamicError {
     lint: &'static Lint,
 }
 
-impl LintDiagnostic<'_, ()> for Box<DynamicError> {
+impl LintDiagnostic<'_, ()> for DynamicError {
+    #[inline]
     fn decorate_lint(self, diag: &mut rustc_errors::Diag<'_, ()>) {
         let primary_message = self.primary.0;
         diag.primary_message(primary_message);
@@ -74,6 +75,12 @@ impl LintDiagnostic<'_, ()> for Box<DynamicError> {
         for (suggestion, code, span, applicability) in self.suggestions {
             diag.span_suggestion(span, suggestion, code, applicability);
         }
+    }
+}
+
+impl LintDiagnostic<'_, ()> for Box<DynamicError> {
+    fn decorate_lint(self, diag: &mut rustc_errors::Diag<'_, ()>) {
+        DynamicError::decorate_lint(*self, diag);
     }
 }
 

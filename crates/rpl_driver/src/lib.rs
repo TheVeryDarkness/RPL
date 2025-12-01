@@ -531,6 +531,15 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     }
     #[instrument(level = "debug", skip(self, impl_))]
     fn check_impl(&mut self, impl_: &hir::Impl<'tcx>, self_ty: Option<ty::Ty<'tcx>>) {
+        // SimpleTyMatcher::new(
+        //     self.tcx,
+        //     self.pcx,
+        //     TypingEnv::post_analysis(self.tcx, def_id),
+        //     self_ty,
+        //     rpl_rust_items,
+        //     &impl_pat.meta,
+        // )
+        // .match_ty(impl_pat.ty);
         for impl_item in impl_.items {
             self.check_impl_item_ref(impl_item, self_ty);
         }
@@ -630,18 +639,27 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     //     self.pcx.for_each_rpl_pattern(|_id, pattern| {
     //         for (&name, pat_item) in &pattern.patt_block {
     //             match pat_item {
-    //                 rpl_context::pat::PatternItem::RustItems(rpl_rust_items) => {
+    //                 PatternItem::RustItems(rpl_rust_items) => {
     //                     for (_, adt_pat) in &rpl_rust_items.adts {
-    //                         for matched in
+    //                         if let Some(_) =
     //                             MatchAdtCtxt::new(self.tcx, self.pcx, rpl_rust_items,
     // adt_pat).match_adt(adt_def)                         {
-    //                             let error = pattern
-    //                                 .get_diag(name, &fn_pat.expect_mir_body().labels, body, &matched)
-    //                                 .unwrap_or_else(identity);
-    //                             self.tcx.emit_node_span_lint(
+    //                             // let error = pattern
+    //                             //     .get_diag(name, source_map, None,
+    // &fn_pat.expect_mir_body().labels, body,                             // &matched)
+    // .unwrap_or_else(identity);                             // self.tcx.emit_node_span_lint(
+    //                             //     error.lint(),
+    //                             //     self.tcx.local_def_id_to_hir_id(def_id),
+    //                             //     error.primary_span().clone(),
+    //                             //     error,
+    //                             // );
+
+    //                             // FIXME: use correct diagnostic
+    //                             let error = DynamicError::default_diagnostic(name,
+    // self.tcx.def_span(def_id));                             self.tcx.emit_node_span_lint(
     //                                 error.lint(),
     //                                 self.tcx.local_def_id_to_hir_id(def_id),
-    //                                 error.primary_span(),
+    //                                 error.primary_span().clone(),
     //                                 error,
     //                             );
     //                         }
@@ -654,5 +672,39 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     // }
     // #[instrument(level = "debug", skip(self))]
     // fn check_enum(&mut self, def_id: LocalDefId, variants: hir::EnumDef<'tcx>, generics: &'tcx
-    // hir::Generics<'tcx>) {}
+    // hir::Generics<'tcx>) {     let adt_def = self.tcx.adt_def(def_id);
+    //     self.pcx.for_each_rpl_pattern(|_id, pattern| {
+    //         for (&name, pat_item) in &pattern.patt_block {
+    //             match pat_item {
+    //                 PatternItem::RustItems(rpl_rust_items) => {
+    //                     for (_, adt_pat) in &rpl_rust_items.adts {
+    //                         if let Some(_) =
+    //                             MatchAdtCtxt::new(self.tcx, self.pcx, rpl_rust_items,
+    // adt_pat).match_adt(adt_def)                         {
+    //                             // let error = pattern
+    //                             //     .get_diag(name, source_map, None,
+    // &fn_pat.expect_mir_body().labels, body,                             // &matched)
+    // .unwrap_or_else(identity);                             // self.tcx.emit_node_span_lint(
+    //                             //     error.lint(),
+    //                             //     self.tcx.local_def_id_to_hir_id(def_id),
+    //                             //     error.primary_span().clone(),
+    //                             //     error,
+    //                             // );
+
+    //                             // FIXME: use correct diagnostic
+    //                             let error = DynamicError::default_diagnostic(name,
+    // self.tcx.def_span(def_id));                             self.tcx.emit_node_span_lint(
+    //                                 error.lint(),
+    //                                 self.tcx.local_def_id_to_hir_id(def_id),
+    //                                 error.primary_span().clone(),
+    //                                 error,
+    //                             );
+    //                         }
+    //                     }
+    //                 },
+    //                 _ => unreachable!(),
+    //             }
+    //         }
+    //     });
+    // }
 }

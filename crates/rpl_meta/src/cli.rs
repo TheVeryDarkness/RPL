@@ -66,6 +66,7 @@ pub fn collect_default_patterns() -> Vec<(PathBuf, String)> {
         "cve/CVE-2020-35873.rpl",
         "cve/CVE-2020-35877.rpl",
         "cve/CVE-2020-35881.rpl",
+        "cve/CVE-2020-35886.rpl",
         "cve/CVE-2020-35887.rpl",
         "cve/CVE-2020-35888.rpl",
         "cve/CVE-2020-35892-3.rpl",

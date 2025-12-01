@@ -30,3 +30,6 @@ rustc-ice-*
 
 # lintcheck
 lintcheck-logs
+
+# Logs
+*.ansi

@@ -37,6 +37,30 @@
                 "LD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-unknown-linux-gnu/lib"
             },
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug test 'compile-test'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--test=compile-test",
+                    "--package=rpl"
+                ],
+                "filter": {
+                    "name": "compile-test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "env": {
+                // "RPL_PATS": "${workspaceFolder}/docs/patterns",
+                "RPL_PATS": "${workspaceFolder}/docs/patterns-pest/",
+                "DYLD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-apple-darwin/lib",
+                "LD_LIBRARY_PATH": "${env:HOME}/.rustup/toolchains/nightly-2025-02-14-aarch64-unknown-linux-gnu/lib"
+            },
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

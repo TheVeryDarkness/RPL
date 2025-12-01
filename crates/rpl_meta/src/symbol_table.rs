@@ -888,11 +888,11 @@ pub struct ImplInner<'i> {
 
 impl<'i> ImplInner<'i> {
     pub fn new(impl_pat: &'i pairs::Impl<'i>) -> Self {
-        let impl_pat = impl_pat.get_matched();
-        let trait_ = impl_pat.1.as_ref().map(|trait_| trait_.get_matched().0);
+        let (_, _, impl_pat, ty, ..) = impl_pat.get_matched();
+        let trait_ = impl_pat.as_ref().map(|trait_| trait_.get_matched().0);
         Self {
             trait_,
-            ty: impl_pat.2,
+            ty,
             fns: FxHashMap::default(),
         }
     }

@@ -136,8 +136,8 @@ pub struct Field<'pcx> {
 
 pub struct Impl<'pcx> {
     pub meta: Arc<NonLocalMetaVars<'pcx>>,
-    pub(crate) ty: Ty<'pcx>,
-    pub(crate) trait_id: Option<Path<'pcx>>,
+    pub ty: Ty<'pcx>,
+    pub trait_id: Option<Path<'pcx>>,
     pub fns: FxHashMap<Symbol, FnPattern<'pcx>>,
     pub constraints: Constraints,
 }
