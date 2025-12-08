@@ -24,10 +24,11 @@ use std::ops::DerefMut;
 use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
-use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
+use rpl_match::graph::{self, MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
+use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::{CheckMirCtxt, pat};
-use rpl_match::{MatchComposedPattern, MirGraph};
+use rpl_match::{MatchComposedPattern, MirGraph, check2};
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -37,6 +38,7 @@ use rustc_lint_defs::RegisteredTools;
 use rustc_macros::{Diagnostic, LintDiagnostic};
 use rustc_middle::hir::nested_filter;
 use rustc_middle::mir;
+use rustc_middle::mir::interpret::PointerArithmetic as _;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_middle::util::Providers;
 use rustc_session::declare_tool_lint;
@@ -162,6 +164,14 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
 //     check_ctxt.visit_item(item);
 // }
 
+fn fn_name<'tcx>(kind: intravisit::FnKind<'tcx>) -> (Option<Ident>, Option<FnHeader>) {
+    match kind {
+        intravisit::FnKind::ItemFn(name, _, fn_header) => (Some(name), Some(fn_header)),
+        intravisit::FnKind::Method(name, fn_sig) => (Some(name), Some(fn_sig.header)),
+        intravisit::FnKind::Closure => (None, None),
+    }
+}
+
 /// Used for finding pattern matches in given Rust crate.
 struct CheckFnCtxt<'pcx, 'tcx> {
     tcx: TyCtxt<'tcx>,
@@ -211,11 +221,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
         _span: Span,
         def_id: LocalDefId,
     ) -> Self::Result {
-        let (name, header) = match kind {
-            intravisit::FnKind::ItemFn(name, _, fn_header) => (Some(name), Some(fn_header)),
-            intravisit::FnKind::Method(name, fn_sig) => (Some(name), Some(fn_sig.header)),
-            intravisit::FnKind::Closure => (None, None),
-        };
+        let (name, header) = fn_name(kind);
 
         let self_ty = self
             .tcx
@@ -429,7 +435,7 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
     impl<'tcx> Visitor<'tcx> for CheckCtxt2<'tcx> {
         fn visit_fn(
             &mut self,
-            _: intravisit::FnKind<'tcx>,
+            fk: intravisit::FnKind<'tcx>,
             fd: &'tcx rustc_hir::FnDecl<'tcx>,
             _: rustc_hir::BodyId,
             _: Span,
@@ -444,9 +450,10 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
 
                 let has_self = fd.implicit_self.has_implicit_self();
                 let typing_env = ty::TypingEnv::post_analysis(self.tcx, body.source.def_id());
+                let (name, _) = fn_name(fk);
 
-                let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
-                let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+                let mir_cfg = graph::mir_control_flow_graph(body);
+                let mir_ddg = graph::mir_data_dep_graph(body, &mir_cfg);
                 self.graphs.push(MirGraph {
                     body,
                     self_ty,
@@ -454,33 +461,58 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
                     mir_cfg,
                     mir_ddg,
                     typing_env,
+                    id,
+                    decl: fd,
+                    name,
                 });
             }
         }
     }
 
-    tcx.hir().walk_toplevel_module(&mut CheckCtxt2 {
+    let mut cx = CheckCtxt2 {
         tcx,
         graphs: Vec::new(),
-    });
+    };
+    tcx.hir().walk_toplevel_module(&mut cx);
 
     let source_map = tcx.sess.source_map();
     pcx.for_each_rpl_pattern(|_id, pattern| {
         for (&name, pat_item) in &pattern.patt_block {
-            // let matched = check2(tcx, pcx, pat, pat_name, pat_cfg, pat_ddg, fn_pat, fns);
-            // for matched in self.fn_matched_pat_item(
-            //     name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
-            // ) {
-            //     let error = pattern
-            //         .get_diag(name, source_map, fn_name, body, decl, &matched)
-            //         .unwrap_or_else(identity);
-            //     self.tcx.emit_node_span_lint(
-            //         error.lint(),
-            //         self.tcx.local_def_id_to_hir_id(def_id),
-            //         error.primary_span().clone(),
-            //         error,
-            //     );
-            // }
+            match pat_item {
+                pat::PatternItem::RustItems(items) => {
+                    for fn_pat in &items.fns {
+                        let mir_pat = fn_pat.body.unwrap();
+                        let pat_cfg = graph::pat_control_flow_graph(mir_pat, tcx.pointer_size().bytes());
+                        let pat_ddg = graph::pat_data_dep_graph(mir_pat, &pat_cfg);
+                        let matched = check2(tcx, pcx, items, name, &pat_cfg, &pat_ddg, fn_pat, &cx.graphs);
+                        for (graph, matched) in matched {
+                            let label_map = &fn_pat.expect_body().labels;
+                            let attr_map = fn_pat.extra_span(tcx, graph.id).unwrap();
+
+                            let matched = NormalizedMatched::new(&matched, label_map, &attr_map);
+                            let error = pattern
+                                .get_diag(
+                                    name,
+                                    source_map,
+                                    graph.name.map(|i| i.name),
+                                    graph.body,
+                                    graph.decl,
+                                    &matched,
+                                )
+                                .unwrap_or_else(identity);
+                            tcx.emit_node_span_lint(
+                                error.lint(),
+                                tcx.local_def_id_to_hir_id(graph.id),
+                                error.primary_span().clone(),
+                                error,
+                            );
+                        }
+                    }
+                },
+                pat::PatternItem::RPLPatternOperation(_) => {
+                    todo!();
+                },
+            }
         }
     });
 }

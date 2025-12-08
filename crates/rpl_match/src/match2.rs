@@ -4,10 +4,12 @@ use std::ops::{Deref, Index};
 use rpl_constraints::Const;
 use rpl_context::{PatCtxt, pat};
 use rustc_hash::FxHashMap;
+use rustc_hir::FnDecl;
+use rustc_hir::def_id::LocalDefId;
 use rustc_index::IndexVec;
 use rustc_middle::ty::{TyCtxt, TypingEnv};
 use rustc_middle::{mir, ty};
-use rustc_span::Symbol;
+use rustc_span::{Ident, Symbol};
 
 use crate::AdtMatch;
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
@@ -22,6 +24,9 @@ pub struct MirGraph<'tcx> {
     pub mir_cfg: MirControlFlowGraph,
     pub mir_ddg: MirDataDepGraph,
     pub typing_env: TypingEnv<'tcx>,
+    pub id: LocalDefId,
+    pub decl: &'tcx FnDecl<'tcx>,
+    pub name: Option<Ident>,
 }
 
 /// Create a new matcher instance.
@@ -41,7 +46,7 @@ struct MatchCtxt2<'a, 'pcx, 'tcx> {
     pat_ddg: &'a PatDataDepGraph,
     /// Copied from [`crate::place::MatchPlaceCtxt`].
     places: IndexVec<pat::PlaceVarIdx, pat::Ty<'pcx>>,
-    fns: Vec<MirGraph<'tcx>>,
+    fns: &'a [MirGraph<'tcx>],
 }
 
 impl<'a, 'pcx, 'tcx> MatchCtxt2<'a, 'pcx, 'tcx> {
@@ -76,7 +81,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt2<'a, 'pcx, 'tcx> {
     }
     fn find_1_component_matches(&self) {
         if let Some(fn_pat) = self.fn_pat.body {
-            for fn_graph in &self.fns {
+            for fn_graph in self.fns {
                 let mut matching_1 = Vec::new();
                 // Find all possible matches of 1-component in pattern graph to MIR graph.
                 for (bb_pat, block_pat) in fn_pat.basic_blocks.iter_enumerated() {
@@ -506,8 +511,8 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
     pat_cfg: &'a PatControlFlowGraph,
     pat_ddg: &'a PatDataDepGraph,
     fn_pat: &'a pat::FnPattern<'pcx>,
-    fns: impl Iterator<Item = MirGraph<'tcx>>,
-) -> Vec<Matched<'tcx>> {
+    fns: &'a [MirGraph<'tcx>],
+) -> Vec<(&'a MirGraph<'tcx>, Matched<'tcx>)> {
     let places = pat.meta.place_vars.iter().map(|var| var.ty).collect();
     let cx = MatchCtxt2 {
         tcx,
@@ -518,7 +523,7 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
         pat_cfg,
         pat_ddg,
         places,
-        fns: fns.collect(),
+        fns,
     };
     cx.find_1_component_matches();
     todo!()
