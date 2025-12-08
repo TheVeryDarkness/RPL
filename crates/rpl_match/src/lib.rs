@@ -32,6 +32,7 @@ extern crate smallvec;
 extern crate tracing;
 
 mod adt;
+mod compose;
 mod counted;
 mod fns;
 pub mod graph; // FIXME: visibility
@@ -45,6 +46,7 @@ mod statement;
 mod ty;
 
 pub(crate) use adt::{AdtMatch, Candidates, MatchAdtCtxt};
+pub use compose::MatchComposedPattern;
 pub(crate) use counted::CountedMatch;
 pub(crate) use fns::MatchFnCtxt;
 pub use match2::{MirGraph, check2};

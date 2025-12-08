@@ -19,20 +19,17 @@ rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::convert::identity;
+use std::ops::DerefMut;
 
-use either::Either;
 use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
 use rpl_match::graph::{MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
-use rpl_match::matches::artifact::NormalizedMatched;
-use rpl_match::mir::pat::PatternItem;
 use rpl_match::mir::{CheckMirCtxt, pat};
-use rpl_match::predicate_evaluator::PredicateEvaluator;
-use rpl_match::{MirGraph, check2};
+use rpl_match::{MatchComposedPattern, MirGraph};
 use rpl_meta::context::MetaContext;
-use rustc_data_structures::fx::{FxHashMap, FxHashSet};
+use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{self as hir, FnHeader};
@@ -252,269 +249,32 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     }
 }
 
-impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
-    #[expect(clippy::too_many_arguments)]
-    #[instrument(level = "trace", skip(self, rpl_rust_items, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
-    fn impl_matched<'a>(
-        &self,
-        name: Symbol,
-        rpl_rust_items: &'pcx pat::RustItems<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
+impl<'tcx, 'pcx> MatchComposedPattern<'pcx, 'tcx> for CheckFnCtxt<'pcx, 'tcx> {
+    fn pcx(&self) -> PatCtxt<'pcx> {
+        self.pcx
+    }
+    fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+    fn body_caches(&self) -> impl DerefMut<Target = FxHashMap<DefId, BodyInfoCache>> {
+        self.body_caches.borrow_mut()
+    }
+    fn check_mir<'a>(
+        tcx: TyCtxt<'tcx>,
+        pcx: PatCtxt<'pcx>,
+        body: &'a mir::Body<'tcx>,
         has_self: bool,
         self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
+        pat_name: Symbol,
+        fn_pat: &'a pat::FnPattern<'pcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let iter = rpl_rust_items.impls.values().flat_map(move |impl_pat| {
-            // FIXME: check impl_pat.ty and impl_pat.trait_id
-            impl_pat
-                .fns
-                .values()
-                .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header, body))
-                .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
-                .flat_map(move |(fn_pat, attr_map)| {
-                    // FIXME: sometimes we need to check function name
-                    // if *fn_name != impl_item.ident.name {
-                    //     continue;
-                    // }
-
-                    CheckMirCtxt::new(
-                        self.tcx,
-                        self.pcx,
-                        body,
-                        has_self,
-                        self_ty,
-                        rpl_rust_items,
-                        name,
-                        fn_pat,
-                        mir_cfg,
-                        mir_ddg,
-                    )
-                    .check()
-                    .into_iter()
-                    .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
-                    .map(move |matched| {
-                        let labels = &fn_pat.expect_body().labels;
-                        (matched, labels, attr_map.clone())
-                    })
-                })
-                .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map))
-        });
-        rpl_rust_items.post_process(iter)
-    }
-
-    #[instrument(level = "trace", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
-    #[expect(clippy::too_many_arguments)]
-    fn impl_matched_pat_op<'a>(
-        &self,
-        name: Symbol,
-        pat_op: &pat::PatternOperation<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let positive: Vec<_> = pat_op
-            .positive
-            .iter()
-            .flat_map(|positive| {
-                self.impl_matched_pat_item(
-                    positive.0, positive.1, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-                )
-                .map(|matched| matched.map(&positive.2))
-            })
-            .collect();
-        let negative: FxHashSet<_> = pat_op
-            .negative
-            .iter()
-            .flat_map(|negative| {
-                self.impl_matched_pat_item(
-                    negative.0, negative.1, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-                )
-                .map(|matched| matched.map(&negative.2))
-            })
-            .collect();
-        debug!(?positive, ?negative, "impl_matched_pat_op");
-
-        let iter = positive
-            .into_iter()
-            .filter(move |matched| {
-                debug_assert!(negative.iter().all(|neg| neg.has_same_head(matched)));
-                !negative.contains(matched)
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
-
-        pat_op.post_process(iter)
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    fn impl_matched_pat_item<'a>(
-        &self,
-        name: Symbol,
-        pat_item: &'pcx PatternItem<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        match pat_item {
-            PatternItem::RustItems(rust_items) => Either::Left(self.impl_matched(
-                name, rust_items, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-            )),
-            PatternItem::RPLPatternOperation(pat_op) => Either::Right(
-                self.impl_matched_pat_op(name, pat_op, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg),
-            ),
-        }
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    #[instrument(level = "trace", skip(self, rpl_rust_items, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
-    fn fn_matched<'a>(
-        &self,
-        name: Symbol,
-        rpl_rust_items: &'pcx pat::RustItems<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let iter = rpl_rust_items
-            .fns
-            .iter()
-            .filter(move |fn_pat| fn_pat.filter(self.tcx, def_id, header, body))
-            .filter_map(move |fn_pat| Some((fn_pat, fn_pat.extra_span(self.tcx, def_id)?)))
-            .flat_map(move |(fn_pat, attr_map)| {
-                CheckMirCtxt::new(
-                    self.tcx,
-                    self.pcx,
-                    body,
-                    has_self,
-                    self_ty,
-                    rpl_rust_items,
-                    name,
-                    fn_pat,
-                    mir_cfg,
-                    mir_ddg,
-                )
-                .check()
-                .into_iter()
-                .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
-                .map(move |matched| {
-                    let labels = &fn_pat.expect_body().labels;
-                    (matched, labels, attr_map.clone())
-                })
-            })
-            .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map));
-
-        rpl_rust_items.post_process(iter)
-    }
-
-    #[instrument(level = "trace", skip(self, pat_op, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
-    #[expect(clippy::too_many_arguments)]
-    fn fn_matched_pat_op<'a>(
-        &self,
-        name: Symbol,
-        pat_op: &pat::PatternOperation<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        let positive: Vec<_> = pat_op
-            .positive
-            .iter()
-            .flat_map(|positive| {
-                self.fn_matched_pat_item(
-                    positive.0, positive.1, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-                )
-                .map(|matched| matched.map(&positive.2))
-            })
-            .collect();
-        let negative: FxHashSet<_> = pat_op
-            .negative
-            .iter()
-            .flat_map(|negative| {
-                self.fn_matched_pat_item(
-                    negative.0, negative.1, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-                )
-                .map(|matched| matched.map(&negative.2))
-            })
-            .collect();
-        debug!(?positive, ?negative, "impl_matched_pat_op");
-
-        let iter = positive
-            .into_iter()
-            .filter(move |matched| {
-                debug_assert!(negative.iter().all(|neg| neg.has_same_head(matched)));
-                !negative.contains(matched)
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
-
-        pat_op.post_process(iter)
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    fn fn_matched_pat_item<'a>(
-        &self,
-        name: Symbol,
-        pat_item: &'pcx PatternItem<'pcx>,
-        def_id: LocalDefId,
-        header: Option<FnHeader>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
-        body: &'a mir::Body<'tcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
-        match pat_item {
-            PatternItem::RustItems(rust_items) => Either::Left(self.fn_matched(
-                name, rust_items, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
-            )),
-            PatternItem::RPLPatternOperation(pat_op) => Either::Right(
-                self.fn_matched_pat_op(name, pat_op, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg),
-            ),
-        }
-    }
-
-    #[instrument(level = "debug", skip(self, fn_pat, body), fields(pat_name = ?name, fn_name = ?fn_pat.name, constraints = ?fn_pat.constraints), ret)]
-    fn check_constraints(
-        &self,
-        name: Symbol,
-        fn_pat: &pat::FnPattern<'pcx>,
-        body: &mir::Body<'tcx>,
-        matched: &Matched<'tcx>,
-    ) -> bool {
-        let mut cache = self.body_caches.borrow_mut();
-        let typing_env = ty::TypingEnv::post_analysis(self.tcx, body.source.def_id());
-        let cache = cache
-            .entry(body.source.def_id())
-            .or_insert_with(|| BodyInfoCache::new(self.tcx, typing_env, body));
-        let evaluator = PredicateEvaluator::new(
-            self.tcx,
-            typing_env,
-            body,
-            &fn_pat.expect_body().labels,
-            matched,
-            cache,
-            fn_pat.symbol_table,
-        );
-        evaluator.evaluate_constraint(&fn_pat.constraints)
+    ) -> Vec<Matched<'tcx>> {
+        CheckMirCtxt::new(
+            tcx, pcx, body, has_self, self_ty, pat, pat_name, fn_pat, mir_cfg, mir_ddg,
+        )
+        .check()
     }
 }
 
@@ -665,13 +425,13 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
     struct CheckCtxt2<'tcx> {
         tcx: TyCtxt<'tcx>,
         graphs: Vec<MirGraph<'tcx>>,
-    };
+    }
     impl<'tcx> Visitor<'tcx> for CheckCtxt2<'tcx> {
         fn visit_fn(
             &mut self,
-            fk: intravisit::FnKind<'tcx>,
+            _: intravisit::FnKind<'tcx>,
             fd: &'tcx rustc_hir::FnDecl<'tcx>,
-            b: rustc_hir::BodyId,
+            _: rustc_hir::BodyId,
             _: Span,
             id: LocalDefId,
         ) -> Self::Result {
