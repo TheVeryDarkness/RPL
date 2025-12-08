@@ -35,16 +35,18 @@ mod adt;
 mod counted;
 mod fns;
 pub mod graph; // FIXME: visibility
+mod match2;
 pub mod matches; // FIXME: visibility
 pub mod mir; // FIXME: visibility
 mod place;
 pub mod predicate_evaluator;
-pub mod resolve;
+pub(crate) mod resolve;
 mod statement;
 mod ty;
 
-pub use adt::{AdtMatch, Candidates, MatchAdtCtxt};
-pub use counted::CountedMatch;
-pub use fns::MatchFnCtxt;
-pub use place::MatchPlaceCtxt;
-pub use ty::{MatchTyCtxt, TryCmpAs};
+pub(crate) use adt::{AdtMatch, Candidates, MatchAdtCtxt};
+pub(crate) use counted::CountedMatch;
+pub(crate) use fns::MatchFnCtxt;
+pub use match2::{MirGraph, check2};
+pub(crate) use place::MatchPlaceCtxt;
+pub(crate) use ty::{MatchTyCtxt, TryCmpAs};

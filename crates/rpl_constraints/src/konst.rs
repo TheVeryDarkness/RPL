@@ -33,3 +33,15 @@ impl<'tcx> Const<'tcx> {
         }
     }
 }
+
+impl<'tcx> From<mir::Const<'tcx>> for Const<'tcx> {
+    fn from(value: mir::Const<'tcx>) -> Self {
+        Self::MIR(value)
+    }
+}
+
+impl From<ty::ParamConst> for Const<'_> {
+    fn from(value: ty::ParamConst) -> Self {
+        Self::Param(value)
+    }
+}

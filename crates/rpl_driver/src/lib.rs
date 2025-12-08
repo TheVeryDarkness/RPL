@@ -30,6 +30,7 @@ use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::pat::PatternItem;
 use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_match::predicate_evaluator::PredicateEvaluator;
+use rpl_match::{MirGraph, check2};
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -130,6 +131,9 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
         body_caches: RefCell::default(),
     };
     tcx.hir().walk_toplevel_module(&mut check_ctxt);
+
+    walk2(tcx, pcx);
+
     rpl_utils::visit_crate(tcx);
 
     #[cfg(feature = "timing")]
@@ -655,4 +659,68 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
     // #[instrument(level = "debug", skip(self))]
     // fn check_enum(&mut self, def_id: LocalDefId, variants: hir::EnumDef<'tcx>, generics: &'tcx
     // hir::Generics<'tcx>) {}
+}
+
+fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
+    struct CheckCtxt2<'tcx> {
+        tcx: TyCtxt<'tcx>,
+        graphs: Vec<MirGraph<'tcx>>,
+    };
+    impl<'tcx> Visitor<'tcx> for CheckCtxt2<'tcx> {
+        fn visit_fn(
+            &mut self,
+            fk: intravisit::FnKind<'tcx>,
+            fd: &'tcx rustc_hir::FnDecl<'tcx>,
+            b: rustc_hir::BodyId,
+            _: Span,
+            id: LocalDefId,
+        ) -> Self::Result {
+            if self.tcx.is_mir_available(id) {
+                let body = self.tcx.optimized_mir(id);
+                let self_ty = self
+                    .tcx
+                    .impl_of_method(id.into())
+                    .map(|impl_| self.tcx.type_of(impl_).instantiate_identity());
+
+                let has_self = fd.implicit_self.has_implicit_self();
+                let typing_env = ty::TypingEnv::post_analysis(self.tcx, body.source.def_id());
+
+                let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
+                let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+                self.graphs.push(MirGraph {
+                    body,
+                    self_ty,
+                    has_self,
+                    mir_cfg,
+                    mir_ddg,
+                    typing_env,
+                });
+            }
+        }
+    }
+
+    tcx.hir().walk_toplevel_module(&mut CheckCtxt2 {
+        tcx,
+        graphs: Vec::new(),
+    });
+
+    let source_map = tcx.sess.source_map();
+    pcx.for_each_rpl_pattern(|_id, pattern| {
+        for (&name, pat_item) in &pattern.patt_block {
+            // let matched = check2(tcx, pcx, pat, pat_name, pat_cfg, pat_ddg, fn_pat, fns);
+            // for matched in self.fn_matched_pat_item(
+            //     name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
+            // ) {
+            //     let error = pattern
+            //         .get_diag(name, source_map, fn_name, body, decl, &matched)
+            //         .unwrap_or_else(identity);
+            //     self.tcx.emit_node_span_lint(
+            //         error.lint(),
+            //         self.tcx.local_def_id_to_hir_id(def_id),
+            //         error.primary_span().clone(),
+            //         error,
+            //     );
+            // }
+        }
+    });
 }
