@@ -104,6 +104,13 @@ pub struct AdtMatch<'tcx> {
     kind: AdtMatchKind<'tcx>,
 }
 
+impl PartialEq for AdtMatch<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // FIXME: consider if this makes sense
+        self.adt == other.adt
+    }
+}
+
 enum AdtMatchKind<'tcx> {
     Struct(FieldCandidates<'tcx>),
     // Enum(VariantCandidates<'tcx>),

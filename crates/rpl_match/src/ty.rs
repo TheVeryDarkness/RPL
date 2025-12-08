@@ -169,6 +169,7 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
     fn match_mir_const_var(&self, const_var: pat::ConstVar<'pcx>, konst: mir::Const<'tcx>) -> bool;
     #[must_use]
     fn match_adt_matches(&self, pat: Symbol, adt_match: AdtMatch<'tcx>) -> bool;
+    fn adt_matched(&self, adt_pat: Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&AdtMatch<'tcx>));
 
     #[instrument(level = "trace", skip(self), ret)]
     fn match_ty(&self, ty_pat: pat::Ty<'pcx>, ty: ty::Ty<'tcx>) -> bool {
@@ -508,8 +509,6 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
             ) => false,
         }
     }
-
-    fn adt_matched(&self, adt_pat: Symbol, adt: ty::AdtDef<'tcx>, f: impl FnOnce(&AdtMatch<'tcx>));
 
     fn for_variant_and_match(
         &self,

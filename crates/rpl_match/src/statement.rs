@@ -17,7 +17,7 @@ use crate::MatchFnCtxt;
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
 use crate::ty::MatchTy;
 
-fn iter_place_proj_and_ty<'pcx, 'tcx>(
+pub(crate) fn iter_place_proj_and_ty<'pcx, 'tcx>(
     body: &mir::Body<'tcx>,
     tcx: TyCtxt<'tcx>,
     place: mir::PlaceRef<'tcx>,
@@ -27,7 +27,7 @@ fn iter_place_proj_and_ty<'pcx, 'tcx>(
         move |place_ty, &proj| Some((proj, std::mem::replace(place_ty, place_ty.projection_ty(tcx, proj)))),
     )
 }
-fn iter_place_pat_proj_and_ty<'pcx, 'tcx>(
+pub(crate) fn iter_place_pat_proj_and_ty<'pcx, 'tcx>(
     pat: &'pcx pat::RustItems<'pcx>,
     place: pat::Place<'pcx>,
     place_base_ty: pat::PlaceTy<'pcx>,
@@ -68,6 +68,8 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     fn match_local(&self, pat: pat::Local, local: mir::Local) -> bool;
     #[must_use]
     fn match_place_var(&self, pat: pat::PlaceVarIdx, place: mir::PlaceRef<'tcx>) -> bool;
+    #[must_use]
+    fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx>;
 
     // Control flow matching
 
@@ -876,7 +878,6 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     fn get_place_ty_from_local(&self, local: pat::Local) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.mir_pat().locals[local])
     }
-    fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx>;
     fn get_place_ty_from_any(&self) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.pcx().mk_any_ty())
     }
