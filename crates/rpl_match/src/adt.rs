@@ -97,7 +97,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[debug("{adt:?}")]
 pub struct AdtMatch<'tcx> {
     pub adt: ty::AdtDef<'tcx>,
@@ -111,6 +111,8 @@ impl PartialEq for AdtMatch<'_> {
     }
 }
 
+// FIXME: this should not contain candidates directly, but rather matching results
+#[derive(Clone, Debug)]
 enum AdtMatchKind<'tcx> {
     Struct(FieldCandidates<'tcx>),
     // Enum(VariantCandidates<'tcx>),
@@ -143,7 +145,7 @@ impl<'tcx> AdtMatch<'tcx> {
     // }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[debug("{candidates:?}")]
 pub struct Candidates<I: Idx> {
     pub candidates: FxIndexMap<Symbol, MixedBitSet<I>>,
@@ -184,7 +186,7 @@ impl<I: Idx> Candidates<I> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[debug("{candidates:?}")]
 pub struct FieldCandidates<'tcx> {
     pub fields: &'tcx IndexSlice<FieldIdx, ty::FieldDef>,

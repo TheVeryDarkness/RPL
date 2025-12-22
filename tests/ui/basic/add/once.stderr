@@ -1,0 +1,13 @@
+error: added value here
+  --> tests/ui/basic/add/once.rs:5:13
+   |
+LL |     let z = x + y;
+   |             -^^^-
+   |             |   |
+   |             |   second value here
+   |             first value here
+   |
+   = note: `#[deny(rpl::foo)]` on by default
+
+error: aborting due to 1 previous error
+
