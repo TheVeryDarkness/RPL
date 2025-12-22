@@ -85,6 +85,16 @@ impl<'pcx> Index<BasicBlock> for FnPatternBody<'pcx> {
     }
 }
 
+impl FnPatternBody<'_> {
+    /// Returns the total number of statements and terminators in the function.
+    pub fn num_nodes(&self) -> usize {
+        self.basic_blocks
+            .iter()
+            .map(|bb| bb.num_statements_and_terminator())
+            .sum()
+    }
+}
+
 #[derive(Default)]
 pub struct BasicBlockData<'pcx> {
     pub statements: Vec<StatementKind<'pcx>>,
@@ -716,6 +726,26 @@ pub enum TerminatorKind<'pcx> {
     Return,
     /// Pattern ends here
     PatEnd,
+}
+
+impl<'pcx> TerminatorKind<'pcx> {
+    /// FIXME: Optimize this. See [`mir::TerminatorKind::successors`].
+    fn successors_helper(&self) -> Box<dyn Iterator<Item = BasicBlock> + '_> {
+        match self {
+            TerminatorKind::SwitchInt { targets, .. } => {
+                let otherwise = targets.otherwise.into_iter();
+                let targets = targets.targets.values().copied();
+                Box::new(targets.chain(otherwise))
+            },
+            TerminatorKind::Goto(target)
+            | TerminatorKind::Call { target, .. }
+            | TerminatorKind::Drop { target, .. } => Box::new(std::iter::once(*target)),
+            TerminatorKind::Return | TerminatorKind::PatEnd => Box::new(std::iter::empty()),
+        }
+    }
+    pub fn successors(&self) -> impl Iterator<Item = BasicBlock> + '_ {
+        self.successors_helper()
+    }
 }
 
 trait Cast<T> {
@@ -1515,6 +1545,9 @@ impl<'pcx> FnPatternBody<'pcx> {
 impl BasicBlockData<'_> {
     pub fn num_statements_and_terminator(&self) -> usize {
         self.statements.len() + self.terminator.is_some() as usize
+    }
+    pub fn num_statements(&self) -> usize {
+        self.statements.len()
     }
 }
 

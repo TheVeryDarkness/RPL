@@ -28,7 +28,7 @@ use rpl_match::graph::{self, MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
 use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::{CheckMirCtxt, pat};
-use rpl_match::{MatchComposedPattern, MirGraph, check2};
+use rpl_match::{MatchComposedPattern, MirGraph, Reachability, check2};
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -433,6 +433,11 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
         graphs: Vec<MirGraph<'tcx>>,
     }
     impl<'tcx> Visitor<'tcx> for CheckCtxt2<'tcx> {
+        type NestedFilter = nested_filter::All;
+        fn nested_visit_map(&mut self) -> Self::Map {
+            self.tcx.hir()
+        }
+
         fn visit_fn(
             &mut self,
             fk: intravisit::FnKind<'tcx>,
@@ -441,6 +446,7 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
             _: Span,
             id: LocalDefId,
         ) -> Self::Result {
+            trace!(?id, is_mir_available = ?self.tcx.is_mir_available(id), "visit_fn");
             if self.tcx.is_mir_available(id) {
                 let body = self.tcx.optimized_mir(id);
                 let self_ty = self
@@ -464,6 +470,7 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
                     id,
                     decl: fd,
                     name,
+                    reachability: Reachability::<mir::BasicBlock>::new_mir(body),
                 });
             }
         }

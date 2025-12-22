@@ -41,6 +41,7 @@ pub mod matches; // FIXME: visibility
 pub mod mir; // FIXME: visibility
 mod place;
 pub mod predicate_evaluator;
+mod reachability;
 pub(crate) mod resolve;
 mod statement;
 mod ty;
@@ -51,4 +52,5 @@ pub(crate) use counted::CountedMatch;
 pub(crate) use fns::MatchFnCtxt;
 pub use match2::{MirGraph, check2};
 pub(crate) use place::MatchPlaceCtxt;
+pub use reachability::Reachability;
 pub(crate) use ty::{MatchTyCtxt, TryCmpAs};
