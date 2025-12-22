@@ -240,6 +240,9 @@ impl<'a, 'pcx, 'tcx> CheckMirCtxt<'a, 'pcx, 'tcx> {
 }
 
 impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
+    fn has_self(&self) -> bool {
+        self.has_self
+    }
     fn body(&self) -> &mir::Body<'tcx> {
         self.body
     }
