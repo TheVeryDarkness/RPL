@@ -10,6 +10,9 @@ use crate::statement::MatchStatement;
 use crate::ty::MatchTy;
 
 impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt<'_, 'pcx, 'tcx> {
+    fn has_self(&self) -> bool {
+        self.cx.has_self
+    }
     fn body(&self) -> &mir::Body<'tcx> {
         self.cx.body
     }

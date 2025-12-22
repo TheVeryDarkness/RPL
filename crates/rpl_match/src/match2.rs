@@ -117,6 +117,22 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
             adt_matches: FxHashMap::default(),
         }
     }
+    fn new_ctx(
+        &'a self,
+        fn_pat: &'a pat::FnPatternBody<'pcx>,
+        fn_graph: &MirGraph<'tcx>,
+    ) -> MatchCtxt2Once<'a, 'pcx, 'tcx> {
+        MatchCtxt2Once {
+            cx: self,
+            has_self: fn_graph.has_self,
+            body: fn_graph.body,
+            self_ty: fn_graph.self_ty,
+            typing_env: fn_graph.typing_env,
+            fn_pat,
+            pat: self.pat,
+            matching: self.new_matching(fn_pat, fn_graph.body),
+        }
+    }
     /// Find all possible matches of 1-component in pattern graph to MIR graph.
     #[instrument(level = "debug", skip_all, fields(pat_name = ?self.pat_name))]
     fn find_matches_1(&self) -> AllMatchings<'a, 'tcx> {
@@ -150,15 +166,16 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                             if fn_pat.self_idx == Some(local_pat) && fn_graph.has_self {
                                 let self_value = mir::Local::from_u32(1);
                                 let matching = self.new_matching(fn_pat, fn_graph.body);
-                                let cx = MatchCtxt2Once {
-                                    cx: self,
-                                    body: fn_graph.body,
-                                    self_ty: fn_graph.self_ty,
-                                    typing_env: fn_graph.typing_env,
-                                    fn_pat,
-                                    pat: self.pat,
-                                    matching,
-                                };
+                                // let cx = MatchCtxt2Once {
+                                //     cx: self,
+                                //     body: fn_graph.body,
+                                //     self_ty: fn_graph.self_ty,
+                                //     typing_env: fn_graph.typing_env,
+                                //     fn_pat,
+                                //     pat: self.pat,
+                                //     matching,
+                                // };
+                                let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_local(local_pat, self_value) {
                                     cx.matching[loc_pat].set(Some(StatementMatch::Arg(self_value)));
                                     matchings.matches.push(cx.matching);
@@ -168,15 +185,16 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                                     let _span = debug_span!("build_candidates", arg = ?StatementMatch::Arg(arg).debug_with(fn_graph.body))
                                 .entered();
                                     let matching = self.new_matching(fn_pat, fn_graph.body);
-                                    let cx = MatchCtxt2Once {
-                                        cx: self,
-                                        body: fn_graph.body,
-                                        self_ty: fn_graph.self_ty,
-                                        typing_env: fn_graph.typing_env,
-                                        fn_pat,
-                                        pat: self.pat,
-                                        matching,
-                                    };
+                                    // let cx = MatchCtxt2Once {
+                                    //     cx: self,
+                                    //     body: fn_graph.body,
+                                    //     self_ty: fn_graph.self_ty,
+                                    //     typing_env: fn_graph.typing_env,
+                                    //     fn_pat,
+                                    //     pat: self.pat,
+                                    //     matching,
+                                    // };
+                                    let cx = self.new_ctx(fn_pat, fn_graph);
                                     if cx.match_local(local_pat, arg) {
                                         info!(
                                             "candidate matched: {loc_pat:?} {pat:?} <-> {arg:?}",
@@ -197,15 +215,16 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                                     statement_index: stmt_idx,
                                 };
                                 let matching = self.new_matching(fn_pat, fn_graph.body);
-                                let cx = MatchCtxt2Once {
-                                    cx: self,
-                                    body: fn_graph.body,
-                                    self_ty: fn_graph.self_ty,
-                                    typing_env: fn_graph.typing_env,
-                                    fn_pat,
-                                    pat: self.pat,
-                                    matching,
-                                };
+                                // let cx = MatchCtxt2Once {
+                                //     cx: self,
+                                //     body: fn_graph.body,
+                                //     self_ty: fn_graph.self_ty,
+                                //     typing_env: fn_graph.typing_env,
+                                //     fn_pat,
+                                //     pat: self.pat,
+                                //     matching,
+                                // };
+                                let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_statement_or_terminator(loc_pat, loc) {
                                     cx.matching[loc_pat].set(Some(StatementMatch::Location(loc)));
                                     cx.matching[loc].set(Some(loc_pat));
@@ -228,15 +247,16 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                                     statement_index: block.statements.len(),
                                 };
                                 let matching = self.new_matching(fn_pat, fn_graph.body);
-                                let cx = MatchCtxt2Once {
-                                    cx: self,
-                                    body: fn_graph.body,
-                                    self_ty: fn_graph.self_ty,
-                                    typing_env: fn_graph.typing_env,
-                                    fn_pat,
-                                    pat: self.pat,
-                                    matching,
-                                };
+                                // let cx = MatchCtxt2Once {
+                                //     cx: self,
+                                //     body: fn_graph.body,
+                                //     self_ty: fn_graph.self_ty,
+                                //     typing_env: fn_graph.typing_env,
+                                //     fn_pat,
+                                //     pat: self.pat,
+                                //     matching,
+                                // };
+                                let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_terminator(loc_pat, loc, &terminator_pat, &terminator) {
                                     cx.matching[loc_pat].set(Some(StatementMatch::Location(loc)));
                                     cx.matching[loc].set(Some(loc_pat));
@@ -385,6 +405,7 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
 
 struct MatchCtxt2Once<'a, 'pcx, 'tcx> {
     cx: &'a MatchCtxt2<'a, 'pcx, 'tcx>,
+    has_self: bool,
     body: &'a mir::Body<'tcx>,
     self_ty: Option<ty::Ty<'tcx>>,
     typing_env: TypingEnv<'tcx>,
@@ -394,6 +415,9 @@ struct MatchCtxt2Once<'a, 'pcx, 'tcx> {
 }
 
 impl<'a, 'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt2Once<'a, 'pcx, 'tcx> {
+    fn has_self(&self) -> bool {
+        self.has_self
+    }
     fn body(&self) -> &mir::Body<'tcx> {
         self.body
     }

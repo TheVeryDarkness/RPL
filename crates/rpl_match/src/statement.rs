@@ -15,6 +15,7 @@ use rustc_span::Symbol;
 
 use crate::MatchFnCtxt;
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
+use crate::matches::StatementMatch;
 use crate::ty::MatchTy;
 
 pub(crate) fn iter_place_proj_and_ty<'pcx, 'tcx>(
@@ -45,6 +46,10 @@ type PlaceElemPair<'pcx, 'tcx> = (
 pub(crate) trait MatchStatement<'pcx, 'tcx> {
     // Block structure matching, such as statement or terminator matching
 
+    /// Returns `true` if the function (MIR) has a `self` parameter.
+    ///
+    /// The function exists here as we can't infer it from `body` or somewhere else.
+    fn has_self(&self) -> bool;
     fn body(&self) -> &mir::Body<'tcx>;
     fn fn_pat(&self) -> &pat::FnPattern<'pcx>;
     fn mir_pat(&self) -> &pat::FnPatternBody<'pcx>;
@@ -72,6 +77,49 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx>;
 
     // Control flow matching
+
+    fn match_arg(&self, loc_pat: pat::Location) -> bool {
+        let bb_pat = loc_pat.block;
+        let stmt_pat = loc_pat.statement_index;
+        let block_pat = &self.mir_pat()[bb_pat];
+        // Note that this should be outside of the `self.cx.body.basic_blocks.iter_enumerated()` loop to
+        // avoid duplicated argument candidates.
+        if loc_pat.statement_index < block_pat.statements.len()
+            && let pat::StatementKind::Assign(
+                pat::Place {
+                    base: pat::PlaceBase::Local(local_pat),
+                    projection: [],
+                },
+                pat::Rvalue::Any,
+            ) = block_pat.statements[loc_pat.statement_index]
+        {
+            if self.mir_pat().self_idx == Some(local_pat) && self.has_self() {
+                let self_value = mir::Local::from_u32(1);
+                if self.match_local(local_pat, self_value) {
+                    info!(
+                        "candidate matched: {loc_pat:?} (self) {pat:?} <-> {self_value:?}",
+                        pat = self.mir_pat()[bb_pat].debug_stmt_at(stmt_pat),
+                    );
+
+                    return true;
+                }
+            } else {
+                for arg in self.body().args_iter() {
+                    let _span =
+                        debug_span!("build_candidates", arg = ?StatementMatch::Arg(arg).debug_with(self.body()))
+                            .entered();
+                    if self.match_local(local_pat, arg) {
+                        info!(
+                            "candidate matched: {loc_pat:?} {pat:?} <-> {arg:?}",
+                            pat = self.mir_pat()[bb_pat].debug_stmt_at(stmt_pat),
+                        );
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 
     #[instrument(level = "trace", skip(self), ret)]
     fn match_statement_or_terminator(&self, pat: pat::Location, loc: mir::Location) -> bool {
