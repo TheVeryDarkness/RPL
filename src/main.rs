@@ -44,22 +44,54 @@ pub fn main() {
     }
 }
 
+#[derive(Debug)]
 struct RplCmd {
     cargo_subcommand: &'static str,
     args: Vec<String>,
     rpl_args: Vec<String>,
+    pattern_groups: Vec<String>,
+    manifest_path: Option<PathBuf>,
 }
 
 impl RplCmd {
-    fn new<I>(mut old_args: I) -> Self
+    fn new<I>(mut old_args: I) -> Result<Self, String>
     where
         I: Iterator<Item = String>,
     {
         let mut cargo_subcommand = "check";
-        let mut args = vec![];
-        let mut rpl_args: Vec<String> = vec![];
+        let mut args = Vec::new();
+        let mut rpl_args = Vec::new();
+        let mut pattern_groups = Vec::new();
+        let mut manifest_path = None;
+        let mut after_dashdash = false;
 
-        for arg in old_args.by_ref() {
+        let iter = old_args.by_ref();
+        while let Some(arg) = iter.next() {
+            if arg == "--" {
+                after_dashdash = true;
+                continue;
+            }
+
+            if after_dashdash {
+                rpl_args.push(arg);
+                continue;
+            }
+
+            if let Some(value) = arg.strip_prefix("--patterns=") {
+                if value.is_empty() {
+                    return Err("`--patterns` requires a non-empty value".to_string());
+                }
+                pattern_groups.push(value.to_string());
+                continue;
+            }
+            if arg == "--patterns" {
+                match iter.next() {
+                    Some(value) if !value.is_empty() => pattern_groups.push(value),
+                    _ => return Err("`--patterns` requires a value".to_string()),
+                }
+                continue;
+            }
+
             match arg.as_str() {
                 "--fix" => {
                     cargo_subcommand = "fix";
@@ -69,23 +101,39 @@ impl RplCmd {
                     rpl_args.push("--no-deps".into());
                     continue;
                 },
-                "--" => break,
                 _ => {},
+            }
+
+            if let Some(value) = arg.strip_prefix("--manifest-path=") {
+                manifest_path = Some(PathBuf::from(value));
+                args.push(arg);
+                continue;
+            }
+
+            if arg == "--manifest-path" {
+                if let Some(value) = iter.next() {
+                    manifest_path = Some(PathBuf::from(&value));
+                    args.push(arg);
+                    args.push(value);
+                } else {
+                    args.push(arg);
+                }
+                continue;
             }
 
             args.push(arg);
         }
-
-        rpl_args.append(&mut (old_args.collect()));
         if cargo_subcommand == "fix" && !rpl_args.iter().any(|arg| arg == "--no-deps") {
             rpl_args.push("--no-deps".into());
         }
 
-        Self {
+        Ok(Self {
             cargo_subcommand,
             args,
             rpl_args,
-        }
+            pattern_groups,
+            manifest_path,
+        })
     }
 
     fn path() -> PathBuf {
@@ -120,9 +168,28 @@ fn process<I>(old_args: I) -> Result<(), i32>
 where
     I: Iterator<Item = String>,
 {
-    let cmd = RplCmd::new(old_args);
+    let cmd = match RplCmd::new(old_args) {
+        Ok(cmd) => cmd,
+        Err(err) => {
+            eprintln!("{err}");
+            return Err(1);
+        },
+    };
+    let config = match rpl_config::load_config(cmd.manifest_path.as_deref(), &cmd.pattern_groups) {
+        Ok(value) => value,
+        Err(err) => {
+            eprintln!("{err}");
+            return Err(1);
+        },
+    };
 
     let mut cmd = cmd.into_std_cmd();
+    if let Some(patterns_env) = config.patterns_env {
+        cmd.env("RPL_PATS", patterns_env);
+    }
+    if let Some(inline_mir) = config.inline_mir {
+        apply_inline_mir(&mut cmd, inline_mir);
+    }
 
     let exit_status = cmd
         .spawn()
@@ -137,6 +204,22 @@ where
     }
 }
 
+fn apply_inline_mir(cmd: &mut Command, inline_mir: bool) {
+    let flag = format!("-Zinline-mir={inline_mir}");
+    match env::var("RUSTFLAGS") {
+        Ok(existing) if existing.contains("inline-mir") => {},
+        Ok(existing) if existing.trim().is_empty() => {
+            cmd.env("RUSTFLAGS", flag);
+        },
+        Ok(existing) => {
+            cmd.env("RUSTFLAGS", format!("{existing} {flag}"));
+        },
+        Err(_) => {
+            cmd.env("RUSTFLAGS", flag);
+        },
+    }
+}
+
 #[must_use]
 pub fn help_message() -> &'static str {
     color_print::cstr!(
@@ -148,6 +231,7 @@ pub fn help_message() -> &'static str {
 <green,bold>Common options:</>
     <cyan,bold>--no-deps</>                Run RPL only on the given crate, without linting the dependencies
     <cyan,bold>--fix</>                    Automatically apply lint suggestions. This flag implies <cyan>--no-deps</> and <cyan>--all-targets</>
+    <cyan,bold>--patterns</> <cyan><<GROUP>></>     Run RPL with selected pattern groups (repeatable)
     <cyan,bold>-h</>, <cyan,bold>--help</>               Print this message
     <cyan,bold>-V</>, <cyan,bold>--version</>            Print version info and exit
     <cyan,bold>--explain [LINT]</>         Print the documentation for a given lint
@@ -177,7 +261,7 @@ mod tests {
     #[test]
     fn fix() {
         let args = "cargo rpl --fix".split_whitespace().map(ToString::to_string);
-        let cmd = RplCmd::new(args);
+        let cmd = RplCmd::new(args).expect("parse args");
         assert_eq!("fix", cmd.cargo_subcommand);
         assert!(!cmd.args.iter().any(|arg| arg.ends_with("unstable-options")));
     }
@@ -185,7 +269,7 @@ mod tests {
     #[test]
     fn fix_implies_no_deps() {
         let args = "cargo rpl --fix".split_whitespace().map(ToString::to_string);
-        let cmd = RplCmd::new(args);
+        let cmd = RplCmd::new(args).expect("parse args");
         assert!(cmd.rpl_args.iter().any(|arg| arg == "--no-deps"));
     }
 
@@ -194,14 +278,61 @@ mod tests {
         let args = "cargo rpl --fix -- --no-deps"
             .split_whitespace()
             .map(ToString::to_string);
-        let cmd = RplCmd::new(args);
+        let cmd = RplCmd::new(args).expect("parse args");
         assert_eq!(cmd.rpl_args.iter().filter(|arg| *arg == "--no-deps").count(), 1);
     }
 
     #[test]
     fn check() {
         let args = "cargo rpl".split_whitespace().map(ToString::to_string);
-        let cmd = RplCmd::new(args);
+        let cmd = RplCmd::new(args).expect("parse args");
         assert_eq!("check", cmd.cargo_subcommand);
+    }
+
+    #[test]
+    fn patterns_equals() {
+        let args = "cargo rpl --patterns=core".split_whitespace().map(ToString::to_string);
+        let cmd = RplCmd::new(args).expect("parse args");
+        assert_eq!(cmd.pattern_groups, vec!["core".to_string()]);
+    }
+
+    #[test]
+    fn patterns_space() {
+        let args = "cargo rpl --patterns core".split_whitespace().map(ToString::to_string);
+        let cmd = RplCmd::new(args).expect("parse args");
+        assert_eq!(cmd.pattern_groups, vec!["core".to_string()]);
+    }
+
+    #[test]
+    fn patterns_multiple() {
+        let args = "cargo rpl --patterns=core --patterns extra"
+            .split_whitespace()
+            .map(ToString::to_string);
+        let cmd = RplCmd::new(args).expect("parse args");
+        assert_eq!(cmd.pattern_groups, vec!["core".to_string(), "extra".to_string()]);
+    }
+
+    #[test]
+    fn patterns_missing_value() {
+        let args = "cargo rpl --patterns".split_whitespace().map(ToString::to_string);
+        let err = RplCmd::new(args).expect_err("missing value should error");
+        assert!(err.contains("--patterns"));
+    }
+
+    #[test]
+    fn patterns_empty_value() {
+        let args = "cargo rpl --patterns=".split_whitespace().map(ToString::to_string);
+        let err = RplCmd::new(args).expect_err("empty value should error");
+        assert!(err.contains("--patterns"));
+    }
+
+    #[test]
+    fn patterns_after_dashdash() {
+        let args = "cargo rpl -- --patterns=core"
+            .split_whitespace()
+            .map(ToString::to_string);
+        let cmd = RplCmd::new(args).expect("parse args");
+        assert!(cmd.pattern_groups.is_empty());
+        assert!(cmd.rpl_args.iter().any(|arg| arg == "--patterns=core"));
     }
 }

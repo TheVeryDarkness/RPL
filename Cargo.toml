@@ -23,6 +23,7 @@ rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
 rpl_utils = { path = "./crates/rpl_utils" }
 rpl_meta = { path = "./crates/rpl_meta" }
 rpl_patterns = { path = "./crates/rpl_patterns" }
+rpl_config = { path = "./crates/rpl_config" }
 rpl_constraints = { path = "./crates/rpl_constraints" }
 rpl_resolve = { path = "./crates/rpl_resolve" }
 rustc_tools_util = "0.3.0"
@@ -93,6 +94,7 @@ path = "src/driver.rs"
 [dependencies]
 rpl_interface.workspace = true
 rpl_meta.workspace = true
+rpl_config.workspace = true
 rustc_tools_util.workspace = true
 color-print = "0.3.4"
 anstream = "0.6.0"

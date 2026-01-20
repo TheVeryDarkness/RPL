@@ -1504,6 +1504,7 @@ dependencies = [
  "quote",
  "radium",
  "regex",
+ "rpl_config",
  "rpl_interface",
  "rpl_meta",
  "rustc_tools_util",
@@ -1521,6 +1522,17 @@ dependencies = [
  "ui_test",
  "walkdir",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "rpl_config"
+version = "0.1.0"
+dependencies = [
+ "cargo_metadata 0.15.4",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]
