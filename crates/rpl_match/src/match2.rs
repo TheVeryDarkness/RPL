@@ -1,24 +1,29 @@
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::hash::Hash;
-use std::mem::take;
 use std::ops::{Deref, Index};
 
+use matched::{Matched, MatchedBlock, StatementMatch};
+use mitsein::vec1::Vec1;
 use rpl_constraints::Const;
 use rpl_context::{PatCtxt, pat};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustc_hir::FnDecl;
 use rustc_hir::def_id::LocalDefId;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::ty::{TyCtxt, TypingEnv};
 use rustc_middle::{mir, ty};
 use rustc_span::{Ident, Symbol};
+pub use with_call_stack::WithCallStack;
 
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
-use crate::matches::{Matched, MatchedBlock, StatementMatch};
+use crate::match2::matched::NormalizedMatched;
 use crate::statement::MatchStatement;
 use crate::ty::MatchTy;
 use crate::{AdtMatch, Reachability};
+
+mod matched;
+mod with_call_stack;
 
 pub struct MirGraph<'tcx> {
     pub body: &'tcx mir::Body<'tcx>,
@@ -37,8 +42,26 @@ pub struct MirGraph<'tcx> {
 struct Matchings<'a, 'tcx> {
     graph: &'a MirGraph<'tcx>,
     /// List of functions that call this function. Used for propagating matches.
+    ///
+    /// Each caller is represented as (caller function id, call location in caller).
     callers: Vec<(LocalDefId, mir::Location)>,
     matches: Vec<Matching<'tcx>>,
+}
+
+impl Matchings<'_, '_> {
+    // FIXME: this deduplication is inefficient, we should use a better data structure
+    #[instrument(level = "trace", skip(self), fields(fn_id = ?self.graph.id))]
+    fn dedup(&mut self) {
+        trace!(num_matches = ?self.matches.len(), "deduplicating matches");
+        let mut unique = Vec::new();
+        for m in self.matches.drain(..) {
+            if !unique.contains(&m) {
+                unique.push(m);
+            }
+        }
+        self.matches = unique;
+        trace!(num_matches = ?self.matches.len(), "deduplicated matches");
+    }
 }
 
 type AllMatchings<'a, 'tcx> = FxHashMap<LocalDefId, Matchings<'a, 'tcx>>;
@@ -89,8 +112,8 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
         let num_locals = fn_pat.locals.len();
         let mir_statements = IndexVec::from_fn_n(
             |bb| {
-                MirStatementBackMatches::from_elem_n(
-                    MatchingCell::new(),
+                MirStatementBackMatches::from_fn_n(
+                    |_| MatchingCell::new(),
                     body[bb].statements.len() + body[bb].terminator.is_some() as usize,
                 )
             },
@@ -99,13 +122,13 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
         Matching {
             basic_blocks: IndexVec::from_fn_n(
                 |bb_pat| {
-                    let mut num_stmt_pats = fn_pat[bb_pat].num_statements_and_terminator();
+                    let num_stmt_pats = fn_pat[bb_pat].num_statements_and_terminator();
                     // We don't need to match the end of the pattern, because it is only a marker and has no
                     // corresponding terminator.
                     // if fn_pat[bb_pat].has_pat_end() {
                     //     num_stmt_pats -= 1;
                     // }
-                    MatchingBlock::from_elem_n(MatchingCell::new(), num_stmt_pats)
+                    MatchingBlock::from_fn_n(|_| MatchingCell::new(), num_stmt_pats)
                 },
                 num_blocks,
             ),
@@ -125,6 +148,7 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
         MatchCtxt2Once {
             cx: self,
             has_self: fn_graph.has_self,
+            def_id: fn_graph.id,
             body: fn_graph.body,
             self_ty: fn_graph.self_ty,
             typing_env: fn_graph.typing_env,
@@ -165,42 +189,27 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                         {
                             if fn_pat.self_idx == Some(local_pat) && fn_graph.has_self {
                                 let self_value = mir::Local::from_u32(1);
-                                let matching = self.new_matching(fn_pat, fn_graph.body);
-                                // let cx = MatchCtxt2Once {
-                                //     cx: self,
-                                //     body: fn_graph.body,
-                                //     self_ty: fn_graph.self_ty,
-                                //     typing_env: fn_graph.typing_env,
-                                //     fn_pat,
-                                //     pat: self.pat,
-                                //     matching,
-                                // };
                                 let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_local(local_pat, self_value) {
-                                    cx.matching[loc_pat].set(Some(StatementMatch::Arg(self_value)));
+                                    let loc = WithCallStack::new_one(fn_graph.id, StatementMatch::Arg(self_value));
+                                    cx.matching[loc_pat].set_checked(loc);
                                     matchings.matches.push(cx.matching);
                                 }
                             } else {
                                 for arg in fn_graph.body.args_iter() {
-                                    let _span = debug_span!("build_candidates", arg = ?StatementMatch::Arg(arg).debug_with(fn_graph.body))
-                                .entered();
-                                    let matching = self.new_matching(fn_pat, fn_graph.body);
-                                    // let cx = MatchCtxt2Once {
-                                    //     cx: self,
-                                    //     body: fn_graph.body,
-                                    //     self_ty: fn_graph.self_ty,
-                                    //     typing_env: fn_graph.typing_env,
-                                    //     fn_pat,
-                                    //     pat: self.pat,
-                                    //     matching,
-                                    // };
+                                    let _span = debug_span!(
+                                        "build_candidates",
+                                        arg = ?StatementMatch::Arg(arg).debug_with(fn_graph.body)
+                                    )
+                                    .entered();
                                     let cx = self.new_ctx(fn_pat, fn_graph);
                                     if cx.match_local(local_pat, arg) {
                                         info!(
                                             "candidate matched: {loc_pat:?} {pat:?} <-> {arg:?}",
                                             pat = cx.mir_pat()[bb_pat].debug_stmt_at(stmt_pat_idx),
                                         );
-                                        cx.matching[loc_pat].set(Some(StatementMatch::Arg(arg)));
+                                        let loc = WithCallStack::new_one(fn_graph.id, StatementMatch::Arg(arg));
+                                        cx.matching[loc_pat].set_checked(loc);
                                         matchings.matches.push(cx.matching);
                                     }
                                 }
@@ -214,20 +223,12 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                                     block: bb,
                                     statement_index: stmt_idx,
                                 };
-                                let matching = self.new_matching(fn_pat, fn_graph.body);
-                                // let cx = MatchCtxt2Once {
-                                //     cx: self,
-                                //     body: fn_graph.body,
-                                //     self_ty: fn_graph.self_ty,
-                                //     typing_env: fn_graph.typing_env,
-                                //     fn_pat,
-                                //     pat: self.pat,
-                                //     matching,
-                                // };
                                 let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_statement_or_terminator(loc_pat, loc) {
-                                    cx.matching[loc_pat].set(Some(StatementMatch::Location(loc)));
-                                    cx.matching[loc].set(Some(loc_pat));
+                                    let loc_with_stack =
+                                        WithCallStack::new_one(fn_graph.id, StatementMatch::Location(loc));
+                                    cx.matching[loc_pat].set_checked(loc_with_stack);
+                                    cx.matching[loc].set_checked(Vec1::from_one(loc_pat));
                                     matchings.matches.push(cx.matching);
                                     // trace!(?fn_graph.id, ?loc_pat, ?loc, "found 1-component
                                     // match");
@@ -246,20 +247,12 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                                     block: bb,
                                     statement_index: block.statements.len(),
                                 };
-                                let matching = self.new_matching(fn_pat, fn_graph.body);
-                                // let cx = MatchCtxt2Once {
-                                //     cx: self,
-                                //     body: fn_graph.body,
-                                //     self_ty: fn_graph.self_ty,
-                                //     typing_env: fn_graph.typing_env,
-                                //     fn_pat,
-                                //     pat: self.pat,
-                                //     matching,
-                                // };
                                 let cx = self.new_ctx(fn_pat, fn_graph);
                                 if cx.match_terminator(loc_pat, loc, &terminator_pat, &terminator) {
-                                    cx.matching[loc_pat].set(Some(StatementMatch::Location(loc)));
-                                    cx.matching[loc].set(Some(loc_pat));
+                                    let loc_with_stack =
+                                        WithCallStack::new_one(fn_graph.id, StatementMatch::Location(loc));
+                                    cx.matching[loc_pat].set_checked(loc_with_stack);
+                                    cx.matching[loc].set_checked(Vec1::from_one(loc_pat));
                                     matchings.matches.push(cx.matching);
                                     // trace!(?fn_graph.id, ?loc_pat, ?loc, "found 1-component
                                     // match");
@@ -281,18 +274,24 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                     ..
                 }) = &block.terminator
                     && let mir::Operand::Constant(box mir::ConstOperand { const_, .. }) = func
-                    && let ty::FnDef(def_id, ..) = *const_.ty().kind()
-                    && let Some(def_id) = def_id.as_local()
-                    && let Some(m) = matching_1.get_mut(&def_id)
+                    && let ty::FnDef(callee_id, ..) = *const_.ty().kind()
+                    && let Some(callee_id) = callee_id.as_local()
+                    && let Some(m) = matching_1.get_mut(&callee_id)
                 {
-                    m.callers.push((
-                        def_id,
-                        mir::Location {
-                            block: bb,
-                            statement_index: block.statements.len(),
-                        },
-                    ));
-                    trace!(caller = ?fn_graph.id, callee = ?def_id, "found caller");
+                    let loc = mir::Location {
+                        block: bb,
+                        statement_index: block.statements.len(),
+                    };
+                    m.callers.push((fn_graph.id, loc));
+                    trace!(caller = ?fn_graph.id, callee = ?callee_id, ?loc, "found caller");
+                }
+            }
+        }
+
+        if cfg!(debug_assertions) {
+            for matching in matching_1.values() {
+                for (caller_id, caller_loc) in &matching.callers {
+                    Matching::check(*caller_loc, *caller_id, &matching_1);
                 }
             }
         }
@@ -302,7 +301,14 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
 
     /// Join matches of `k` components with matches of `1` components to form matches of `k+1`
     /// components.
-    #[instrument(level = "debug", skip_all, fields(num_fn_matches_k = ?matches_k.len(), num_fn_matches_1 = ?matches_1.len()))]
+    #[instrument(
+        level = "debug",
+        skip_all,
+        fields(
+            num_fn_matches_k = ?matches_k.len(),
+            num_fn_matches_1 = ?matches_1.len(),
+        )
+    )]
     fn join_matches(
         &self,
         matches_k: &AllMatchings<'a, 'tcx>,
@@ -334,19 +340,21 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                     }
                 }
 
-                if !matchings_k1.matches.is_empty() {
-                    trace!(?fn_id, num_matches_k1 = ?matchings_k1.matches.len(), "joined matches for function");
-                    // matchings_k1.matches.dedup();
-                    let matchings = take(&mut matchings_k1.matches);
+                matchings_k1.dedup();
+                // if !matchings_k1.matches.is_empty() {
+                //     trace!(?fn_id, num_matches_k1 = ?matchings_k1.matches.len(), "joined matches
+                // for function");     // matchings_k1.matches.dedup();
+                //     let matchings = take(&mut matchings_k1.matches);
 
-                    // FIXME: this deduplication is inefficient, we should use a better data structure
-                    for matching_k1 in matchings {
-                        if !matchings_k1.matches.contains(&matching_k1) {
-                            matchings_k1.matches.push(matching_k1);
-                        }
-                    }
-                }
-                trace!(?fn_id, num_matches_k1 = ?matchings_k1.matches.len(), "deduped joined matches for function");
+                //     // FIXME: this deduplication is inefficient, we should use a better data
+                // structure     for matching_k1 in matchings {
+                //         if !matchings_k1.matches.contains(&matching_k1) {
+                //             matchings_k1.matches.push(matching_k1);
+                //         }
+                //     }
+                // }
+                // trace!(?fn_id, num_matches_k1 = ?matchings_k1.matches.len(), "deduped joined
+                // matches for function");
                 matches_k1.insert(*fn_id, matchings_k1);
             }
         }
@@ -361,7 +369,6 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
         for (fn_id, matchings_fn) in matchings.iter() {
             debug!(?fn_id, num_matches = ?matchings_fn.matches.len(), "before propagation");
         }
-        let fns: Vec<_> = matchings.keys().cloned().collect();
         let mut to_visit: VecDeque<_> = matchings.keys().cloned().collect();
 
         while let Some(fn_id) = to_visit.pop_front() {
@@ -369,13 +376,17 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
             if let Some(matchings_fn) = matchings.get(&fn_id).cloned() {
                 for matching in matchings_fn.matches.iter() {
                     for (caller_id, caller_loc) in &matchings_fn.callers {
+                        if cfg!(debug_assertions) {
+                            Matching::check(*caller_loc, *caller_id, matchings);
+                        }
+                        let caller_body = matchings.get(caller_id).unwrap().graph.body;
                         let m = matchings.get_mut(caller_id).unwrap();
-                        let propagated = matching.propagate(*caller_loc);
+                        let propagated = matching.propagate(*caller_loc, caller_body, *caller_id);
                         if !m.matches.contains(&propagated) {
                             m.matches.push(propagated);
-                        }
-                        if !to_visit.contains(caller_id) {
-                            to_visit.push_back(*caller_id);
+                            if !to_visit.contains(caller_id) {
+                                to_visit.push_back(*caller_id);
+                            }
                         }
                     }
                 }
@@ -406,6 +417,7 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
 struct MatchCtxt2Once<'a, 'pcx, 'tcx> {
     cx: &'a MatchCtxt2<'a, 'pcx, 'tcx>,
     has_self: bool,
+    def_id: LocalDefId,
     body: &'a mir::Body<'tcx>,
     self_ty: Option<ty::Ty<'tcx>>,
     typing_env: TypingEnv<'tcx>,
@@ -467,13 +479,13 @@ impl<'a, 'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for MatchCtxt2Once<'a, 'pcx, 'tc
     fn match_local(&self, pat: pat::Local, local: mir::Local) -> bool {
         self.ty()
             .match_ty(self.mir_pat().locals[pat], self.body().local_decls[local].ty)
-            && self.matching[pat].try_set(local)
+            && self.matching[pat].try_set(WithCallStack::new_one(self.def_id, local))
     }
     #[instrument(level = "trace", skip(self), ret)]
     fn match_place_var(&self, pat: pat::PlaceVarIdx, place: mir::PlaceRef<'tcx>) -> bool {
         let place_ty = place.ty(&self.body.local_decls, self.ty().tcx);
         let matched = self.ty().match_ty(self.places[pat], place_ty.ty);
-        matched && self.matching[pat].try_set(place)
+        matched && self.matching[pat].try_set(WithCallStack::new_one(self.def_id, place))
     }
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.places[var])
@@ -646,22 +658,58 @@ trait MatchingCell<T> {
     #[must_use]
     fn try_set(&self, new: T) -> bool;
     fn new() -> Self;
+
+    fn set_checked(&self, new: T) {
+        let ok = self.try_set(new);
+        debug_assert!(ok, "try_set failed in set_checked");
+    }
 }
 
-impl<T: PartialEq + Copy> MatchingCell<T> for Cell<Option<T>> {
+impl<T: PartialEq> MatchingCell<T> for Cell<Option<T>> {
     #[must_use]
     fn try_set(&self, new: T) -> bool {
-        if self.get().as_ref().is_none_or(|old| *old == new) {
-            self.set(Some(new));
-            true
-        } else {
-            false
+        match self.take() {
+            None => {
+                self.set(Some(new));
+                true
+            },
+            Some(old) if old == new => {
+                self.set(Some(new));
+                true
+            },
+            Some(old) => {
+                self.set(Some(old));
+                false
+            },
         }
+        // if self.get().as_ref().is_none_or(|old| *old == new) {
+        //     self.set(Some(new));
+        //     true
+        // } else {
+        //     false
+        // }
     }
     fn new() -> Self {
         Cell::new(None)
     }
 }
+
+// impl<T: PartialEq> MatchingCell<Vec<T>> for VecCell<T> {
+//     #[must_use]
+//     fn try_set(&self, new: Vec<T>) -> bool {
+//         let old = self.take();
+//         if old.is_empty() || old == new {
+//             self.set(new);
+//             true
+//         } else {
+//             self.set(old);
+//             false
+//         }
+//     }
+//     fn new() -> Self {
+//         VecCell::new(Vec::new())
+//     }
+// }
 
 impl<T: PartialEq> MatchingCell<T> for RefCell<Option<T>> {
     #[must_use]
@@ -747,15 +795,41 @@ impl<T: PartialEq + Clone> BatchJoin for RefCell<Option<T>> {
         Some(())
     }
 }
+impl<T: BatchJoin> BatchJoin for Option<T> {
+    #[must_use]
+    fn join(&mut self, others: &Self) -> Option<()> {
+        if let (Some(self_), Some(other)) = (self.as_mut(), others.as_ref()) {
+            self_.join(other)?;
+        } else {
+            *self = None;
+        }
+        Some(())
+    }
+}
+// impl<T: PartialEq + Clone> BatchJoin for VecCell<T> {
+//     #[must_use]
+//     fn join(&mut self, others: &Self) -> Option<()> {
+//         if let Some(other) = others.get() {
+//             if let Some(self_) = self.get() {
+//                 if &*self_ != &*other {
+//                     return None;
+//                 }
+//             } else {
+//                 self.set(other.clone());
+//             }
+//         }
+//         Some(())
+//     }
+// }
 
 type MatchingBlock = IndexVec<usize, StatementMatches>;
-type StatementMatches = Cell<Option<StatementMatch>>;
-type LocalMatches = Cell<Option<mir::Local>>;
-type TyVarMatches<'tcx> = Cell<Option<ty::Ty<'tcx>>>;
-type ConstVarMatches<'tcx> = Cell<Option<Const<'tcx>>>;
-type PlaceVarMatches<'tcx> = Cell<Option<mir::PlaceRef<'tcx>>>;
-type MirStatementBackMatches = IndexVec<usize, Cell<Option<pat::Location>>>;
-type MirStatementBackMatch = Cell<Option<pat::Location>>;
+type StatementMatches = RefCell<Option<WithCallStack<StatementMatch>>>;
+type LocalMatches = RefCell<Option<WithCallStack<mir::Local>>>;
+type TyVarMatches<'tcx> = RefCell<Option<ty::Ty<'tcx>>>;
+type ConstVarMatches<'tcx> = RefCell<Option<Const<'tcx>>>;
+type PlaceVarMatches<'tcx> = RefCell<Option<WithCallStack<mir::PlaceRef<'tcx>>>>;
+type MirStatementBackMatches = IndexVec<usize, MirStatementBackMatch>;
+type MirStatementBackMatch = RefCell<Option<Vec1<pat::Location>>>;
 type AdtMatches<'tcx> = RefCell<Option<AdtMatch<'tcx>>>;
 
 /// See its counterpart in [`crate::matches`].
@@ -769,6 +843,8 @@ struct Matching<'tcx> {
     place_vars: IndexVec<pat::PlaceVarIdx, PlaceVarMatches<'tcx>>,
     /// Track which pattern statement the statement is matched to,
     /// so that one statement in MIR can be matched to at most one statement in pattern.
+    ///
+    /// Set to `None` after propagation.
     mir_statements: IndexVec<mir::BasicBlock, MirStatementBackMatches>,
     /// See [`crate::adt::AdtMatch`].
     adt_matches: FxHashMap<Symbol, AdtMatches<'tcx>>,
@@ -779,29 +855,36 @@ impl<'tcx> Matching<'tcx> {
     fn is_complete(&self) -> bool {
         for bb in self.basic_blocks.iter() {
             for stmt in bb.iter() {
-                if stmt.get().is_none() {
+                if stmt.borrow().is_none() {
                     return false;
                 }
             }
         }
         for local in self.locals.iter() {
-            if local.get().is_none() {
+            if local.borrow().is_none() {
                 return false;
             }
         }
         for ty_var in self.ty_vars.iter() {
-            if ty_var.get().is_none() {
+            if ty_var.borrow().is_none() {
                 return false;
             }
         }
         for const_var in self.const_vars.iter() {
-            if const_var.get().is_none() {
+            if const_var.borrow().is_none() {
                 return false;
             }
         }
         for place_var in self.place_vars.iter() {
-            if place_var.get().is_none() {
+            if place_var.borrow().is_none() {
                 return false;
+            }
+        }
+        for bb in self.mir_statements.iter() {
+            for stmt in bb.iter() {
+                if stmt.borrow().is_none() {
+                    return false;
+                }
             }
         }
         true
@@ -811,7 +894,7 @@ impl<'tcx> Matching<'tcx> {
     fn has_statement_intersection(&self, other: &Self) -> bool {
         for (bb_self, bb_other) in self.basic_blocks.iter().zip(other.basic_blocks.iter()) {
             for (stmt_self, stmt_other) in bb_self.iter().zip(bb_other.iter()) {
-                if let (Some(_), Some(_)) = (stmt_self.get(), stmt_other.get()) {
+                if let (Some(_), Some(_)) = (stmt_self.borrow().as_ref(), stmt_other.borrow().as_ref()) {
                     return true;
                 }
             }
@@ -826,10 +909,15 @@ impl<'tcx> Matching<'tcx> {
     ) -> bool {
         for (bb_idx_self, bb_self) in self.basic_blocks.iter_enumerated() {
             for (stmt_idx_self, stmt_self) in bb_self.iter().enumerate() {
-                if let Some(StatementMatch::Location(loc_self)) = stmt_self.get() {
+                if let Some(loc_self) = stmt_self.borrow().as_ref()
+                    && let (def_id_self, Some(loc_self)) = loc_self.bottom_location()
+                {
                     for (bb_idx_other, bb_other) in other.basic_blocks.iter_enumerated() {
                         for (stmt_idx_other, stmt_other) in bb_other.iter().enumerate() {
-                            if let Some(StatementMatch::Location(loc_other)) = stmt_other.get() {
+                            if let Some(loc_other) = stmt_other.borrow().as_ref()
+                                && let (def_id_other, Some(loc_other)) = loc_other.bottom_location()
+                            {
+                                debug_assert_eq!(def_id_self, def_id_other);
                                 let pat_reachability = pat_reachability.is_reachable(
                                     pat::Location {
                                         block: bb_idx_self,
@@ -893,12 +981,13 @@ impl<'tcx> Matching<'tcx> {
         Some(matching)
     }
 
-    fn propagate(&self, caller_loc: mir::Location) -> Self {
-        let matching = self.clone();
+    #[instrument(level = "trace", skip(self, body))]
+    fn propagate(&self, caller_loc: mir::Location, body: &mir::Body<'_>, def_id: LocalDefId) -> Self {
+        let mut matching = self.clone();
 
         for (_bb_idx, bb) in matching.basic_blocks.iter_enumerated() {
             for (_stmt_idx, stmt) in bb.iter_enumerated() {
-                if stmt.get().is_some() {
+                if let Some(stmt) = stmt.borrow_mut().as_mut() {
                     // let pat_loc = pat::Location {
                     //     block: bb_idx,
                     //     statement_index: stmt_idx,
@@ -907,17 +996,55 @@ impl<'tcx> Matching<'tcx> {
                     //     // Propagate to caller location.
                     //     stmt.set(Some(StatementMatch::Location(caller_loc)));
                     // }
-                    stmt.set(Some(StatementMatch::Location(caller_loc)));
+                    stmt.push_call(def_id, caller_loc);
                 }
             }
         }
 
-        for (_bb_idx, bb) in matching.mir_statements.iter_enumerated() {
-            for (_stmt_idx, stmt) in bb.iter_enumerated() {
-                stmt.set(None);
-            }
+        matching.mir_statements = IndexVec::from_fn_n(
+            |bb| {
+                IndexVec::from_fn_n(
+                    |_| MatchingCell::new(),
+                    body.basic_blocks[bb].statements.len() + body.basic_blocks[bb].terminator.is_some() as usize,
+                )
+            },
+            body.basic_blocks.len(),
+        );
+
+        let pat_stmts = matching
+            .mir_statements
+            .iter_mut()
+            .flat_map(|bb| bb.iter().flat_map(|stmt| stmt.borrow().as_ref().cloned()).flatten());
+        let pat_stmts: Vec<pat::Location> = pat_stmts.collect();
+        let pat_stmts: Option<Vec1<pat::Location>> = pat_stmts.try_into().ok();
+        if let Some(mut pat_stmts) = pat_stmts {
+            pat_stmts.sort();
+            matching.mir_statements[caller_loc.block][caller_loc.statement_index].set_checked(pat_stmts);
         }
         matching
+    }
+
+    fn check(caller_loc: mir::Location, caller_id: LocalDefId, matchings: &AllMatchings<'_, 'tcx>) {
+        if cfg!(debug_assertions) {
+            let body = matchings[&caller_id].graph.body;
+            debug_assert!(body.basic_blocks.len() > caller_loc.block.as_usize());
+            let bb = &body.basic_blocks[caller_loc.block];
+            let bb_len = bb.statements.len() + bb.terminator.is_some() as usize;
+            trace!(
+                ?caller_id,
+                ?caller_loc,
+                ?bb_len,
+                bb_num_stmt = ?bb.statements.len(),
+                bb_num_term = ?bb.terminator.is_some(),
+                "checking caller location validity"
+            );
+            debug_assert!(
+                bb_len > caller_loc.statement_index,
+                "{} > {} does not hold",
+                bb_len,
+                caller_loc.statement_index,
+            );
+        }
     }
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -931,37 +1058,46 @@ impl<'tcx> Matching<'tcx> {
                     Some(MatchedBlock {
                         statements: bb
                             .iter()
-                            .map(|stmt| stmt.get().as_ref().cloned())
+                            .map(|stmt| stmt.borrow().as_ref().cloned())
                             .collect::<Option<_>>()?,
-                        start: None,
-                        end: None,
                     })
                 })
                 .collect::<Option<_>>()?,
             locals: self
                 .locals
                 .iter()
-                .map(|local| local.get().as_ref().cloned())
+                .map(|local| local.borrow().as_ref().cloned())
                 .collect::<Option<_>>()?,
             ty_vars: self
                 .ty_vars
                 .iter()
-                .map(|ty_var| ty_var.get().as_ref().cloned())
+                .map(|ty_var| ty_var.borrow().as_ref().cloned())
                 .collect::<Option<_>>()?,
             const_vars: self
                 .const_vars
                 .iter()
-                .map(|const_var| const_var.get().as_ref().cloned())
+                .map(|const_var| const_var.borrow().as_ref().cloned())
                 .collect::<Option<_>>()?,
             place_vars: self
                 .place_vars
                 .iter()
-                .map(|place_var| place_var.get().as_ref().cloned())
+                .map(|place_var| place_var.borrow().as_ref().cloned())
                 .collect::<Option<_>>()?,
         })
     }
 
-    #[instrument(level = "trace", skip(self), fields(num_bbs = ?self.basic_blocks.len(), num_locals = ?self.locals.len(), num_ty_vars = ?self.ty_vars.len(), num_const_vars = ?self.const_vars.len(), num_place_vars = ?self.place_vars.len(), num_mir_stmts = ?self.mir_statements.len()))]
+    #[instrument(
+        level = "trace",
+        skip(self),
+        fields(
+            num_bbs = ?self.basic_blocks.len(),
+            num_locals = ?self.locals.len(),
+            num_ty_vars = ?self.ty_vars.len(),
+            num_const_vars = ?self.const_vars.len(),
+            num_place_vars = ?self.place_vars.len(),
+            num_mir_stmts = ?self.mir_statements.len(),
+        )
+    )]
     fn log_matched(&self) {
         for (bb_idx, bb) in self.basic_blocks.iter_enumerated() {
             for (stmt_idx, stmt) in bb.iter().enumerate() {
@@ -969,28 +1105,28 @@ impl<'tcx> Matching<'tcx> {
                     block: bb_idx,
                     statement_index: stmt_idx,
                 };
-                if let Some(matched) = stmt.get() {
+                if let Some(matched) = stmt.borrow().as_ref() {
                     trace!(?pat_stmt, ?matched, num_stmts = ?bb.len(), num_bbs = ?self.basic_blocks.len());
                 }
             }
         }
         for (pat_local, local) in self.locals.iter_enumerated() {
-            if let Some(matched) = local.get() {
+            if let Some(matched) = local.borrow().as_ref() {
                 trace!(?pat_local, ?matched, num_locals = ?self.locals.len());
             }
         }
         for (pat_ty_var, ty_var) in self.ty_vars.iter_enumerated() {
-            if let Some(matched) = ty_var.get() {
+            if let Some(matched) = ty_var.borrow().as_ref() {
                 trace!(?pat_ty_var, ?matched, num_ty_vars = ?self.ty_vars.len());
             }
         }
         for (pat_const_var, const_var) in self.const_vars.iter_enumerated() {
-            if let Some(matched) = const_var.get() {
+            if let Some(matched) = const_var.borrow().as_ref() {
                 trace!(?pat_const_var, ?matched, num_const_vars = ?self.const_vars.len());
             }
         }
         for (pat_place_var, place_var) in self.place_vars.iter_enumerated() {
-            if let Some(matched) = place_var.get() {
+            if let Some(matched) = place_var.borrow().as_ref() {
                 trace!(?pat_place_var, ?matched, num_place_vars = ?self.place_vars.len());
             }
         }
@@ -1000,8 +1136,8 @@ impl<'tcx> Matching<'tcx> {
                     block: bb_idx,
                     statement_index: stmt_idx,
                 };
-                if let Some(matched) = stmt.get() {
-                    trace!(?loc, ?matched, num_stmts = ?bb.len(), num_bbs = ?self.mir_statements.len());
+                if let Some(matched) = stmt.borrow().as_ref() {
+                    trace!(?loc, matched = ?&*matched, num_stmts = ?bb.len(), num_bbs = ?self.mir_statements.len());
                 }
             }
         }
@@ -1067,7 +1203,7 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
     pat_ddg: &'a PatDataDepGraph,
     fn_pat: &'a pat::FnPattern<'pcx>,
     fns: &'a [MirGraph<'tcx>],
-) -> Vec<(&'a MirGraph<'tcx>, Matched<'tcx>)> {
+) -> Vec<NormalizedMatched<'tcx>> {
     trace!(?pat_name, ?fn_pat.name, fn_count = ?fns.len(), "check2");
     let places = pat.meta.place_vars.iter().map(|var| var.ty).collect();
     let Some(body) = fn_pat.body else {
@@ -1113,11 +1249,16 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
                         trace!("found full match for function");
                         matched.log_matched();
                     });
-                    results.push((fn_graph, matched));
+                    let bottom = fn_graph.id;
+                    let label_map = &fn_pat.expect_body().labels;
+                    let attr_map = fn_pat.extra_span(tcx, bottom).unwrap();
+                    let matched = NormalizedMatched::new(bottom, matched, label_map, &attr_map);
+                    results.push(matched);
                 }
             }
         }
     }
+    let results = FxHashSet::from_iter(results).into_iter().collect::<Vec<_>>();
     debug!(match_count = ?results.len(), "check2 done");
     results
 }

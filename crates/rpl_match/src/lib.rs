@@ -28,6 +28,7 @@ extern crate rustc_span;
 extern crate rustc_target;
 extern crate rustc_type_ir;
 extern crate smallvec;
+extern crate static_assertions;
 #[macro_use]
 extern crate tracing;
 
@@ -50,7 +51,7 @@ pub(crate) use adt::{AdtMatch, Candidates, MatchAdtCtxt};
 pub use compose::MatchComposedPattern;
 pub(crate) use counted::CountedMatch;
 pub(crate) use fns::MatchFnCtxt;
-pub use match2::{MirGraph, check2};
+pub use match2::{MirGraph, WithCallStack, check2};
 pub(crate) use place::MatchPlaceCtxt;
 pub use reachability::Reachability;
 pub(crate) use ty::{MatchTyCtxt, TryCmpAs};

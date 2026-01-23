@@ -1,5 +1,6 @@
 use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{MatchedMap, Spanned};
+use rustc_data_structures::sorted_map::SortedMap;
 use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Local, PlaceRef};
@@ -15,8 +16,9 @@ pub enum NormalizedSpanned {
     Local(Local),
     Body,
     Output,
-    /// A span that is not associated with a specific location, local, or body.
-    /// For example, [`rustc_hir::Attribute`]
+    /// A span that is not associated with a specific location, local, or body,
+    /// especially cannot be retrieved from some indices.
+    /// For example, [`rustc_hir::Attribute`].
     Span(Span),
 }
 
@@ -34,13 +36,25 @@ impl NormalizedSpanned {
 }
 
 /// A normalized version of [`Matched`].
+///
+/// # Normalization
+///
+/// Normalization here means that:
+///
+/// - The matched meta variables and labels are mapped to a canonical form
+///  based on a provided mapping (`MatchedMap`).
+/// - Some information that is not relevant for equality comparison is discarded.
+/// - Some extra spans are included to capture additional function context.
+///
+/// This makes it so that two `NormalizedMatched` can be compared for equality even if they
+/// were matched against different patterns with an identical set of meta variable and label names.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
     /// Labels and attributes. Sorted by label.
-    extra: Vec<(Symbol, NormalizedSpanned)>,
+    extra: SortedMap<Symbol, NormalizedSpanned>,
 }
 
 impl<'tcx> NormalizedMatched<'tcx> {
@@ -50,7 +64,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
-        let mut labels: Vec<_> = label_map
+        let labels: SortedMap<_, _> = label_map
             .iter()
             .map(|(label, spanned)| match spanned {
                 Spanned::Location(location) => (*label, NormalizedSpanned::Location(matched[*location])),
@@ -58,13 +72,12 @@ impl<'tcx> NormalizedMatched<'tcx> {
                 Spanned::Body => (*label, NormalizedSpanned::Body),
                 Spanned::Output => (*label, NormalizedSpanned::Output),
             })
+            .chain(
+                extra_spans
+                    .iter()
+                    .map(|(label, span)| (*label, NormalizedSpanned::Span(span.span()))),
+            )
             .collect();
-        labels.extend(
-            extra_spans
-                .iter()
-                .map(|(label, span)| (*label, NormalizedSpanned::Span(span.span()))),
-        );
-        labels.sort_by_key(|(label, _)| *label);
 
         NormalizedMatched {
             ty_vars,
@@ -92,7 +105,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| matched_from.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
-        let mut labels: Vec<_> = label_map_from
+        let labels: SortedMap<_, _> = label_map_from
             .iter()
             .map(|(label, spanned)| {
                 let mapped_label = *matched_map.labels.get(label).unwrap_or(label);
@@ -104,7 +117,6 @@ impl<'tcx> NormalizedMatched<'tcx> {
                 }
             })
             .collect();
-        labels.sort_by_key(|(label, _)| *label);
 
         NormalizedMatched {
             ty_vars,
@@ -129,12 +141,11 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| self.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
-        let mut labels: Vec<_> = self
+        let labels: SortedMap<_, _> = self
             .extra
             .iter()
             .map(|(label, spanned)| (*matched_map.labels.get(label).unwrap_or(label), *spanned))
             .collect();
-        labels.sort_by_key(|(label, _)| *label);
 
         NormalizedMatched {
             ty_vars,
@@ -153,7 +164,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             && self
                 .extra
                 .iter()
-                .zip(&other.extra)
+                .zip(other.extra.iter())
                 .all(|((label1, _), (label2, _))| label1 == label2)
     }
 }
@@ -161,13 +172,15 @@ impl<'tcx> NormalizedMatched<'tcx> {
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
     fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
         let labels = &self.extra;
-        let i = labels
-            .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
-            .unwrap_or_else(|_| {
-                panic!("label `{name}` not found in pattern labels: {labels:?}");
-            });
-        labels[i].1.span(body, decl)
+        let symbol = Symbol::intern(name);
+        debug_assert!(
+            labels.contains_key(&symbol),
+            "label `{name}` not found in pattern labels: {labels:?}",
+        );
+        labels[&symbol].span(body, decl)
     }
+}
+impl<'tcx> pat::MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]
     }
