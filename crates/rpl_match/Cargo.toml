@@ -10,6 +10,7 @@ repository.workspace = true
 
 [dependencies]
 derive_more.workspace = true
+mitsein.workspace = true
 rpl_context.workspace = true
 rpl_resolve.workspace = true
 rpl_constraints.workspace = true

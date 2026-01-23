@@ -3,7 +3,6 @@ use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 
-pub use error::DynamicError;
 use error::DynamicErrorBuilder;
 use rpl_constraints::Constraints;
 use rpl_meta::collect_elems_separated_by_comma;
@@ -13,6 +12,7 @@ use rpl_parser::generics::{Choice2, Choice3, Choice4};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_hir::FnDecl;
+use rustc_hir::def_id::LocalDefId;
 use rustc_middle::mir::Body;
 use rustc_span::Symbol;
 use rustc_span::source_map::SourceMap;
@@ -33,8 +33,9 @@ mod ty;
 mod utils;
 
 pub use attr::PatAttr;
+pub use error::DynamicError;
 pub use item::*;
-pub use matched::{Matched, MatchedMap};
+pub use matched::{Matched, Matched2, MatchedMap, MatchedMetaVars, MatchedMetaVars2, MirGraphs};
 pub use mir::*;
 pub use non_local_meta_vars::*;
 pub(crate) use table::TableHead;
@@ -376,6 +377,8 @@ impl<'pcx> Pattern<'pcx> {
         }
     }
 
+    /// Get the diagnostic for a pattern item, where all spans should be inside a single function
+    /// body.
     pub fn get_diag<'tcx>(
         &self,
         pat_name: Symbol,
@@ -390,6 +393,23 @@ impl<'pcx> Pattern<'pcx> {
                 .get(&pat_name)
                 .ok_or_else(|| Box::new(DynamicError::default_diagnostic(pat_name, body.span)))?
                 .build(source_map, fn_name, body, decl, matched),
+        ))
+    }
+
+    /// Get the diagnostic for a pattern item, where spans may be across multiple function bodies.
+    pub fn get_diag2<'tcx>(
+        &self,
+        pat_name: Symbol,
+        source_map: &SourceMap,
+        bottom: LocalDefId,
+        fns: &FxHashMap<LocalDefId, (Option<Symbol>, &Body<'tcx>, &FnDecl<'tcx>)>,
+        matched: &impl Matched2<'tcx>,
+    ) -> Result<Box<DynamicError>, Box<DynamicError>> {
+        Ok(Box::new(
+            self.diag_block
+                .get(&pat_name)
+                .ok_or_else(|| Box::new(DynamicError::default_diagnostic(pat_name, fns[&bottom].1.span)))?
+                .build2(source_map, bottom, fns, matched),
         ))
     }
 }
@@ -421,7 +441,11 @@ impl<'pcx> Pattern<'pcx> {
         );
     }
 
-    #[instrument(level = "debug", skip(self, attr, item_or_patt_op, symbol_table, meta), fields(patt_block = ?self.patt_block.keys(), util_block = ?self.util_block.keys()))]
+    #[instrument(
+        level = "debug",
+        skip(self, attr, item_or_patt_op, symbol_table, meta),
+        fields(patt_block = ?self.patt_block.keys(), util_block = ?self.util_block.keys())
+    )]
     fn add_item_or_patt_op(
         &mut self,
         pat_name: Symbol,

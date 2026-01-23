@@ -26,7 +26,6 @@ use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
 use rpl_match::graph::{self, MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
-use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_match::{MatchComposedPattern, MirGraph, Reachability, check2};
 use rpl_meta::context::MetaContext;
@@ -330,8 +329,8 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         if self.tcx.is_mir_available(def_id) {
             let decl = sig.decl;
             let body = self.tcx.optimized_mir(def_id);
-            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
-            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+            let mir_cfg = graph::mir_control_flow_graph(body);
+            let mir_ddg = graph::mir_data_dep_graph(body, &mir_cfg);
             let header = Some(sig.header);
             let source_map = self.tcx.sess.source_map();
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
@@ -366,8 +365,8 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
         trace!(is_mir_available = ?self.tcx.is_mir_available(def_id), "check_fn");
         if self.tcx.is_mir_available(def_id) {
             let body = self.tcx.optimized_mir(def_id);
-            let mir_cfg = rpl_match::graph::mir_control_flow_graph(body);
-            let mir_ddg = rpl_match::graph::mir_data_dep_graph(body, &mir_cfg);
+            let mir_cfg = graph::mir_control_flow_graph(body);
+            let mir_ddg = graph::mir_data_dep_graph(body, &mir_cfg);
             let fn_name = fn_name.map(|ident| ident.name);
             let source_map = self.tcx.sess.source_map();
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
@@ -483,6 +482,11 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
     tcx.hir().walk_toplevel_module(&mut cx);
 
     let source_map = tcx.sess.source_map();
+    let graphs = cx
+        .graphs
+        .iter()
+        .map(|graph| (graph.id, (graph.name.map(|n| n.name), graph.body, graph.decl)))
+        .collect::<FxHashMap<_, _>>();
     pcx.for_each_rpl_pattern(|_id, pattern| {
         for (&name, pat_item) in &pattern.patt_block {
             match pat_item {
@@ -492,24 +496,15 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
                         let pat_cfg = graph::pat_control_flow_graph(mir_pat, tcx.pointer_size().bytes());
                         let pat_ddg = graph::pat_data_dep_graph(mir_pat, &pat_cfg);
                         let matched = check2(tcx, pcx, items, name, &pat_cfg, &pat_ddg, fn_pat, &cx.graphs);
-                        for (graph, matched) in matched {
-                            let label_map = &fn_pat.expect_body().labels;
-                            let attr_map = fn_pat.extra_span(tcx, graph.id).unwrap();
-
-                            let matched = NormalizedMatched::new(&matched, label_map, &attr_map);
+                        for matched in matched {
+                            let bottom = matched.bottom();
+                            // let matched = NormalizedMatched::new(&matched, label_map, &attr_map);
                             let error = pattern
-                                .get_diag(
-                                    name,
-                                    source_map,
-                                    graph.name.map(|i| i.name),
-                                    graph.body,
-                                    graph.decl,
-                                    &matched,
-                                )
+                                .get_diag2(name, source_map, bottom, &graphs, &matched)
                                 .unwrap_or_else(identity);
                             tcx.emit_node_span_lint(
                                 error.lint(),
-                                tcx.local_def_id_to_hir_id(graph.id),
+                                tcx.local_def_id_to_hir_id(bottom),
                                 error.primary_span().clone(),
                                 error,
                             );

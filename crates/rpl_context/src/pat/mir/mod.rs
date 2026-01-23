@@ -30,6 +30,7 @@ rustc_index::newtype_index! {
 
 rustc_index::newtype_index! {
     #[debug_format = "?bb{}"]
+    #[orderable]
     pub struct BasicBlock {}
 }
 
@@ -38,7 +39,7 @@ pub struct LocalWithIdent<'pcx> {
     pub ident: Ident<'pcx>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Location {
     pub block: BasicBlock,
     pub statement_index: usize,

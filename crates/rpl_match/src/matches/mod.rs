@@ -87,6 +87,8 @@ impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
                 panic!("label `{name}` not found in:\n    pattern labels: {labels:?}\n    attributes: {attr:?}");
             })
     }
+}
+impl<'tcx> pat::MatchedMetaVars<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.1.ty_vars[idx]
     }
