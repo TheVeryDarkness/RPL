@@ -558,6 +558,7 @@ impl<'pcx> PathWithArgs<'pcx> {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum IntTy {
+    AnyInt,
     NegInt(ty::IntTy),
     Int(ty::IntTy),
     Uint(ty::UintTy),
@@ -624,7 +625,7 @@ impl IntValue {
         let ty = if let Some(ty) = ty {
             IntTy::from(ty)
         } else {
-            IntTy::Uint(ty::UintTy::Usize)
+            IntTy::AnyInt
         };
         Self { value, ty }
     }
@@ -645,7 +646,7 @@ impl IntValue {
 
 impl IntValue {
     pub fn normalize(self, pointer_bytes: u64) -> Pu128 {
-        use IntTy::{Bool, Int, NegInt, Uint};
+        use IntTy::{AnyInt, Bool, Int, NegInt, Uint};
         use ty::IntTy::{I8, I16, I32, I64, I128, Isize};
 
         let IntValue { ty, value } = self;
@@ -661,7 +662,7 @@ impl IntValue {
                 8 => u128::from(u64::MAX),
                 _ => panic!("unsupported pointer size: {pointer_bytes}"),
             },
-            Int(_) | Uint(_) | Bool => return value,
+            AnyInt | Int(_) | Uint(_) | Bool => return value,
         };
         Pu128((value.get() ^ mask).wrapping_add(1) & mask)
     }

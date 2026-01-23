@@ -141,6 +141,7 @@ impl fmt::Display for RegionKind {
 impl fmt::Debug for IntValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.ty {
+            IntTy::AnyInt => write!(f, "{}", self.value),
             IntTy::Bool => write!(f, "{}", self.value != 0),
             IntTy::Int(ty) => write!(f, "{}_{}", self.value, ty.name_str()),
             IntTy::NegInt(ty) => write!(f, "-{}_{}", self.value, ty.name_str()),
