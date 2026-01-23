@@ -467,6 +467,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             (&pat::ConstOperand::ConstVar(const_var), konst) => self.ty().match_mir_const_var(const_var, konst),
             (&pat::ConstOperand::ScalarInt(value_pat), mir::Const::Val(mir::ConstValue::Scalar(value), ty)) => {
                 (match (value_pat.ty, *ty.kind()) {
+                    (pat::IntTy::AnyInt, ty::Int(_) | ty::Uint(_)) => true,
                     (pat::IntTy::NegInt(ty_pat), ty::Int(ty)) => ty_pat == ty,
                     (pat::IntTy::Int(ty_pat), ty::Int(ty)) => ty_pat == ty,
                     (pat::IntTy::Uint(ty_pat), ty::Uint(ty)) => ty_pat == ty,
