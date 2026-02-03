@@ -16,6 +16,7 @@ use rustc_span::Symbol;
 // use crate::passes::create_rpl_ctxt;
 
 pub static RPL_ARGS_ENV: &str = "RPL_ARGS";
+pub static RPL_PATS_ENV: &str = "RPL_PATS";
 
 fn track_rpl_args(psess: &mut ParseSess, args_env_var: &Option<String>) {
     psess.env_depinfo.get_mut().insert((
@@ -37,6 +38,20 @@ fn track_files(psess: &mut ParseSess) {
         && let Some(current_exe) = current_exe.to_str()
     {
         file_depinfo.insert(Symbol::intern(current_exe));
+    }
+}
+
+fn track_rpl_pats(psess: &mut ParseSess, pats_env_var: Option<String>, pats: &[String]) {
+    let rpl_pats = pats_env_var;
+    psess
+        .env_depinfo
+        .get_mut()
+        .insert((Symbol::intern(RPL_PATS_ENV), rpl_pats.as_deref().map(Symbol::intern)));
+
+    let pat_depinfo = psess.file_depinfo.get_mut();
+
+    for path in pats {
+        pat_depinfo.insert(Symbol::intern(path));
     }
 }
 
@@ -66,13 +81,15 @@ impl rustc_driver::Callbacks for DefaultCallbacks {}
 
 pub struct RplCallbacks {
     rpl_args_var: Option<String>,
+    rpl_pats_var: Option<String>,
     pattern_paths: Option<Vec<String>>,
 }
 
 impl RplCallbacks {
-    pub fn new(rpl_args_var: Option<String>, pattern_paths: Option<Vec<String>>) -> Self {
+    pub fn new(rpl_args_var: Option<String>, rpl_pats_var: Option<String>, pattern_paths: Option<Vec<String>>) -> Self {
         Self {
             rpl_args_var,
+            rpl_pats_var,
             pattern_paths,
         }
     }
@@ -102,9 +119,12 @@ impl rustc_driver::Callbacks for RplCallbacks {
     #[allow(rustc::bad_opt_access)]
     fn config(&mut self, config: &mut interface::Config) {
         let rpl_args_var = self.rpl_args_var.take();
+        let rpl_pats_var = self.rpl_pats_var.take();
+        let rpl_pats = self.pattern_paths.clone();
         config.psess_created = Some(Box::new(move |psess| {
             track_rpl_args(psess, &rpl_args_var);
             track_files(psess);
+            track_rpl_pats(psess, rpl_pats_var, rpl_pats.as_deref().unwrap_or(&[]));
         }));
         config.locale_resources = crate::default_locale_resources();
 

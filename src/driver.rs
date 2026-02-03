@@ -221,7 +221,8 @@ pub fn main() {
         let mut args: Vec<String> = orig_args.clone();
         pass_sysroot_env_if_given(&mut args, sys_root_env);
 
-        let pattern_paths = match env::var("RPL_PATS") {
+        let rpl_pats_var = env::var("RPL_PATS");
+        let pattern_paths = match &rpl_pats_var {
             Ok(val) => Some(val.split(':').map(ToString::to_string).collect()),
             Err(env::VarError::NotPresent) => None,
             Err(env::VarError::NotUnicode(var)) => {
@@ -261,7 +262,10 @@ pub fn main() {
             /* rustc_driver::RunCompiler::new(&args, &mut RplCallbacks::new(rpl_args_var))
             .set_using_internal_features(using_internal_features)
             .run() */
-            rustc_driver::run_compiler(&args, &mut RplCallbacks::new(rpl_args_var, pattern_paths))
+            rustc_driver::run_compiler(
+                &args,
+                &mut RplCallbacks::new(rpl_args_var, rpl_pats_var.ok(), pattern_paths),
+            )
         } else {
             rustc_driver::run_compiler(&args, &mut RustcCallbacks::new(rpl_args_var))
         }
