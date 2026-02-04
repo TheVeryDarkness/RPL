@@ -1,3 +1,4 @@
+//@ignore-target: windows
 fn main() {
     let s: *const core::net::SocketAddrV4 = core::ptr::null();
     let t1 = s as *const libc::sockaddr;

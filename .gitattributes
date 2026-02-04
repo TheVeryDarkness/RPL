@@ -1,0 +1,6 @@
+*.dot text eol=lf
+*.fixed text eol=lf
+*.rs text eol=lf
+*.sh text eol=lf
+*.stderr text eol=lf
+*.toml text eol=lf

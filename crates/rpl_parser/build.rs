@@ -1,11 +1,21 @@
+use std::env::VarError;
 use std::fs::{File, read_to_string};
 use std::io::Write as _;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use quote::quote;
 
+const TOOLCHAIN_PREFIX: &str = "nightly-2025-02-14";
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo::rerun-if-changed=src/grammar/RPL.pest");
+
+    let Some(rustfmt) = find_rustfmt_path()? else {
+        println!("cargo::warning=Could not find rustfmt for {TOOLCHAIN_PREFIX}, skipping parser generation.");
+        return Ok(());
+    };
+
     let parser = {
         use pest_typed_generator::derive_typed_parser;
         let input = quote! {
@@ -17,8 +27,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         derive_typed_parser(input.clone(), false, true)
     };
-
-    let rustfmt = find_rustfmt_path()?;
 
     let child = Command::new(rustfmt)
         .stdin(Stdio::piped())
@@ -41,10 +49,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn find_rustfmt_path() -> Result<String, Box<dyn std::error::Error>> {
-    let rustup_home = std::env::var("RUSTUP_HOME")?;
+fn find_rustfmt_path() -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let rustup_home = match std::env::var("RUSTUP_HOME") {
+        Ok(val) => val,
+        Err(VarError::NotPresent) => return Ok(None),
+        Err(e) => return Err(Box::new(e)),
+    };
 
-    let toolchains_dir = format!("{}/toolchains", rustup_home);
+    let toolchains_dir = Path::new(&rustup_home).join("toolchains");
     let toolchains = std::fs::read_dir(toolchains_dir)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
@@ -56,16 +68,21 @@ fn find_rustfmt_path() -> Result<String, Box<dyn std::error::Error>> {
             .file_stem()
             // Remember to update the date in the condition below if you change the nightly toolchain date.
             // FIXME: This is a temporary solution to use a specific nightly toolchain.
-            .is_some_and(|stem| stem.to_str().is_some_and(|stem| stem.starts_with("nightly-2025-02-14")))
+            .is_some_and(|stem| stem.to_str().is_some_and(|stem| stem.starts_with(TOOLCHAIN_PREFIX)))
         {
             continue; // Use only the nightly toolchain from 2025-02-14
         }
-        let rustfmt_candidate = toolchain.join("bin/rustfmt");
+        let rustfmt_executable = if cfg!(windows) { "rustfmt.exe" } else { "rustfmt" };
+        let rustfmt_candidate = toolchain.join("bin").join(rustfmt_executable);
         if rustfmt_candidate.exists() {
-            return Ok(rustfmt_candidate.to_str().unwrap().to_string());
+            return Ok(Some(
+                rustfmt_candidate
+                    .to_str()
+                    .ok_or_else(|| format!("Invalid UTF-8 in rustfmt path {:?}", rustfmt_candidate))?
+                    .to_string(),
+            ));
         }
     }
 
-    let err = "Could not find rustfmt in any toolchain";
-    Err(err.into())
+    Ok(None)
 }

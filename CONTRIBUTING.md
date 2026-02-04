@@ -6,6 +6,10 @@ Then, use `cargo +nightly-2025-02-14 rpl` to run RPL in your own repository to d
 
 > Every three months (or so), the toolchain will be updated to the latest nightly version. You can check the current toolchain by running `rustc -V` in the RPL repository.
 
+# Development Setup
+
+When aiming to update the pattern grammar, you should first set your RUSTUP_HOME environment variable, normally `%USERPROFILE%\.rustup` on Windows, so that the build script of `rpl_parser` crate can find the rustfmt binary in your toolchains.
+
 # Tests
 
 -   Use `cargo tests` (short for `cargo test --all`) to run all tests.

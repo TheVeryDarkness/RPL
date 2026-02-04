@@ -4,7 +4,7 @@ note: Item(
               owner_id: DefId(dump_hir::{use#1}),
               kind: Use(
                   Path {
-                      span: tests/ui/utils/dump_hir.rs:9:5: 9:19 (#0),
+                      span: tests/ui/utils/dump_hir.rs:10:5: 10:19 (#N),
                       res: [
                           Def(
                               Struct,
@@ -43,11 +43,11 @@ note: Item(
                   },
                   Single,
               ),
-              span: tests/ui/utils/dump_hir.rs:9:1: 9:20 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:9:1: 9:1 (#0),
+              span: tests/ui/utils/dump_hir.rs:10:1: 10:20 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:10:1: 10:1 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:9:5
+  --> tests/ui/utils/dump_hir.rs:10:5
    |
 LL | #[rpl::dump_hir]
    | ---------------- HIR dumped because of this attribute
@@ -62,8 +62,8 @@ note: Item(
               kind: Mod(
                   Mod {
                       spans: ModSpans {
-                          inner_span: tests/ui/utils/dump_hir.rs:17:5: 18:2 (#0),
-                          inject_use_span: tests/ui/utils/dump_hir.rs:17:5: 17:5 (#0),
+                          inner_span: tests/ui/utils/dump_hir.rs:18:5: 19:2 (#N),
+                          inject_use_span: tests/ui/utils/dump_hir.rs:18:5: 18:5 (#N),
                       },
                       item_ids: [
                           ItemId {
@@ -72,11 +72,11 @@ note: Item(
                       ],
                   },
               ),
-              span: tests/ui/utils/dump_hir.rs:15:1: 18:2 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:15:1: 15:1 (#0),
+              span: tests/ui/utils/dump_hir.rs:16:1: 19:2 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:16:1: 16:1 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:15:1
+  --> tests/ui/utils/dump_hir.rs:16:1
    |
 LL | #[rpl::dump_hir]
    | ---------------- HIR dumped because of this attribute
@@ -95,8 +95,8 @@ note: Item(
                       params: [],
                       predicates: [],
                       has_where_clause_predicates: false,
-                      where_clause_span: tests/ui/utils/dump_hir.rs:24:10: 24:10 (#0),
-                      span: tests/ui/utils/dump_hir.rs:24:10: 24:10 (#0),
+                      where_clause_span: tests/ui/utils/dump_hir.rs:25:10: 25:10 (#N),
+                      span: tests/ui/utils/dump_hir.rs:25:10: 25:10 (#N),
                   },
                   [],
                   [
@@ -106,15 +106,15 @@ note: Item(
                           },
                           ident: N#0,
                           kind: Const,
-                          span: tests/ui/utils/dump_hir.rs:30:5: 30:20 (#0),
+                          span: tests/ui/utils/dump_hir.rs:31:5: 31:20 (#N),
                       },
                   ],
               ),
-              span: tests/ui/utils/dump_hir.rs:24:1: 31:2 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:24:1: 24:1 (#0),
+              span: tests/ui/utils/dump_hir.rs:25:1: 32:2 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:25:1: 25:1 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:24:1
+  --> tests/ui/utils/dump_hir.rs:25:1
    |
 LL | #[rpl::dump_hir]
    | ---------------- HIR dumped because of this attribute
@@ -130,18 +130,18 @@ note: TraitItem(
                   params: [],
                   predicates: [],
                   has_where_clause_predicates: false,
-                  where_clause_span: tests/ui/utils/dump_hir.rs:30:19: 30:19 (#0),
-                  span: tests/ui/utils/dump_hir.rs:30:12: 30:12 (#0),
+                  where_clause_span: tests/ui/utils/dump_hir.rs:31:19: 31:19 (#N),
+                  span: tests/ui/utils/dump_hir.rs:31:12: 31:12 (#N),
               },
               kind: Const(
                   Ty {
                       hir_id: HirId(DefId(dump_hir::Foo::N).1),
-                      span: tests/ui/utils/dump_hir.rs:30:14: 30:19 (#0),
+                      span: tests/ui/utils/dump_hir.rs:31:14: 31:19 (#N),
                       kind: Path(
                           Resolved(
                               None,
                               Path {
-                                  span: tests/ui/utils/dump_hir.rs:30:14: 30:19 (#0),
+                                  span: tests/ui/utils/dump_hir.rs:31:14: 31:19 (#N),
                                   res: PrimTy(
                                       Uint(
                                           Usize,
@@ -166,13 +166,13 @@ note: TraitItem(
                   },
                   None,
               ),
-              span: tests/ui/utils/dump_hir.rs:30:5: 30:20 (#0),
+              span: tests/ui/utils/dump_hir.rs:31:5: 31:20 (#N),
               defaultness: Default {
                   has_value: false,
               },
           },
       )
-  --> tests/ui/utils/dump_hir.rs:30:5
+  --> tests/ui/utils/dump_hir.rs:31:5
    |
 LL |     #[rpl::dump_hir]
    |     ---------------- HIR dumped because of this attribute
@@ -195,13 +195,13 @@ note: Item(
                           params: [],
                           predicates: [],
                           has_where_clause_predicates: false,
-                          where_clause_span: tests/ui/utils/dump_hir.rs:37:16: 37:16 (#0),
-                          span: tests/ui/utils/dump_hir.rs:37:5: 37:5 (#0),
+                          where_clause_span: tests/ui/utils/dump_hir.rs:38:16: 38:16 (#N),
+                          span: tests/ui/utils/dump_hir.rs:38:5: 38:5 (#N),
                       },
                       of_trait: Some(
                           TraitRef {
                               path: Path {
-                                  span: tests/ui/utils/dump_hir.rs:37:6: 37:9 (#0),
+                                  span: tests/ui/utils/dump_hir.rs:38:6: 38:9 (#N),
                                   res: Def(
                                       Trait,
                                       DefId(dump_hir::Foo),
@@ -224,7 +224,7 @@ note: Item(
                       ),
                       self_ty: Ty {
                           hir_id: HirId(DefId(dump_hir::{impl#0}).3),
-                          span: tests/ui/utils/dump_hir.rs:37:14: 37:16 (#0),
+                          span: tests/ui/utils/dump_hir.rs:38:14: 38:16 (#N),
                           kind: Tup(
                               [],
                           ),
@@ -236,7 +236,7 @@ note: Item(
                               },
                               ident: N#0,
                               kind: Const,
-                              span: tests/ui/utils/dump_hir.rs:43:5: 43:30 (#0),
+                              span: tests/ui/utils/dump_hir.rs:44:5: 44:30 (#N),
                               trait_item_def_id: Some(
                                   DefId(dump_hir::Foo::N),
                               ),
@@ -244,11 +244,11 @@ note: Item(
                       ],
                   },
               ),
-              span: tests/ui/utils/dump_hir.rs:37:1: 44:2 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:37:1: 37:1 (#0),
+              span: tests/ui/utils/dump_hir.rs:38:1: 45:2 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:38:1: 38:1 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:37:1
+  --> tests/ui/utils/dump_hir.rs:38:1
    |
 LL | #[rpl::dump_hir]
    | ---------------- HIR dumped because of this attribute
@@ -264,18 +264,18 @@ note: ImplItem(
                   params: [],
                   predicates: [],
                   has_where_clause_predicates: false,
-                  where_clause_span: tests/ui/utils/dump_hir.rs:43:19: 43:19 (#0),
-                  span: tests/ui/utils/dump_hir.rs:43:12: 43:12 (#0),
+                  where_clause_span: tests/ui/utils/dump_hir.rs:44:19: 44:19 (#N),
+                  span: tests/ui/utils/dump_hir.rs:44:12: 44:12 (#N),
               },
               kind: Const(
                   Ty {
                       hir_id: HirId(DefId(dump_hir::{impl#0}::N).1),
-                      span: tests/ui/utils/dump_hir.rs:43:14: 43:19 (#0),
+                      span: tests/ui/utils/dump_hir.rs:44:14: 44:19 (#N),
                       kind: Path(
                           Resolved(
                               None,
                               Path {
-                                  span: tests/ui/utils/dump_hir.rs:43:14: 43:19 (#0),
+                                  span: tests/ui/utils/dump_hir.rs:44:14: 44:19 (#N),
                                   res: PrimTy(
                                       Uint(
                                           Usize,
@@ -303,11 +303,11 @@ note: ImplItem(
                   },
               ),
               defaultness: Final,
-              span: tests/ui/utils/dump_hir.rs:43:5: 43:30 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:43:5: 43:5 (#0),
+              span: tests/ui/utils/dump_hir.rs:44:5: 44:30 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:44:5: 44:5 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:43:5
+  --> tests/ui/utils/dump_hir.rs:44:5
    |
 LL |     #[rpl::dump_hir]
    |     ---------------- HIR dumped because of this attribute
@@ -332,31 +332,31 @@ note: Item(
                       decl: FnDecl {
                           inputs: [],
                           output: DefaultReturn(
-                              tests/ui/utils/dump_hir.rs:50:10: 50:10 (#0),
+                              tests/ui/utils/dump_hir.rs:51:10: 51:10 (#0),
                           ),
                           c_variadic: false,
                           implicit_self: None,
                           lifetime_elision_allowed: false,
                       },
-                      span: tests/ui/utils/dump_hir.rs:50:1: 50:10 (#0),
+                      span: tests/ui/utils/dump_hir.rs:51:1: 51:10 (#N),
                   },
                   generics: Generics {
                       params: [],
                       predicates: [],
                       has_where_clause_predicates: false,
-                      where_clause_span: tests/ui/utils/dump_hir.rs:50:10: 50:10 (#0),
-                      span: tests/ui/utils/dump_hir.rs:50:8: 50:8 (#0),
+                      where_clause_span: tests/ui/utils/dump_hir.rs:51:10: 51:10 (#N),
+                      span: tests/ui/utils/dump_hir.rs:51:8: 51:8 (#N),
                   },
                   body: BodyId {
                       hir_id: HirId(DefId(dump_hir::main).75),
                   },
                   has_body: true,
               },
-              span: tests/ui/utils/dump_hir.rs:50:1: 103:2 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:50:1: 50:1 (#0),
+              span: tests/ui/utils/dump_hir.rs:51:1: 104:2 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:51:1: 51:1 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:50:1
+  --> tests/ui/utils/dump_hir.rs:51:1
    |
 LL | #[rpl::dump_hir]
    | ---------------- HIR dumped because of this attribute
@@ -380,7 +380,7 @@ note: Stmt(
                               x#0,
                               None,
                           ),
-                          span: tests/ui/utils/dump_hir.rs:56:9: 56:10 (#0),
+                          span: tests/ui/utils/dump_hir.rs:57:9: 57:10 (#N),
                           default_binding_modes: true,
                       },
                       ty: None,
@@ -394,12 +394,12 @@ note: Stmt(
                                           TypeRelative(
                                               Ty {
                                                   hir_id: HirId(DefId(dump_hir::main).6),
-                                                  span: tests/ui/utils/dump_hir.rs:56:13: 56:16 (#0),
+                                                  span: tests/ui/utils/dump_hir.rs:57:13: 57:16 (#N),
                                                   kind: Path(
                                                       Resolved(
                                                           None,
                                                           Path {
-                                                              span: tests/ui/utils/dump_hir.rs:56:13: 56:16 (#0),
+                                                              span: tests/ui/utils/dump_hir.rs:57:13: 57:16 (#N),
                                                               res: Def(
                                                                   Struct,
                                                                   DefId(alloc::sync::Arc),
@@ -429,7 +429,7 @@ note: Stmt(
                                               },
                                           ),
                                       ),
-                                      span: tests/ui/utils/dump_hir.rs:56:13: 56:21 (#0),
+                                      span: tests/ui/utils/dump_hir.rs:57:13: 57:21 (#N),
                                   },
                                   [
                                       Expr {
@@ -444,26 +444,26 @@ note: Stmt(
                                                           Usize,
                                                       ),
                                                   ),
-                                                  span: tests/ui/utils/dump_hir.rs:56:22: 56:29 (#0),
+                                                  span: tests/ui/utils/dump_hir.rs:57:22: 57:29 (#N),
                                               },
                                           ),
-                                          span: tests/ui/utils/dump_hir.rs:56:22: 56:29 (#0),
+                                          span: tests/ui/utils/dump_hir.rs:57:22: 57:29 (#N),
                                       },
                                   ],
                               ),
-                              span: tests/ui/utils/dump_hir.rs:56:13: 56:30 (#0),
+                              span: tests/ui/utils/dump_hir.rs:57:13: 57:30 (#N),
                           },
                       ),
                       els: None,
                       hir_id: HirId(DefId(dump_hir::main).9),
-                      span: tests/ui/utils/dump_hir.rs:56:5: 56:31 (#0),
+                      span: tests/ui/utils/dump_hir.rs:57:5: 57:31 (#N),
                       source: Normal,
                   },
               ),
-              span: tests/ui/utils/dump_hir.rs:56:5: 56:31 (#0),
+              span: tests/ui/utils/dump_hir.rs:57:5: 57:31 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:56:5
+  --> tests/ui/utils/dump_hir.rs:57:5
    |
 LL |     #[rpl::dump_hir]
    |     ---------------- HIR dumped because of this attribute
@@ -488,31 +488,31 @@ note: Item(
                       decl: FnDecl {
                           inputs: [],
                           output: DefaultReturn(
-                              tests/ui/utils/dump_hir.rs:62:13: 62:13 (#0),
+                              tests/ui/utils/dump_hir.rs:63:13: 63:13 (#0),
                           ),
                           c_variadic: false,
                           implicit_self: None,
                           lifetime_elision_allowed: false,
                       },
-                      span: tests/ui/utils/dump_hir.rs:62:5: 62:13 (#0),
+                      span: tests/ui/utils/dump_hir.rs:63:5: 63:13 (#N),
                   },
                   generics: Generics {
                       params: [],
                       predicates: [],
                       has_where_clause_predicates: false,
-                      where_clause_span: tests/ui/utils/dump_hir.rs:62:13: 62:13 (#0),
-                      span: tests/ui/utils/dump_hir.rs:62:11: 62:11 (#0),
+                      where_clause_span: tests/ui/utils/dump_hir.rs:63:13: 63:13 (#N),
+                      span: tests/ui/utils/dump_hir.rs:63:11: 63:11 (#N),
                   },
                   body: BodyId {
                       hir_id: HirId(DefId(dump_hir::main::foo).4),
                   },
                   has_body: true,
               },
-              span: tests/ui/utils/dump_hir.rs:62:5: 69:6 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:62:5: 62:5 (#0),
+              span: tests/ui/utils/dump_hir.rs:63:5: 70:6 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:63:5: 63:5 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:62:5
+  --> tests/ui/utils/dump_hir.rs:63:5
    |
 LL |     #[rpl::dump_hir]
    |     ---------------- HIR dumped because of this attribute
@@ -529,15 +529,15 @@ note: Expr(
                       expr: None,
                       hir_id: HirId(DefId(dump_hir::main::foo).3),
                       rules: DefaultBlock,
-                      span: tests/ui/utils/dump_hir.rs:68:9: 68:11 (#0),
+                      span: tests/ui/utils/dump_hir.rs:69:9: 69:11 (#N),
                       targeted_by_break: false,
                   },
                   None,
               ),
-              span: tests/ui/utils/dump_hir.rs:68:9: 68:11 (#0),
+              span: tests/ui/utils/dump_hir.rs:69:9: 69:11 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:68:9
+  --> tests/ui/utils/dump_hir.rs:69:9
    |
 LL |         #[rpl::dump_hir]
    |         ---------------- HIR dumped because of this attribute
@@ -559,13 +559,13 @@ note: Expr(
                                       node: Bool(
                                           true,
                                       ),
-                                      span: tests/ui/utils/dump_hir.rs:75:8: 75:12 (#0),
+                                      span: tests/ui/utils/dump_hir.rs:76:8: 76:12 (#N),
                                   },
                               ),
-                              span: tests/ui/utils/dump_hir.rs:75:8: 75:12 (#0),
+                              span: tests/ui/utils/dump_hir.rs:76:8: 76:12 (#N),
                           },
                       ),
-                      span: tests/ui/utils/dump_hir.rs:75:8: 75:12 (#11),
+                      span: tests/ui/utils/dump_hir.rs:76:8: 76:12 (#N),
                   },
                   Expr {
                       hir_id: HirId(DefId(dump_hir::main).16),
@@ -575,12 +575,12 @@ note: Expr(
                               expr: None,
                               hir_id: HirId(DefId(dump_hir::main).15),
                               rules: DefaultBlock,
-                              span: tests/ui/utils/dump_hir.rs:75:13: 77:6 (#0),
+                              span: tests/ui/utils/dump_hir.rs:76:13: 78:6 (#N),
                               targeted_by_break: false,
                           },
                           None,
                       ),
-                      span: tests/ui/utils/dump_hir.rs:75:13: 77:6 (#0),
+                      span: tests/ui/utils/dump_hir.rs:76:13: 78:6 (#N),
                   },
                   Some(
                       Expr {
@@ -591,19 +591,19 @@ note: Expr(
                                   expr: None,
                                   hir_id: HirId(DefId(dump_hir::main).18),
                                   rules: DefaultBlock,
-                                  span: tests/ui/utils/dump_hir.rs:77:12: 78:6 (#0),
+                                  span: tests/ui/utils/dump_hir.rs:78:12: 79:6 (#N),
                                   targeted_by_break: false,
                               },
                               None,
                           ),
-                          span: tests/ui/utils/dump_hir.rs:77:12: 78:6 (#0),
+                          span: tests/ui/utils/dump_hir.rs:78:12: 79:6 (#N),
                       },
                   ),
               ),
-              span: tests/ui/utils/dump_hir.rs:75:5: 78:6 (#0),
+              span: tests/ui/utils/dump_hir.rs:76:5: 79:6 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:75:5
+  --> tests/ui/utils/dump_hir.rs:76:5
    |
 LL |       #[rpl::dump_hir]
    |       ---------------- HIR dumped because of this attribute
@@ -624,7 +624,7 @@ note: Expr(
                           Resolved(
                               None,
                               Path {
-                                  span: tests/ui/utils/dump_hir.rs:84:5: 84:23 (#0),
+                                  span: tests/ui/utils/dump_hir.rs:85:5: 85:23 (#N),
                                   res: Def(
                                       Fn,
                                       DefId(std::thread::spawn),
@@ -664,7 +664,7 @@ note: Expr(
                               },
                           ),
                       ),
-                      span: tests/ui/utils/dump_hir.rs:84:5: 84:23 (#0),
+                      span: tests/ui/utils/dump_hir.rs:85:5: 85:23 (#N),
                   },
                   [
                       Expr {
@@ -675,13 +675,13 @@ note: Expr(
                                   binder: Default,
                                   constness: NotConst,
                                   capture_clause: Value {
-                                      move_kw: tests/ui/utils/dump_hir.rs:84:24: 84:28 (#0),
+                                      move_kw: tests/ui/utils/dump_hir.rs:85:24: 85:28 (#0),
                                   },
                                   bound_generic_params: [],
                                   fn_decl: FnDecl {
                                       inputs: [],
                                       output: DefaultReturn(
-                                          tests/ui/utils/dump_hir.rs:84:31: 84:31 (#0),
+                                          tests/ui/utils/dump_hir.rs:85:31: 85:31 (#0),
                                       ),
                                       c_variadic: false,
                                       implicit_self: None,
@@ -690,21 +690,21 @@ note: Expr(
                                   body: BodyId {
                                       hir_id: HirId(DefId(dump_hir::main).26),
                                   },
-                                  fn_decl_span: tests/ui/utils/dump_hir.rs:84:24: 84:31 (#0),
+                                  fn_decl_span: tests/ui/utils/dump_hir.rs:85:24: 85:31 (#N),
                                   fn_arg_span: Some(
-                                      tests/ui/utils/dump_hir.rs:84:29: 84:31 (#0),
+                                      tests/ui/utils/dump_hir.rs:85:29: 85:31 (#0),
                                   ),
                                   kind: Closure,
                               },
                           ),
-                          span: tests/ui/utils/dump_hir.rs:84:24: 87:6 (#0),
+                          span: tests/ui/utils/dump_hir.rs:85:24: 88:6 (#N),
                       },
                   ],
               ),
-              span: tests/ui/utils/dump_hir.rs:84:5: 87:7 (#0),
+              span: tests/ui/utils/dump_hir.rs:85:5: 88:7 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:84:5
+  --> tests/ui/utils/dump_hir.rs:85:5
    |
 LL |       #[rpl::dump_hir]
    |       ---------------- HIR dumped because of this attribute
@@ -723,16 +723,16 @@ note: Item(
                   MacroDef {
                       body: DelimArgs {
                           dspan: DelimSpan {
-                              open: tests/ui/utils/dump_hir.rs:93:22: 93:23 (#0),
-                              close: tests/ui/utils/dump_hir.rs:99:5: 99:6 (#0),
+                              open: tests/ui/utils/dump_hir.rs:94:22: 94:23 (#0),
+                              close: tests/ui/utils/dump_hir.rs:100:5: 100:6 (#0),
                           },
                           delim: Brace,
                           tokens: TokenStream(
                               [
                                   Delimited(
                                       DelimSpan {
-                                          open: tests/ui/utils/dump_hir.rs:95:9: 95:10 (#0),
-                                          close: tests/ui/utils/dump_hir.rs:95:10: 95:11 (#0),
+                                          open: tests/ui/utils/dump_hir.rs:96:9: 96:10 (#0),
+                                          close: tests/ui/utils/dump_hir.rs:96:10: 96:11 (#0),
                                       },
                                       DelimSpacing {
                                           open: JointHidden,
@@ -746,14 +746,14 @@ note: Item(
                                   Token(
                                       Token {
                                           kind: FatArrow,
-                                          span: tests/ui/utils/dump_hir.rs:95:12: 95:14 (#0),
+                                          span: tests/ui/utils/dump_hir.rs:96:12: 96:14 (#N),
                                       },
                                       Alone,
                                   ),
                                   Delimited(
                                       DelimSpan {
-                                          open: tests/ui/utils/dump_hir.rs:95:15: 95:16 (#0),
-                                          close: tests/ui/utils/dump_hir.rs:98:9: 98:10 (#0),
+                                          open: tests/ui/utils/dump_hir.rs:96:15: 96:16 (#0),
+                                          close: tests/ui/utils/dump_hir.rs:99:9: 99:10 (#0),
                                       },
                                       DelimSpacing {
                                           open: Alone,
@@ -765,14 +765,14 @@ note: Item(
                                               Token(
                                                   Token {
                                                       kind: Pound,
-                                                      span: tests/ui/utils/dump_hir.rs:96:13: 96:14 (#0),
+                                                      span: tests/ui/utils/dump_hir.rs:97:13: 97:14 (#N),
                                                   },
                                                   JointHidden,
                                               ),
                                               Delimited(
                                                   DelimSpan {
-                                                      open: tests/ui/utils/dump_hir.rs:96:14: 96:15 (#0),
-                                                      close: tests/ui/utils/dump_hir.rs:96:28: 96:29 (#0),
+                                                      open: tests/ui/utils/dump_hir.rs:97:14: 97:15 (#0),
+                                                      close: tests/ui/utils/dump_hir.rs:97:28: 97:29 (#0),
                                                   },
                                                   DelimSpacing {
                                                       open: JointHidden,
@@ -787,14 +787,14 @@ note: Item(
                                                                       "rpl",
                                                                       No,
                                                                   ),
-                                                                  span: tests/ui/utils/dump_hir.rs:96:15: 96:18 (#0),
+                                                                  span: tests/ui/utils/dump_hir.rs:97:15: 97:18 (#N),
                                                               },
                                                               Joint,
                                                           ),
                                                           Token(
                                                               Token {
                                                                   kind: PathSep,
-                                                                  span: tests/ui/utils/dump_hir.rs:96:18: 96:20 (#0),
+                                                                  span: tests/ui/utils/dump_hir.rs:97:18: 97:20 (#N),
                                                               },
                                                               JointHidden,
                                                           ),
@@ -804,7 +804,7 @@ note: Item(
                                                                       "dump_hir",
                                                                       No,
                                                                   ),
-                                                                  span: tests/ui/utils/dump_hir.rs:96:20: 96:28 (#0),
+                                                                  span: tests/ui/utils/dump_hir.rs:97:20: 97:28 (#N),
                                                               },
                                                               JointHidden,
                                                           ),
@@ -817,21 +817,21 @@ note: Item(
                                                           "println",
                                                           No,
                                                       ),
-                                                      span: tests/ui/utils/dump_hir.rs:97:13: 97:20 (#0),
+                                                      span: tests/ui/utils/dump_hir.rs:98:13: 98:20 (#N),
                                                   },
                                                   Joint,
                                               ),
                                               Token(
                                                   Token {
                                                       kind: Not,
-                                                      span: tests/ui/utils/dump_hir.rs:97:20: 97:21 (#0),
+                                                      span: tests/ui/utils/dump_hir.rs:98:20: 98:21 (#N),
                                                   },
                                                   JointHidden,
                                               ),
                                               Delimited(
                                                   DelimSpan {
-                                                      open: tests/ui/utils/dump_hir.rs:97:21: 97:22 (#0),
-                                                      close: tests/ui/utils/dump_hir.rs:97:28: 97:29 (#0),
+                                                      open: tests/ui/utils/dump_hir.rs:98:21: 98:22 (#0),
+                                                      close: tests/ui/utils/dump_hir.rs:98:28: 98:29 (#0),
                                                   },
                                                   DelimSpacing {
                                                       open: JointHidden,
@@ -849,7 +849,7 @@ note: Item(
                                                                           suffix: None,
                                                                       },
                                                                   ),
-                                                                  span: tests/ui/utils/dump_hir.rs:97:22: 97:28 (#0),
+                                                                  span: tests/ui/utils/dump_hir.rs:98:22: 98:28 (#N),
                                                               },
                                                               JointHidden,
                                                           ),
@@ -859,7 +859,7 @@ note: Item(
                                               Token(
                                                   Token {
                                                       kind: Semi,
-                                                      span: tests/ui/utils/dump_hir.rs:97:29: 97:30 (#0),
+                                                      span: tests/ui/utils/dump_hir.rs:98:29: 98:30 (#N),
                                                   },
                                                   Alone,
                                               ),
@@ -869,7 +869,7 @@ note: Item(
                                   Token(
                                       Token {
                                           kind: Semi,
-                                          span: tests/ui/utils/dump_hir.rs:98:10: 98:11 (#0),
+                                          span: tests/ui/utils/dump_hir.rs:99:10: 99:11 (#N),
                                       },
                                       Alone,
                                   ),
@@ -880,11 +880,11 @@ note: Item(
                   },
                   Bang,
               ),
-              span: tests/ui/utils/dump_hir.rs:93:5: 99:6 (#0),
-              vis_span: tests/ui/utils/dump_hir.rs:93:5: 93:5 (#0),
+              span: tests/ui/utils/dump_hir.rs:94:5: 100:6 (#N),
+              vis_span: tests/ui/utils/dump_hir.rs:94:5: 94:5 (#N),
           },
       )
-  --> tests/ui/utils/dump_hir.rs:93:5
+  --> tests/ui/utils/dump_hir.rs:94:5
    |
 LL |     #[rpl::dump_hir]
    |     ---------------- HIR dumped because of this attribute
@@ -893,7 +893,7 @@ LL |     macro_rules! mac {
    |     ^^^^^^^^^^^^^^^^
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:5:1
+  --> tests/ui/utils/dump_hir.rs:6:1
    |
 LL | #[rpl::dump_hir]
    | ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -902,7 +902,7 @@ LL | #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:11:1
+  --> tests/ui/utils/dump_hir.rs:12:1
    |
 LL | #[rpl::dump_hir]
    | ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -911,7 +911,7 @@ LL | #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:20:1
+  --> tests/ui/utils/dump_hir.rs:21:1
    |
 LL | #[rpl::dump_hir]
    | ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -920,7 +920,7 @@ LL | #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:26:5
+  --> tests/ui/utils/dump_hir.rs:27:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -929,7 +929,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:33:1
+  --> tests/ui/utils/dump_hir.rs:34:1
    |
 LL | #[rpl::dump_hir]
    | ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -938,7 +938,7 @@ LL | #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:39:5
+  --> tests/ui/utils/dump_hir.rs:40:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -947,7 +947,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:46:1
+  --> tests/ui/utils/dump_hir.rs:47:1
    |
 LL | #[rpl::dump_hir]
    | ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -956,7 +956,7 @@ LL | #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:52:5
+  --> tests/ui/utils/dump_hir.rs:53:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -965,7 +965,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:58:5
+  --> tests/ui/utils/dump_hir.rs:59:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -974,7 +974,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:64:9
+  --> tests/ui/utils/dump_hir.rs:65:9
    |
 LL |         #[rpl::dump_hir]
    |         ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -983,7 +983,7 @@ LL |         #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:71:5
+  --> tests/ui/utils/dump_hir.rs:72:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -992,7 +992,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:80:5
+  --> tests/ui/utils/dump_hir.rs:81:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute
@@ -1001,7 +1001,7 @@ LL |     #[rpl::dump_hir]
    = note: this error is to remind you removing these attributes
 
 error: abort due to debugging
-  --> tests/ui/utils/dump_hir.rs:89:5
+  --> tests/ui/utils/dump_hir.rs:90:5
    |
 LL |     #[rpl::dump_hir]
    |     ^^^^^^^^^^^^^^^^ help: remove this attribute

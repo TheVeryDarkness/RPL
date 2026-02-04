@@ -1,6 +1,7 @@
 //@revisions: inline regular
 //@[inline]compile-flags: -Z inline-mir=true
 //@[regular]compile-flags: -Z inline-mir=false
+//@ignore-target: windows
 #![allow(unsafe_op_in_unsafe_fn)]
 
 //! Non-blocking TCP or Unix connect.

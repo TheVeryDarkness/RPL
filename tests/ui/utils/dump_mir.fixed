@@ -1,6 +1,6 @@
 //@ compile-flags: -Z inline-mir=false
-//@ normalize-stderr-test: "see `.*/mir_dump/(.*)` for dumped" -> "see `./mir_dump/$1` for dumped"
-//@ normalize-stderr-test: "/.*/lib/rustlib/src/rust/library" -> "$$SRC_DIR"
+//
+//@ normalize-stderr-test: "(\w:)?[/\\].*[/\\]lib[/\\]rustlib[/\\]src[/\\]rust[/\\]library" -> "$$SRC_DIR"
 
  //~ ERROR: abort due to debugging
 //~^ NOTE: `#[rpl::dump_hir]`, `#[rpl::print_hir]` and `#[rpl::dump_mir]` are only used for debugging
