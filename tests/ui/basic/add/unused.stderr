@@ -1,0 +1,20 @@
+error: added value here
+  --> tests/ui/basic/add/unused.rs:5:5
+   |
+LL |     a + b
+   |     ^^^^^
+   |
+help: first value here
+  --> tests/ui/basic/add/unused.rs:4:8
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |        ^
+help: second value here
+  --> tests/ui/basic/add/unused.rs:4:18
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |                  ^
+   = note: `#[deny(rpl::foo)]` on by default
+
+error: aborting due to 1 previous error
+

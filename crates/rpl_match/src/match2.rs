@@ -369,9 +369,14 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
         for (fn_id, matchings_fn) in matchings.iter() {
             debug!(?fn_id, num_matches = ?matchings_fn.matches.len(), "before propagation");
         }
-        let mut to_visit: VecDeque<_> = matchings.keys().cloned().collect();
 
-        while let Some(fn_id) = to_visit.pop_front() {
+        let fns: Vec<LocalDefId> = matchings.keys().cloned().collect();
+        let mut new_matchings: FxHashMap<LocalDefId, Matching<'tcx>> = FxHashMap::default();
+        for fn_id in &fns {
+            let _guard =
+                debug_span!("propagate", ?fn_id, num_matched = ?matchings.get(&fn_id).map_or(0, |m| m.matches.len()))
+                    .entered();
+
             // FIXME: this clone is sometimes unnecessary
             if let Some(matchings_fn) = matchings.get(&fn_id).cloned() {
                 for matching in matchings_fn.matches.iter() {
@@ -379,18 +384,20 @@ impl<'a, 'pcx, 'tcx: 'a> MatchCtxt2<'a, 'pcx, 'tcx> {
                         if cfg!(debug_assertions) {
                             Matching::check(*caller_loc, *caller_id, matchings);
                         }
-                        let caller_body = matchings.get(caller_id).unwrap().graph.body;
                         let m = matchings.get_mut(caller_id).unwrap();
+                        let caller_body = m.graph.body;
                         let propagated = matching.propagate(*caller_loc, caller_body, *caller_id);
+                        trace!(count = ?m.matches.len(), ?caller_id, ?caller_loc, "propagating match");
                         if !m.matches.contains(&propagated) {
-                            m.matches.push(propagated);
-                            if !to_visit.contains(caller_id) {
-                                to_visit.push_back(*caller_id);
-                            }
+                            new_matchings.insert(*caller_id, propagated);
+                            // m.matches.push(propagated);
                         }
                     }
                 }
             }
+        }
+        for (caller_id, propagated) in new_matchings {
+            matchings.get_mut(&caller_id).unwrap().matches.push(propagated);
         }
 
         // for (fn_id, matchings_fn) in matchings.iter_mut() {
@@ -983,6 +990,7 @@ impl<'tcx> Matching<'tcx> {
 
     #[instrument(level = "trace", skip(self, body))]
     fn propagate(&self, caller_loc: mir::Location, body: &mir::Body<'_>, def_id: LocalDefId) -> Self {
+        // self.log_matched();
         let mut matching = self.clone();
 
         for (_bb_idx, bb) in matching.basic_blocks.iter_enumerated() {
@@ -1021,6 +1029,7 @@ impl<'tcx> Matching<'tcx> {
             pat_stmts.sort();
             matching.mir_statements[caller_loc.block][caller_loc.statement_index].set_checked(pat_stmts);
         }
+        // matching.log_matched();
         matching
     }
 

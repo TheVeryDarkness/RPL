@@ -123,12 +123,12 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
     //     Ok(())
     // });
 
-    let mut check_ctxt = CheckFnCtxt {
-        tcx,
-        pcx,
-        body_caches: RefCell::default(),
-    };
-    tcx.hir().walk_toplevel_module(&mut check_ctxt);
+    // let mut check_ctxt = CheckFnCtxt {
+    //     tcx,
+    //     pcx,
+    //     body_caches: RefCell::default(),
+    // };
+    // tcx.hir().walk_toplevel_module(&mut check_ctxt);
 
     walk2(tcx, pcx);
 
