@@ -2,21 +2,36 @@ error: added value here
   --> tests/ui/basic/add/twice.rs:6:13
    |
 LL |     let w = x + y + z;
-   |             -^^^-
-   |             |   |
-   |             |   second value here
-   |             first value here
+   |             ^^^^^^^^^
    |
+help: first value here
+  --> tests/ui/basic/add/twice.rs:6:13
+   |
+LL |     let w = x + y + z;
+   |             ^^^^^
+help: second value here
+  --> tests/ui/basic/add/twice.rs:6:21
+   |
+LL |     let w = x + y + z;
+   |                     ^
    = note: `#[deny(rpl::foo)]` on by default
 
 error: added value here
   --> tests/ui/basic/add/twice.rs:6:13
    |
 LL |     let w = x + y + z;
-   |             -----^^^-
-   |             |       |
-   |             |       second value here
-   |             first value here
+   |             ^^^^^
+   |
+help: first value here
+  --> tests/ui/basic/add/twice.rs:6:13
+   |
+LL |     let w = x + y + z;
+   |             ^
+help: second value here
+  --> tests/ui/basic/add/twice.rs:6:17
+   |
+LL |     let w = x + y + z;
+   |                 ^
 
 error: aborting due to 2 previous errors
 

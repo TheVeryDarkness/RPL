@@ -1,21 +1,21 @@
 pattern a
 
 patt {
-    foo = unsafe? fn _(..) -> _ {
+    foo[$T: type where is_copy(self)] = unsafe? fn _(..) -> _ {
         'x:
-        let $x: usize = _;
+        let $x: $T;
         'y:
-        let $y: usize = _;
+        let $y: $T;
         'z:
-        let $z: usize = Add(copy $x, copy $y);
+        let $z: $T = Add(move $x, move $y);
     }
 }
 
 diag {
     foo = {
-        primary(z)      = "added value here",
-        label(x)        = "first value here",
-        label(y)        = "second value here",
-        name            = "foo",
+        primary(z)     = "added value here",
+        help(x)        = "first value here",
+        help(y)        = "second value here",
+        name           = "foo",
     }
 }

@@ -1,22 +1,54 @@
 error: added value here
-  --> tests/ui/basic/add/nested.rs:11:17
+  --> tests/ui/basic/add/nested.rs:5:5
    |
-LL |     let w = add(add(x, y), z);
-   |                 ^^^^-^^-^
-   |                     |  |
-   |                     |  second value here
-   |                     first value here
+LL |     a + b
+   |     ^^^^^
    |
+help: first value here
+  --> tests/ui/basic/add/nested.rs:4:8
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |        ^
+help: second value here
+  --> tests/ui/basic/add/nested.rs:4:18
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |                  ^
    = note: `#[deny(rpl::foo)]` on by default
 
 error: added value here
-  --> tests/ui/basic/add/nested.rs:11:13
+  --> tests/ui/basic/add/nested.rs:15:13
    |
-LL |     let w = add(add(x, y), z);
-   |             ^^^^---------^^-^
-   |                 |          |
-   |                 |          second value here
-   |                 first value here
+LL |     let w = add(x, y);
+   |             ^^^^^^^^^
+   |
+help: first value here
+  --> tests/ui/basic/add/nested.rs:4:8
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |        ^
+help: second value here
+  --> tests/ui/basic/add/nested.rs:4:18
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |                  ^
 
-error: aborting due to 2 previous errors
+error: added value here
+  --> tests/ui/basic/add/nested.rs:10:9
+   |
+LL |     add(add(x, y), z)
+   |         ^^^^^^^^^
+   |
+help: first value here
+  --> tests/ui/basic/add/nested.rs:4:8
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |        ^
+help: second value here
+  --> tests/ui/basic/add/nested.rs:4:18
+   |
+LL | fn add(a: usize, b: usize) -> usize {
+   |                  ^
+
+error: aborting due to 3 previous errors
 

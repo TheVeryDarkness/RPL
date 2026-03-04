@@ -9,13 +9,11 @@ fn add(a: usize, b: usize) -> usize {
 fn f1(x: usize, y: usize, z: usize) -> usize {
     add(add(x, y), z)
     //~^ ERROR: added value here
-    //~| ERROR: added value here
 }
 #[inline(never)]
 fn f2(x: usize, y: usize, z: usize) -> usize {
     let w = add(x, y);
     //~^ ERROR: added value here
     add(w, z)
-    //~^ ERROR: added value here
 }
 fn main() {}
