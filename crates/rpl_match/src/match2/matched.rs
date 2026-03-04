@@ -1,4 +1,3 @@
-use std::cmp::PartialOrd;
 use std::ops::Index;
 
 use rpl_constraints::Const;
