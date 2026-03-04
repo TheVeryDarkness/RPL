@@ -142,6 +142,7 @@ impl<'pcx> BasicBlockData<'pcx> {
     }
 }
 
+/// See [`mir::PlaceElem`] ([`mir::ProjectionElem`]) for more details.
 #[derive(Debug, Clone, Copy)]
 pub enum PlaceElem<'pcx> {
     Deref,
