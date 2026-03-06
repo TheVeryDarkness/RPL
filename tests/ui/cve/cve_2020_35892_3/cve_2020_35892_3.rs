@@ -28,6 +28,7 @@ impl<T> Drop for Slab<T> {
 impl<T> Index<usize> for Slab<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < self.len, "Index out of bounds");
         unsafe { &(*(self.mem.offset(index as isize))) }
         //~^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
         //~| HELP:  check whether it's in bound before offsetting

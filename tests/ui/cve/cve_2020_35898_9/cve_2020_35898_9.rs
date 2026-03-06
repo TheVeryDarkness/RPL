@@ -5,13 +5,13 @@ pub struct Cell<T> {
     pub inner: Rc<UnsafeCell<T>>,
 }
 
-/* impl<T> Clone for Cell<T> {
+impl<T> Clone for Cell<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
         }
     }
-} */
+}
 
 impl<T> Cell<T> {
     pub fn get_mut(&mut self) -> &mut T {

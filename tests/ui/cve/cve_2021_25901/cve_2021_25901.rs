@@ -1,8 +1,8 @@
-//@check-pass
+//@check-pass: no pattern yet
 
 use std::{
     cell::UnsafeCell,
-    sync::{atomic::AtomicBool, Mutex},
+    sync::{Mutex, atomic::AtomicBool},
 };
 
 enum ThisOrThat<T, U> {

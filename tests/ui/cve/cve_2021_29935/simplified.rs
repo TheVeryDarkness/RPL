@@ -1,7 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
-//@[regular] check-pass
+//@[regular] check-pass: no pattern yet
 
 use std::fmt::{self, Write};
 use std::marker::PhantomData;

@@ -1,11 +1,11 @@
 error: it is unsound to cast between `u64` and `AtomicU64`
-  --> tests/ui/cve/cve_2022_23639/cve_2022_23639.rs:52:36
+  --> tests/ui/cve/cve_2022_23639/cve_2022_23639_patched.rs:54:40
    |
-LL |                 let a = unsafe { &*(self.value.get() as *const $atomic) };
-   |                                    ^----------------^^^^^^^^^^^^^^^^^^^
-   |                                    ||
-   |                                    |u64 created here
-   |                                    casted here
+LL |                     let a = unsafe { &*(self.value.get() as *const $atomic) };
+   |                                        ^----------------^^^^^^^^^^^^^^^^^^^
+   |                                        ||
+   |                                        |u64 created here
+   |                                        casted here
 ...
 LL | impl_arithmetic!(u64, AtomicU64, "let a = AtomicCell::new(7u64);");
    | ------------------------------------------------------------------ in this macro invocation

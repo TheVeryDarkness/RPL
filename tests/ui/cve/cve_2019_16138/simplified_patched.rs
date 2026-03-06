@@ -1,0 +1,15 @@
+//@check-pass
+//@revisions: inline regular
+//@[inline]compile-flags: -Z inline-mir=true
+//@[regular]compile-flags: -Z inline-mir=false
+
+// #[rpl::dump_mir(dump_cfg, dump_ddg)]
+fn foo() {
+    let pixel_count = 1920 * 1080;
+    let mut ret: Vec<(u8, u8, u8)> = Vec::with_capacity(pixel_count);
+    ret.resize(pixel_count, (0, 0, 0));
+}
+
+fn main() {
+    foo()
+}

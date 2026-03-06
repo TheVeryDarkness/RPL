@@ -1,3 +1,4 @@
+//@check-pass
 extern crate bytes;
 extern crate tokio;
 extern crate tokio_util;
@@ -7,6 +8,7 @@ use std::task::{Context, Poll, ready};
 use std::{fmt, io};
 
 use bytes::{Buf, BytesMut};
+use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -34,7 +36,9 @@ impl Flags {
 
 /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
 /// the `Encoder` and `Decoder` traits to encode and decode frames.
+#[pin_project]
 pub struct Framed<T, U> {
+    #[pin]
     io: T,
     codec: U,
     flags: Flags,
@@ -45,21 +49,25 @@ pub struct Framed<T, U> {
 impl<T, U> Framed<T, U> {
     /// Try to read underlying I/O stream and decode item.
     // #[rpl::dump_mir(dump_cfg, dump_ddg)]
-    pub fn next_item(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<U::Item, U::Error>>>
+    pub fn next_item(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<U::Item, U::Error>>>
     where
         T: AsyncRead,
         U: Decoder,
     {
         loop {
+            let mut this = self.as_mut().project();
             // Repeatedly call `decode` or `decode_eof` as long as it is
             // "readable". Readable is defined as not having returned `None`. If
             // the upstream has returned EOF, and the decoder is no longer
             // readable, it can be assumed that the decoder will never become
             // readable again, at which point the stream is terminated.
 
-            if self.flags.contains(Flags::READABLE) {
-                if self.flags.contains(Flags::EOF) {
-                    match self.codec.decode_eof(&mut self.read_buf) {
+            if this.flags.contains(Flags::READABLE) {
+                if this.flags.contains(Flags::EOF) {
+                    match this.codec.decode_eof(&mut this.read_buf) {
                         Ok(Some(frame)) => return Poll::Ready(Some(Ok(frame))),
                         Ok(None) => return Poll::Ready(None),
                         Err(e) => return Poll::Ready(Some(Err(e))),
@@ -68,7 +76,7 @@ impl<T, U> Framed<T, U> {
 
                 log::trace!("attempting to decode a frame");
 
-                match self.codec.decode(&mut self.read_buf) {
+                match this.codec.decode(&mut this.read_buf) {
                     Ok(Some(frame)) => {
                         log::trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));
@@ -77,48 +85,42 @@ impl<T, U> Framed<T, U> {
                     _ => (), // Need more data
                 }
 
-                self.flags.remove(Flags::READABLE);
+                this.flags.remove(Flags::READABLE);
             }
 
-            debug_assert!(!self.flags.contains(Flags::EOF));
+            debug_assert!(!this.flags.contains(Flags::EOF));
 
             // Otherwise, try to read more data and try again. Make sure we've got room
-            let remaining = self.read_buf.capacity() - self.read_buf.len();
+            let remaining = this.read_buf.capacity() - this.read_buf.len();
             if remaining < LW {
-                self.read_buf.reserve(HW - remaining)
+                this.read_buf.reserve(HW - remaining)
             }
-            let cnt = match unsafe {
-                // FIXME: this should be an error
-                Pin::new_unchecked(&mut self.io).poll_read_buf(cx, &mut self.read_buf)
-                // ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
-            } {
+            let cnt = match this.io.poll_read_buf(cx, &mut this.read_buf) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
                 Poll::Ready(Ok(cnt)) => cnt,
             };
 
             if cnt == 0 {
-                self.flags.insert(Flags::EOF);
+                this.flags.insert(Flags::EOF);
             }
-            self.flags.insert(Flags::READABLE);
+            this.flags.insert(Flags::READABLE);
         }
     }
 
     /// Flush write buffer to underlying I/O stream.
-    pub fn flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
+    pub fn flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder,
     {
+        let mut this = self.as_mut().project();
         log::trace!("flushing framed transport");
 
-        while !self.write_buf.is_empty() {
-            log::trace!("writing; remaining={}", self.write_buf.len());
+        while !this.write_buf.is_empty() {
+            log::trace!("writing; remaining={}", this.write_buf.len());
 
-            let n = ready!(unsafe {
-                Pin::new_unchecked(&mut self.io).poll_write(cx, &self.write_buf)
-                //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
-            })?;
+            let n = ready!(this.io.as_mut().poll_write(cx, this.write_buf))?;
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
@@ -129,12 +131,11 @@ impl<T, U> Framed<T, U> {
             }
 
             // remove written data
-            self.write_buf.advance(n);
+            this.write_buf.advance(n);
         }
 
         // Try flushing the underlying IO
-        ready!(unsafe { Pin::new_unchecked(&mut self.io).poll_flush(cx) })?;
-        //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
+        ready!(this.io.poll_flush(cx))?;
 
         log::trace!("framed transport flushed");
         Poll::Ready(Ok(()))
@@ -142,17 +143,15 @@ impl<T, U> Framed<T, U> {
 
     /// Flush write buffer and shutdown underlying I/O stream.
     // #[rpl::dump_mir(dump_cfg, dump_ddg)]
-    pub fn close(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
+    pub fn close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder,
     {
-        unsafe {
-            ready!(Pin::new_unchecked(&mut self.io).poll_flush(cx))?;
-            //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
-            ready!(Pin::new_unchecked(&mut self.io).poll_shutdown(cx))?;
-            //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
-        }
+        let mut this = self.as_mut().project();
+        ready!(this.io.as_mut().poll_flush(cx))?;
+        ready!(this.io.as_mut().poll_shutdown(cx))?;
+
         Poll::Ready(Ok(()))
     }
 }
