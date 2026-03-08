@@ -49,6 +49,13 @@ cves = [
         sha_after="ac30e169ae51b262bc8cf7026469851ce39b23c6",
     ),
     CVE(
+        name="CVE-2020-35881",
+        crate_name="destructure_traitobject",
+        repo="https://github.com/philip-peterson/destructure_traitobject",
+        sha_before="8aabddab131f84daa3ba5da9a9799c55efc32403",
+        sha_after="99b1993a13bf80e93031048586526384d1d8bddc",
+    ),
+    CVE(
         name="CVE-2020-35886",
         crate_name="arr",
         repo="https://github.com/sjep/array",

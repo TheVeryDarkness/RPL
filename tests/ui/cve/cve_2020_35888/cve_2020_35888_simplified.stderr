@@ -1,5 +1,5 @@
 error: dropped an possibly-uninitialized value
-  --> tests/ui/cve/cve_2020_35888_simplified/cve_2020_35888_simplified.rs:17:9
+  --> tests/ui/cve/cve_2020_35888/cve_2020_35888_simplified.rs:17:9
    |
 LL |     let ptr: *mut DropDetector = unsafe { alloc(layout) as *mut DropDetector };
    |                                           ----------------------------------

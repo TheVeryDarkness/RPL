@@ -1,4 +1,4 @@
-//@check-pass
+//@check-pass: no pattern yet
 
 use std::cmp::Ordering;
 use std::fmt;

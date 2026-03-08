@@ -1,6 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
+//@[inline] check-pass
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc};
 use std::ops::{Index, IndexMut, Range};
 
@@ -54,15 +55,13 @@ impl<T> Index<usize> for Array<T> {
 
     // #[rpl::dump_mir(dump_cfg, dump_ddg)]
     fn index<'a>(&'a self, idx: usize) -> &'a Self::Output {
-        unsafe { self.ptr.wrapping_offset(idx as isize).as_ref() }.unwrap()
-        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+        &self.to_slice()[idx]
     }
 }
 
 impl<T> IndexMut<usize> for Array<T> {
     fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Self::Output {
-        unsafe { self.ptr.wrapping_offset(idx as isize).as_mut() }.unwrap()
-        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+        &mut self.to_slice_mut()[idx]
     }
 }
 

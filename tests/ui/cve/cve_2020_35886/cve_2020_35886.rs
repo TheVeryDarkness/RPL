@@ -1,7 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
-//@[regular] check-pass
+//@[inline] check-pass
 // FIXME: write a non-inline pattern
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc};
 use std::ops::{Index, IndexMut, Range};
@@ -9,6 +9,25 @@ use std::ops::{Index, IndexMut, Range};
 pub struct Array<T> {
     size: usize,
     ptr: *mut T,
+}
+
+unsafe impl<T> Sync for Array<T> {}
+unsafe impl<T> Send for Array<T> {}
+
+impl<T> Array<T>
+where
+    T: Zeroable,
+{
+    /// Extremely fast initialization if all you want is 0's. Note that your type must be Zeroable.
+    /// The auto-Zeroable types are u8, i8, u16, i16, u32, i32, u64, i64, usize, isize, f32, f64.
+    /// `std::Array`s also implement Zeroable allowing for types like `[u8; 1 << 25]`.
+    pub fn zero(size: usize) -> Self {
+        let objsize = std::mem::size_of::<T>();
+        let layout = Layout::from_size_align(size * objsize, 8).unwrap();
+        let ptr = unsafe { alloc_zeroed(layout) as *mut T };
+        //~[regular]^ERROR: public function `zero` allocates a pointer that may be zero-sized, which is an undefined behavior
+        Self { size, ptr }
+    }
 }
 
 impl<T> Array<T> {
@@ -28,43 +47,21 @@ impl<T> Array<T> {
     }
 }
 
-impl<T> Index<usize> for Array<T> {
-    type Output = T;
+/// Marker trait to determine if a type is auto-zeroable. This allows the initialization to simply
+/// zero out the buffer on initialization.
+pub trait Zeroable {}
 
-    // #[rpl::dump_mir(dump_cfg, dump_ddg)]
-    fn index<'a>(&'a self, idx: usize) -> &'a Self::Output {
-        unsafe { self.ptr.wrapping_offset(idx as isize).as_ref() }.unwrap()
-        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
-    }
-}
+impl Zeroable for u8 {}
+impl Zeroable for i8 {}
+impl Zeroable for u16 {}
+impl Zeroable for i16 {}
+impl Zeroable for u32 {}
+impl Zeroable for i32 {}
+impl Zeroable for u64 {}
+impl Zeroable for i64 {}
+impl Zeroable for usize {}
+impl Zeroable for isize {}
+impl Zeroable for f32 {}
+impl Zeroable for f64 {}
 
-impl<T> IndexMut<usize> for Array<T> {
-    fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Self::Output {
-        unsafe { self.ptr.wrapping_offset(idx as isize).as_mut() }.unwrap()
-        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
-    }
-}
-
-impl<T> Index<Range<usize>> for Array<T> {
-    type Output = [T];
-
-    fn index<'a>(&'a self, idx: Range<usize>) -> &'a Self::Output {
-        &self.to_slice()[idx]
-    }
-}
-
-impl<T> IndexMut<Range<usize>> for Array<T> {
-    fn index_mut<'a>(&'a mut self, idx: Range<usize>) -> &'a mut Self::Output {
-        &mut self.to_slice_mut()[idx]
-    }
-}
-
-impl<T> Drop for Array<T> {
-    fn drop(&mut self) {
-        let objsize = std::mem::size_of::<T>();
-        let layout = Layout::from_size_align(self.size * objsize, 8).unwrap();
-        unsafe {
-            dealloc(self.ptr as *mut u8, layout);
-        }
-    }
-}
+impl<T, const N: usize> Zeroable for [T; N] where T: Zeroable {}
