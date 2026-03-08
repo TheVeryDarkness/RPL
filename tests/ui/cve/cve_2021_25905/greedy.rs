@@ -1,7 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
-//@[inline] check-pass
+//@[inline] check-pass: no pattern yet
 use std::io::{Read, Result as IoResult};
 
 pub struct GreedyAccessReader<R> {
@@ -35,7 +35,7 @@ where
             // safe because it's within the buffer's limits
             // and we won't be reading uninitialized memory
             std::slice::from_raw_parts_mut(self.buf.as_mut_ptr().add(b), self.buf.capacity() - b)
-            //~[regular]^ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from a `Vec` that is not initialized yet
+            //~[regular]^ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized part of a `Vec`
         };
 
         match self.inner.read(buf) {
