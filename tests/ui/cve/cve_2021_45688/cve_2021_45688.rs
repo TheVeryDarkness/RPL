@@ -21,7 +21,7 @@ pub fn read_spv<R: io::Read + io::Seek>(x: &mut R) -> io::Result<Vec<u32>> {
     x.seek(io::SeekFrom::Start(0))?;
     unsafe {
         x.read_exact(slice::from_raw_parts_mut(
-            //FIXME: a false negative, `result` is not uninitialized
+            //FIXME: a false negative, `result` is not initialized
             //ERROR: it violates the precondition of `std::slice::from_raw_parts_mut` to create a slice from uninitialized data
             result.as_mut_ptr() as *mut u8,
             words * 4,
