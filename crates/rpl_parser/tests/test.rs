@@ -19,6 +19,32 @@ macro_rules! full_test {
         }
     }};
 }
+
+#[test]
+fn mir_decl() {
+    full_test!(MirDecl, "'offset: let $ptr_1: *const $T = Offset(copy $ptr, _);");
+}
+
+#[test]
+fn mir_stmt() {
+    full_test!(MirStmt, "'offset: $ptr_1 = Offset(copy $ptr, _);");
+}
+
+#[test]
+fn mir_switch_int() {
+    full_test!(
+        MirSwitchInt,
+        "switchInt(move $cmp) {
+            0 => {}
+            _ => {
+                'offset:
+                $ptr_1 = Offset(copy $ptr, _);
+            }
+        }
+    "
+    );
+}
+
 #[test]
 fn mir_rvalue_or_call() {
     full_test!(MirRvalueCast, "copy $x as isize (IntToInt)");

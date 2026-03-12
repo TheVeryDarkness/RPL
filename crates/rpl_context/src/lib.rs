@@ -5,6 +5,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 #![feature(map_try_insert)]
+#![feature(gen_blocks)]
 
 extern crate either;
 extern crate rustc_abi;

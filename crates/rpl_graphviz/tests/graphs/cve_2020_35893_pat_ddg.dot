@@ -3,11 +3,13 @@ compound = true;
 subgraph cluster_bb0 {
     bb0IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb0[IN]</td></tr></table>>];
     bb0OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb0[OUT]</td></tr></table>>];
-    bb0stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?0 = move ?P0 as ?T1 (Transmute)</td></tr></table>>];
-    bb0stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">switchInt(copy _?1) -&gt; [0_usize: ?bb1, otherwise: ?bb3]</td></tr></table>>];
-    bb0IN -> bb0stmt1 [label="_?1"];
+    bb0stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?0 = _</td></tr></table>>];
+    bb0stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?4 = Lt(copy _?0, _)</td></tr></table>>];
+    bb0stmt2 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">switchInt(move _?4) -&gt; [false: ?bb1, otherwise: ?bb2]</td></tr></table>>];
     bb0stmt0 -> bb0OUT [label="_?0"];
-    bb0IN -> bb0OUT [label="_?1"];
+    bb0IN -> bb0OUT [label="_?1,_?2,_?3"];
+    bb0stmt0 -> bb0stmt1 [label="_?0"];
+    bb0stmt1 -> bb0stmt2 [label="_?4"];
 }
 subgraph cluster_bb1 {
     bb1IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb1[IN]</td></tr></table>>];
@@ -17,18 +19,22 @@ subgraph cluster_bb1 {
 subgraph cluster_bb2 {
     bb2IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb2[IN]</td></tr></table>>];
     bb2OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb2[OUT]</td></tr></table>>];
-    bb2IN -> bb2OUT [label="*"];
+    bb2stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?3 = copy _?0 as ?T2 (IntToInt)</td></tr></table>>];
+    bb2stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?2 = Offset(copy _?1, copy _?3)</td></tr></table>>];
+    bb2IN -> bb2stmt0 [label="_?0"];
+    bb2IN -> bb2stmt1 [label="_?1"];
+    bb2stmt1 -> bb2OUT [label="_?2"];
+    bb2stmt0 -> bb2OUT [label="_?3"];
+    bb2IN -> bb2OUT [label="_?0,_?1,_?4"];
+    bb2stmt0 -> bb2stmt1 [label="_?3"];
 }
 subgraph cluster_bb3 {
     bb3IN [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb3[IN]</td></tr></table>>];
     bb3OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb3[OUT]</td></tr></table>>];
-    bb3stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_ = core::option::Option:: &lt; ?T0 &gt;(move _?0)</td></tr></table>>];
-    bb3IN -> bb3stmt0 [label="_?0"];
-    bb3IN -> bb3OUT [label="_?1"];
+    bb3IN -> bb3OUT [label="*"];
 }
     bb0OUT -> bb1IN [label="0"];
-    bb0OUT -> bb3IN [label="otherwise"];
-    bb1OUT -> bb2IN [label="goto"];
-    bb3OUT -> bb2IN [label="goto"];
-    bb0stmt0 -> bb3stmt0 [label="_?0"];
+    bb0OUT -> bb2IN [label="otherwise"];
+    bb2OUT -> bb3IN [label="goto"];
+    bb0stmt0 -> bb2stmt0 [label="_?0"];
 }
