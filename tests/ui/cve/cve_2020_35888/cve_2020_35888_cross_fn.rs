@@ -1,9 +1,16 @@
-//@check-pass
+//@check-pass: FN
 use std::alloc::{Layout, alloc};
 
 pub struct Array<T> {
     size: usize,
     ptr: *mut T,
+}
+
+unsafe fn store<T: Clone>(ptr: *mut T, i: usize, template: &T) {
+    unsafe {
+        (*(ptr.wrapping_offset(i as isize))) = template.clone();
+        //FN: ~^ ERROR: dropped an possibly-uninitialized value
+    }
 }
 
 impl<T> Array<T>
@@ -15,9 +22,7 @@ where
         let layout = Layout::from_size_align(size * objsize, 8).unwrap();
         let ptr = unsafe { alloc(layout) as *mut T };
         for i in 0..size {
-            unsafe {
-                ptr.wrapping_offset(i as isize).write(template.clone());
-            }
+            unsafe { store(ptr, i, template) }
         }
         Self { size, ptr }
     }

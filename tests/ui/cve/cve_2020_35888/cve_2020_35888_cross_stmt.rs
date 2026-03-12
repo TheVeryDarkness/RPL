@@ -1,4 +1,3 @@
-//@check-pass
 use std::alloc::{Layout, alloc};
 
 pub struct Array<T> {
@@ -15,8 +14,10 @@ where
         let layout = Layout::from_size_align(size * objsize, 8).unwrap();
         let ptr = unsafe { alloc(layout) as *mut T };
         for i in 0..size {
+            let ptr_i = ptr.wrapping_offset(i as isize);
             unsafe {
-                ptr.wrapping_offset(i as isize).write(template.clone());
+                *ptr_i = template.clone();
+                //~^ ERROR: dropped an possibly-uninitialized value
             }
         }
         Self { size, ptr }

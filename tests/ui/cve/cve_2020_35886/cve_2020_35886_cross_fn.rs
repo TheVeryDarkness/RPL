@@ -11,11 +11,6 @@ pub struct Array<T> {
     ptr: *mut T,
 }
 
-unsafe impl<T> Sync for Array<T> {}
-//FP: ...
-unsafe impl<T> Send for Array<T> {}
-//FP: ...
-
 impl<T> Array<T> {
     /// Convert to slice
     pub fn to_slice<'a>(&'a self) -> &'a [T] {
@@ -34,7 +29,13 @@ impl<T> Array<T> {
 }
 
 impl<T> Drop for Array<T> {
+    #[allow(non_local_definitions)]
     fn drop(&mut self) {
+        unsafe impl<T> Sync for Array<T> {}
+        //FN: ...
+        unsafe impl<T> Send for Array<T> {}
+        //FN: ...
+
         let objsize = std::mem::size_of::<T>();
         let layout = Layout::from_size_align(self.size * objsize, 8).unwrap();
         unsafe {

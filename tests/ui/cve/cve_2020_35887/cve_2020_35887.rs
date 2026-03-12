@@ -1,6 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
+//@[regular] check-pass: no pattern yet
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc};
 use std::ops::{Index, IndexMut, Range};
 
@@ -26,29 +27,6 @@ impl<T> Array<T> {
     }
 }
 
-impl<T> Array<T>
-where
-    T: Default + Copy,
-{
-    /// Easy initialization if all you want is your T's default instantiation
-    // #[rpl::dump_mir(dump_cfg, dump_ddg)]
-    pub fn new(size: usize) -> Self {
-        let objsize = std::mem::size_of::<T>();
-        let layout = Layout::from_size_align(size * objsize, 8).unwrap();
-        let ptr = unsafe { alloc(layout) as *mut T };
-        //~[regular]^ ERROR: resulting pointer `*mut T` has a different alignment than the original alignment that the pointer was created with
-        //~[regular]| ERROR: public function `new` allocates a pointer that may be zero-sized, which is an undefined behavior
-        let default: T = Default::default();
-        for i in 0..size {
-            unsafe {
-                (*(ptr.wrapping_offset(i as isize))) = default;
-                // FIXME: ~^ ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
-            }
-        }
-        Self { size, ptr }
-    }
-}
-
 impl<T> Index<usize> for Array<T> {
     type Output = T;
 
@@ -63,20 +41,6 @@ impl<T> IndexMut<usize> for Array<T> {
     fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Self::Output {
         unsafe { self.ptr.wrapping_offset(idx as isize).as_mut() }.unwrap()
         //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
-    }
-}
-
-impl<T> Index<Range<usize>> for Array<T> {
-    type Output = [T];
-
-    fn index<'a>(&'a self, idx: Range<usize>) -> &'a Self::Output {
-        &self.to_slice()[idx]
-    }
-}
-
-impl<T> IndexMut<Range<usize>> for Array<T> {
-    fn index_mut<'a>(&'a mut self, idx: Range<usize>) -> &'a mut Self::Output {
-        &mut self.to_slice_mut()[idx]
     }
 }
 

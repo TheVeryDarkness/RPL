@@ -32,12 +32,5 @@ impl Drop for DropDetector {
     }
 }
 fn main() {
-    let array = Array::new_from_template(2, &DropDetector(12345));
-    // for i in 0..array.size {
-    //     // drop elements
-    //     unsafe {
-    //         let ptr = array.ptr.wrapping_offset(i as isize);
-    //         std::ptr::drop_in_place(ptr);
-    //     }
-    // }
+    let _array = Array::new_from_template(2, &DropDetector(12345));
 }

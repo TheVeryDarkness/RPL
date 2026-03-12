@@ -1,8 +1,7 @@
 //@ revisions: inline regular
 //@[inline] compile-flags: -Z inline-mir=true
 //@[regular] compile-flags: -Z inline-mir=false
-//@ check-pass: no pattern yet
-// FIXME: write a non-inline pattern
+//@[regular] check-pass: no pattern yet
 use std::alloc::{Layout, alloc, alloc_zeroed, dealloc};
 use std::ops::{Index, IndexMut, Range};
 
@@ -10,11 +9,6 @@ pub struct Array<T> {
     size: usize,
     ptr: *mut T,
 }
-
-unsafe impl<T> Sync for Array<T> {}
-//FP: ...
-unsafe impl<T> Send for Array<T> {}
-//FP: ...
 
 impl<T> Array<T> {
     /// Convert to slice
@@ -30,6 +24,25 @@ impl<T> Array<T> {
     /// The length of the array (number of elements T)
     pub fn len(&self) -> usize {
         self.size
+    }
+}
+
+impl<T> Index<usize> for Array<T> {
+    type Output = T;
+
+    // #[rpl::dump_mir(dump_cfg, dump_ddg)]
+    fn index<'a>(&'a self, idx: usize) -> &'a Self::Output {
+        let ptr = self.ptr.wrapping_offset(idx as isize);
+        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+        unsafe { ptr.as_ref() }.unwrap()
+    }
+}
+
+impl<T> IndexMut<usize> for Array<T> {
+    fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Self::Output {
+        let ptr = self.ptr.wrapping_offset(idx as isize);
+        //~[inline]^ERROR: it is an undefined behavior to offset a pointer using an unchecked integer
+        unsafe { ptr.as_mut() }.unwrap()
     }
 }
 
