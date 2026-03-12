@@ -206,7 +206,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         self.match_operand(operand, discr) && self.match_switch_targets(loc_pat.block, loc.block)
     }
 
-    #[instrument(level = "trace", skip(self), ret)]
+    #[instrument(level = "trace", skip(self, terminator), fields(terminator = ?terminator.kind), ret)]
     fn match_terminator(
         &self,
         loc_pat: pat::Location,
@@ -214,6 +214,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         pat: &pat::TerminatorKind<'pcx>,
         terminator: &mir::Terminator<'tcx>,
     ) -> bool {
+        trace!(pat = pat.name(), mir = terminator.kind.name());
         let matched = match (pat, &terminator.kind) {
             (
                 &pat::TerminatorKind::Call {
@@ -225,7 +226,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 &mir::TerminatorKind::Call {
                     ref func,
                     box ref args,
-                    target: Some(_),
+                    target: _, // it's possible to diverge
                     destination,
                     ..
                 },

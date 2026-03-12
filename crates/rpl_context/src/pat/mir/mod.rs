@@ -4,11 +4,11 @@ use std::ops::Index;
 
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
-use rpl_parser::generics::{Choice5, Choice6, Choice7, Choice12};
+use rpl_parser::generics::{Choice5, Choice6, Choice8, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_hir::Target;
-use rustc_index::IndexVec;
+use rustc_index::{IndexSlice, IndexVec};
 use rustc_middle::mir::{self, CoercionSource};
 use rustc_middle::ty::adjustment::PointerCoercion;
 
@@ -73,8 +73,48 @@ pub struct FnPatternBody<'pcx> {
     pub return_idx: Option<Local>,
     pub params_idx: FxHashSet<Local>,
     pub locals: IndexVec<Local, Ty<'pcx>>,
-    pub basic_blocks: IndexVec<BasicBlock, BasicBlockData<'pcx>>,
+    basic_blocks: IndexVec<BasicBlock, BasicBlockData<'pcx>>,
     pub labels: LabelMap,
+}
+
+impl<'pcx> FnPatternBody<'pcx> {
+    /// Get the basic blocks of the function pattern body.
+    pub fn basic_blocks(&self) -> &IndexSlice<BasicBlock, BasicBlockData<'pcx>> {
+        &self.basic_blocks
+    }
+
+    pub(crate) fn validate(&self) {
+        #[cfg(debug_assertions)]
+        {
+            use rustc_index::bit_set::DenseBitSet;
+
+            for (idx, bb) in self.basic_blocks.iter_enumerated() {
+                assert!(
+                    bb.num_statements_and_terminator() as usize >= 1,
+                    "empty basic block {idx:?} in pattern body",
+                );
+            }
+
+            let mut visited = DenseBitSet::new_filled(self.basic_blocks.len());
+            visited.insert(BasicBlock::ZERO);
+            for (idx, bb) in self.basic_blocks.iter_enumerated() {
+                assert!(
+                    bb.terminator.is_some(),
+                    "basic block {idx:?} without terminator in pattern body"
+                );
+                for succ in bb.terminator().successors() {
+                    assert!(
+                        succ.as_usize() < self.basic_blocks.len(),
+                        "invalid successor {succ:?} in basic block {idx:?}",
+                    );
+                    visited.insert(succ);
+                }
+            }
+            for (idx, _) in self.basic_blocks.iter_enumerated() {
+                assert!(visited.contains(idx), "unreachable basic block {idx:?} in pattern body",);
+            }
+        }
+    }
 }
 
 impl<'pcx> Index<BasicBlock> for FnPatternBody<'pcx> {
@@ -106,18 +146,40 @@ impl<'pcx> BasicBlockData<'pcx> {
         }
     }
     fn set_terminator(&mut self, terminator: TerminatorKind<'pcx>) {
-        assert!(self.terminator.is_none(), "terminator already set");
+        debug_assert!(
+            self.terminator.is_none(),
+            "terminator already set to {:?}",
+            self.terminator,
+        );
         self.terminator = Some(terminator);
+    }
+    fn set_pat_end(&mut self) {
+        debug_assert!(
+            matches!(self.terminator, None | Some(TerminatorKind::PatEnd)),
+            "terminator already set to {:?}",
+            self.terminator,
+        );
+        self.terminator = Some(TerminatorKind::PatEnd);
     }
     fn set_goto(&mut self, block: BasicBlock) {
         match &mut self.terminator {
             None => self.terminator = Some(TerminatorKind::Goto(block)),
-            Some(TerminatorKind::Call { target, .. } | TerminatorKind::Drop { target, .. }) => *target = block,
+            Some(
+                TerminatorKind::Call {
+                    target: Some(target), ..
+                }
+                | TerminatorKind::Drop { target, .. },
+            ) => *target = block,
             // Here the `goto ?bb` termiantor comes from `break` or `continue`,
             // plus the `return` termnator, are all skipped because thay are
             // abnormal control flows.
-            Some(TerminatorKind::Goto(_) | TerminatorKind::Return) => {},
-            Some(terminator @ (TerminatorKind::SwitchInt { .. } | TerminatorKind::PatEnd)) => {
+            Some(
+                terminator @ (TerminatorKind::Goto(_)
+                | TerminatorKind::Call { target: None, .. }
+                | TerminatorKind::Return
+                | TerminatorKind::SwitchInt { .. }
+                | TerminatorKind::PatEnd),
+            ) => {
                 panic!("expect `{:?}`, but found `{terminator:?}`", TerminatorKind::Goto(block));
             },
         }
@@ -470,6 +532,19 @@ impl<'pcx> RawDecleration<'pcx> {
     }
 }
 
+pub enum Diverge {
+    Diverge,
+}
+
+impl Diverge {
+    pub fn new(_: Option<Symbol>, special: &pairs::Word<'_>) -> Self {
+        match special.span.as_str() {
+            "diverge" => Diverge::Diverge,
+            _ => unreachable!("unknown special `{}`", special.span.as_str()),
+        }
+    }
+}
+
 pub enum RawStatement<'pcx> {
     Assign(Option<Label>, Place<'pcx>, Rvalue<'pcx>),
     Call(Option<Label>, Place<'pcx>, Call<'pcx>),
@@ -485,6 +560,7 @@ pub enum RawStatement<'pcx> {
         targets: Vec<(IntValue, Vec<RawStatement<'pcx>>)>,
         otherwise: Option<Vec<RawStatement<'pcx>>>,
     },
+    Diverge(Diverge),
 }
 
 impl<'pcx> RawStatement<'pcx> {
@@ -495,19 +571,28 @@ impl<'pcx> RawStatement<'pcx> {
     ) -> Self {
         let p = stmt.path;
         match stmt.inner.deref() {
-            Choice7::_0(call_ignore_ret) => {
+            Choice8::_0(call_ignore_ret) => {
                 Self::from_call_ignore_ret(with_path(p, call_ignore_ret.get_matched().0), pcx, sym_tab)
             },
-            Choice7::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
-            Choice7::_2(control) => Self::from_control(control.get_matched().0),
-            Choice7::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
-            Choice7::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
-            Choice7::_5(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
-            Choice7::_6(copy_non_overlapping) => {
+            Choice8::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
+            Choice8::_2(control) => Self::from_control(control.get_matched().0),
+            Choice8::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
+            Choice8::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
+            Choice8::_5(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
+            Choice8::_6(copy_non_overlapping) => {
                 Self::from_copy_non_overlapping(WithPath::new(p, copy_non_overlapping.get_matched().0), pcx, sym_tab)
+            },
+            Choice8::_7(mir_special) => {
+                Self::from_mir_special(WithPath::new(p, mir_special.get_matched().0), pcx, sym_tab)
             },
         }
     }
+
+    // /// Whether the statement has a following statement to execute. For example, `break` and
+    // /// `continue` do not have a following statement, while `assign` and `call` do.
+    // pub(crate) fn can_proceed(&self) -> bool {
+    //     matches!(self, Self::Break | Self::Continue | Self::Diverge(_))
+    // }
 
     pub fn from_assign(
         stmt: WithPath<'pcx, &'pcx pairs::MirAssign<'pcx>>,
@@ -644,6 +729,19 @@ impl<'pcx> RawStatement<'pcx> {
         Self::CopyNonOverlapping(label, src, dst, count)
     }
 
+    fn from_mir_special(
+        mir_special: WithPath<'pcx, &'pcx pairs::MirDiverge<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        _ = (pcx, fn_sym_tab);
+        let (label, special, _, _, _) = mir_special.get_matched();
+        let label = label
+            .as_ref()
+            .map(|label| Symbol::intern(label.Label().LabelName().span.as_str()));
+        Self::Diverge(Diverge::new(label, special))
+    }
+
     pub fn from_switch_int_block(
         block: WithPath<'pcx, &'pcx pairs::MirSwitchBody<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -707,7 +805,7 @@ pub enum TerminatorKind<'pcx> {
         func: Operand<'pcx>,
         args: List<Operand<'pcx>>,
         destination: Option<Place<'pcx>>,
-        target: BasicBlock,
+        target: Option<BasicBlock>,
     },
     Drop {
         place: Place<'pcx>,
@@ -716,6 +814,41 @@ pub enum TerminatorKind<'pcx> {
     Return,
     /// Pattern ends here
     PatEnd,
+}
+
+impl TerminatorKind<'_> {
+    pub fn name(&self) -> &'static str {
+        match self {
+            TerminatorKind::SwitchInt { .. } => "switchInt",
+            TerminatorKind::Goto(_) => "goto",
+            TerminatorKind::Call { .. } => "call",
+            TerminatorKind::Drop { .. } => "drop",
+            TerminatorKind::Return => "return",
+            TerminatorKind::PatEnd => "patEnd",
+        }
+    }
+
+    pub gen fn successors(&self) -> BasicBlock {
+        match self {
+            TerminatorKind::SwitchInt { targets, .. } => {
+                for target in targets.targets.values().copied().chain(targets.otherwise) {
+                    yield target;
+                }
+            },
+            TerminatorKind::Goto(target) => yield *target,
+            TerminatorKind::Call { target, .. } => {
+                if let Some(target) = target {
+                    yield *target;
+                }
+            },
+            TerminatorKind::Drop { target, .. } => yield *target,
+            TerminatorKind::Return | TerminatorKind::PatEnd => {},
+        };
+    }
+
+    pub const fn is_pat_end(&self) -> bool {
+        matches!(self, TerminatorKind::PatEnd)
+    }
 }
 
 trait Cast<T> {
@@ -1204,9 +1337,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         }
     }
 
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current))]
     pub fn build(mut self, name: Symbol, output: Option<Symbol>) -> FnPatternBody<'pcx> {
         self.new_block_if_terminated();
-        self.pattern.basic_blocks[self.current].set_terminator(TerminatorKind::PatEnd);
+        self.set_pattern_end_terminator();
 
         // If the function name starts with `$`, it now refers to the function's body.
         let name_str = name.as_str();
@@ -1218,6 +1352,8 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         if let Some(output) = output {
             _ = self.pattern.labels.try_insert(output, Spanned::Output);
         }
+
+        self.pattern.validate();
 
         self.pattern
     }
@@ -1264,22 +1400,72 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         *self.pattern.self_idx.insert(self.pattern.locals.push(ty))
     }
 
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current))]
     fn new_block_if_terminated(&mut self) {
-        if self.pattern.basic_blocks[self.current].terminator.is_some() {
-            self.current = self.pattern.basic_blocks.push(BasicBlockData::default());
+        let terminator = &self.pattern.basic_blocks[self.current].terminator;
+        trace!(?terminator);
+        if let Some(terminator) = terminator
+            && !terminator.is_pat_end()
+        {
+            self.new_block();
         }
+        trace!(?self.current);
     }
-    fn next_block(&mut self) -> BasicBlock {
-        self.new_block_if_terminated();
+
+    /// Create a new block and set it as the current block. This is used for generating statements
+    /// that must be in a new block, such as the body of a loop or the target of a `goto`.
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn new_block(&mut self) -> BasicBlock {
+        self.current = self.pattern.basic_blocks.push(BasicBlockData::default());
+        self.current
+    }
+
+    /// Create a new block, set it as the current block, and set a `goto` terminator from the
+    /// previous block to the new block. This is used for generating statements that must be in
+    /// a new block and are the target of a `goto` from previous statements, such as the body of a
+    /// loop.
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn goto_new_block(&mut self) -> BasicBlock {
+        let new_block = self.pattern.basic_blocks.push(BasicBlockData::default());
+        self.mk_goto(new_block);
+        self.current = new_block;
+        new_block
+    }
+
+    /// Create a new block, set it as the current block, and set a `call` terminator from the
+    /// previous block to the new block.
+    #[instrument(level = "trace", skip(self, f), fields(current = ?self.current), ret)]
+    fn call_to_new_block(&mut self, f: impl FnOnce(BasicBlock) -> TerminatorKind<'pcx>) -> BasicBlock {
+        let new_block = self.pattern.basic_blocks.push(BasicBlockData::default());
+        let current = self.current;
+        self.pattern.basic_blocks[current].set_terminator(f(new_block));
+        self.current = new_block;
+        current
+    }
+
+    /// Get the next block index without changing the current block. This is used for generating
+    /// terminators that refer to the next block, such as `goto` and `switchInt`.
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn next_block(&self) -> BasicBlock {
         self.pattern.basic_blocks.next_index()
     }
 
-    pub fn mk_raw_stmts(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) {
+    #[instrument(level = "trace", skip(self, stmts), fields(current = ?self.current))]
+    fn mk_raw_stmts(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) {
         for stmt in stmts {
-            let _loc = self.mk_raw_stmt(stmt);
+            self.mk_raw_stmt(stmt);
         }
     }
 
+    #[instrument(level = "trace", skip(self, stmts), fields(current = ?self.current), ret)]
+    pub fn mk_body(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) {
+        for stmt in stmts {
+            self.mk_raw_stmt(stmt);
+        }
+        self.new_block_if_terminated();
+    }
+
+    #[instrument(level = "trace", skip(self, kind), fields(current = ?self.current), ret)]
     fn mk_raw_stmt(&mut self, kind: RawStatement<'pcx>) -> Location {
         match kind {
             RawStatement::Assign(label, place, rvalue) => self.mk_assign(label, StatementKind::Assign(place, rvalue)),
@@ -1307,6 +1493,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 targets,
                 otherwise,
             } => self.mk_switch_int(label, operand, targets, otherwise),
+            RawStatement::Diverge(Diverge::Diverge) => self.mk_special(None),
         }
     }
 
@@ -1321,12 +1508,16 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             match rvalue_or_call {
                 RvalueOrCall::Rvalue(rvalue) => _ = self.mk_assign(label, StatementKind::Assign(local.into(), rvalue)),
                 RvalueOrCall::Call(call) => {
+                    // FIXME: whether `last_stmt` should be `true` or `false` here depends on whether there are more
+                    // statements after this one. We currently set it to `false` because we don't have the information
+                    // about the following statements here, but this may lead to incorrect codegen for some patterns.
                     _ = self.mk_fn_call(label, call.0, call.1.into_boxed_slice(), Some(local.into()))
                 },
             }
         }
     }
 
+    #[instrument(level = "trace", skip(self, assign), fields(current = ?self.current), ret)]
     fn mk_assign(&mut self, label: Option<Label>, assign: StatementKind<'pcx>) -> Location {
         self.new_block_if_terminated();
 
@@ -1341,11 +1532,33 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         loc
     }
 
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
     fn set_terminator(&mut self, kind: TerminatorKind<'pcx>) -> Location {
+        for successor in kind.successors() {
+            assert!(
+                successor.as_usize() <= self.pattern.basic_blocks.len(),
+                "invalid successor {successor:?} in terminator {kind:?}",
+            );
+        }
         self.pattern.basic_blocks[self.current].set_terminator(kind);
         self.pattern.terminator_loc(self.current)
     }
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn set_pattern_end_terminator(&mut self) -> Location {
+        self.pattern.basic_blocks[self.current].set_pat_end();
+        self.pattern.terminator_loc(self.current)
+    }
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn set_goto_terminator(&mut self, target: BasicBlock) -> Location {
+        assert!(
+            target.as_usize() <= self.pattern.basic_blocks.len(),
+            "invalid goto target {target:?}",
+        );
+        self.pattern.basic_blocks[self.current].set_goto(target);
+        self.pattern.terminator_loc(self.current)
+    }
 
+    #[instrument(level = "trace", skip(self, func, args, destination), fields(current = ?self.current), ret)]
     pub fn mk_fn_call(
         &mut self,
         label: Option<Label>,
@@ -1371,13 +1584,14 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             );
         }
 
-        let target = self.next_block();
-        let loc = self.set_terminator(TerminatorKind::Call {
+        self.new_block_if_terminated();
+        let bb = self.call_to_new_block(|target| TerminatorKind::Call {
             func,
             args,
             destination,
-            target,
+            target: Some(target),
         });
+        let loc = self.terminator_loc(bb);
 
         if let Some(label) = label {
             self.pattern.labels.insert(label, Spanned::Location(loc));
@@ -1385,7 +1599,9 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
         loc
     }
+    #[instrument(level = "trace", skip(self, label, place), fields(current = ?self.current), ret)]
     pub fn mk_drop(&mut self, label: Option<Label>, place: impl Into<Place<'pcx>>) -> Location {
+        self.new_block_if_terminated();
         let target = self.next_block();
         let place = place.into();
         let loc = self.set_terminator(TerminatorKind::Drop { place, target });
@@ -1396,6 +1612,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
         loc
     }
+    #[instrument(level = "trace", skip(self, operand, target_value_and_stmts, otherwise_stmts), fields(current = ?self.current), ret)]
     pub fn mk_switch_int(
         &mut self,
         label: Option<Label>,
@@ -1405,20 +1622,53 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     ) -> Location {
         self.new_block_if_terminated();
         let current = self.current;
-        self.pattern.basic_blocks[current].set_terminator(TerminatorKind::SwitchInt {
+        self.set_terminator(TerminatorKind::SwitchInt {
             operand,
             targets: SwitchTargets::default(),
         });
-        let next = self.pattern.basic_blocks.push(BasicBlockData::default());
+
+        // We need to create the next block(s) before setting the switch targets because the switch targets
+        // need to refer to the next block(s).
+        let mut next = None;
         let mut targets = SwitchTargets::default();
         for (value, stmts) in target_value_and_stmts {
-            self.mk_switch_target(value, stmts, &mut targets, next);
+            self.mk_switch_target(value, stmts, &mut targets, &mut next);
         }
         if let Some(stmts) = otherwise_stmts {
-            self.mk_otherwise(stmts, &mut targets, next);
+            self.mk_otherwise(stmts, &mut targets, &mut next);
         }
         self.pattern.basic_blocks[current].set_switch_targets(targets);
-        self.current = next;
+        let loc = self.pattern.terminator_loc(current);
+
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, Spanned::Location(loc));
+        }
+
+        if let Some(next) = next {
+            self.current = next;
+        }
+
+        loc
+    }
+    #[instrument(level = "trace", skip(self, stmts, targets), fields(current = ?self.current))]
+    pub fn mk_switch_target(
+        &mut self,
+        value: IntValue,
+        stmts: impl IntoIterator<Item = RawStatement<'pcx>>,
+        targets: &mut SwitchTargets,
+        next: &mut Option<BasicBlock>,
+    ) {
+        let target = self.new_block();
+        targets.targets.insert(value, target);
+        self.mk_raw_stmts(stmts);
+        self.mk_next_block_for_branch(next);
+    }
+
+    #[instrument(level = "trace", skip(self, label), fields(current = ?self.current), ret)]
+    pub fn mk_special(&mut self, label: Option<Label>) -> Location {
+        self.new_block_if_terminated();
+        let current = self.current;
+        self.set_pattern_end_terminator();
         let loc = self.pattern.terminator_loc(current);
 
         if let Some(label) = label {
@@ -1427,59 +1677,73 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
         loc
     }
-    pub fn mk_switch_target(
-        &mut self,
-        value: IntValue,
-        stmts: impl IntoIterator<Item = RawStatement<'pcx>>,
-        targets: &mut SwitchTargets,
-        next: BasicBlock,
-    ) {
-        let target = self.pattern.basic_blocks.push(BasicBlockData::default());
-        targets.targets.insert(value, target);
-        self.current = target;
-        for stmt in stmts {
-            self.mk_raw_stmt(stmt);
-        }
-        self.mk_goto(next);
-    }
 
+    #[instrument(level = "trace", skip(self, stmts, targets), fields(current = ?self.current))]
     pub fn mk_otherwise(
         &mut self,
         stmts: impl IntoIterator<Item = RawStatement<'pcx>>,
         targets: &mut SwitchTargets,
-        next: BasicBlock,
+        next: &mut Option<BasicBlock>,
     ) {
-        let target = self.pattern.basic_blocks.push(BasicBlockData::default());
+        let target = self.new_block();
         targets.otherwise = Some(target);
-        self.current = target;
-        for stmt in stmts {
-            self.mk_raw_stmt(stmt);
-        }
-        self.mk_goto(next);
+        self.mk_raw_stmts(stmts);
+        self.mk_next_block_for_branch(next);
     }
 
-    fn mk_goto(&mut self, block: BasicBlock) -> Location {
-        self.pattern.basic_blocks[self.current].set_goto(block);
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn mk_next_block_for_branch(&mut self, block: &mut Option<BasicBlock>) -> Location {
+        let current = &mut self.pattern.basic_blocks[self.current];
+        if current.terminator.is_none() {
+            let block = match block {
+                Some(block) => *block,
+                None => {
+                    let new_block = self.pattern.basic_blocks.push(BasicBlockData::default());
+                    *block = Some(new_block);
+                    new_block
+                },
+            };
+            self.set_goto_terminator(block);
+        } else {
+            debug!(
+                ?self.current,
+                ?current.terminator,
+                "terminator already set by inner statements, not setting goto or patEnd",
+            );
+        }
         self.pattern.terminator_loc(self.current)
     }
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
+    fn mk_goto(&mut self, block: BasicBlock) -> Location {
+        if self.pattern.basic_blocks[self.current].terminator.is_none() {
+            self.pattern.basic_blocks[self.current].set_goto(block);
+        } else {
+            debug!(
+                current = ?self.current,
+                current.terminator = ?self.pattern.basic_blocks[self.current].terminator,
+                "terminator already set by previous statements in the block, not setting goto",
+            );
+        }
+        self.pattern.terminator_loc(self.current)
+    }
+    #[instrument(level = "trace", skip(self, stmts), fields(current = ?self.current), ret)]
     pub fn mk_loop(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) -> Location {
-        let enter = self.pattern.basic_blocks.push(BasicBlockData::default());
-        self.mk_goto(enter);
-        let exit = self.pattern.basic_blocks.push(BasicBlockData::default());
+        let enter = self.goto_new_block();
+        let exit = self.new_block();
         self.loop_stack.push(Loop { enter, exit });
         self.current = enter;
-        for stmt in stmts {
-            self.mk_raw_stmt(stmt);
-        }
+        self.mk_raw_stmts(stmts);
         self.loop_stack.pop();
         let location = self.mk_goto(enter);
         self.current = exit;
         location
     }
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
     pub fn mk_break(&mut self) -> Location {
         let exit = self.loop_stack.last().expect("no loop to break from").exit;
         self.mk_goto(exit)
     }
+    #[instrument(level = "trace", skip(self), fields(current = ?self.current), ret)]
     pub fn mk_continue(&mut self) -> Location {
         let enter = self.loop_stack.last().expect("no loop to continue").enter;
         self.mk_goto(enter)
@@ -1513,6 +1777,9 @@ impl<'pcx> FnPatternBody<'pcx> {
 }
 
 impl BasicBlockData<'_> {
+    // fn num_statements_and_terminator_without_pat_end(&self) -> usize {
+    //     self.statements.len() + !matches!(self.terminator, None | Some(TerminatorKind::PatEnd)) as
+    // usize }
     pub fn num_statements_and_terminator(&self) -> usize {
         self.statements.len() + self.terminator.is_some() as usize
     }

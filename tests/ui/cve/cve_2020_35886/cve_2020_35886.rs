@@ -14,22 +14,6 @@ pub struct Array<T> {
 unsafe impl<T> Sync for Array<T> {}
 unsafe impl<T> Send for Array<T> {}
 
-impl<T> Array<T>
-where
-    T: Zeroable,
-{
-    /// Extremely fast initialization if all you want is 0's. Note that your type must be Zeroable.
-    /// The auto-Zeroable types are u8, i8, u16, i16, u32, i32, u64, i64, usize, isize, f32, f64.
-    /// `std::Array`s also implement Zeroable allowing for types like `[u8; 1 << 25]`.
-    pub fn zero(size: usize) -> Self {
-        let objsize = std::mem::size_of::<T>();
-        let layout = Layout::from_size_align(size * objsize, 8).unwrap();
-        let ptr = unsafe { alloc_zeroed(layout) as *mut T };
-        //~[regular]^ERROR: public function `zero` allocates a pointer that may be zero-sized, which is an undefined behavior
-        Self { size, ptr }
-    }
-}
-
 impl<T> Array<T> {
     /// Convert to slice
     pub fn to_slice<'a>(&'a self) -> &'a [T] {
@@ -47,21 +31,12 @@ impl<T> Array<T> {
     }
 }
 
-/// Marker trait to determine if a type is auto-zeroable. This allows the initialization to simply
-/// zero out the buffer on initialization.
-pub trait Zeroable {}
-
-impl Zeroable for u8 {}
-impl Zeroable for i8 {}
-impl Zeroable for u16 {}
-impl Zeroable for i16 {}
-impl Zeroable for u32 {}
-impl Zeroable for i32 {}
-impl Zeroable for u64 {}
-impl Zeroable for i64 {}
-impl Zeroable for usize {}
-impl Zeroable for isize {}
-impl Zeroable for f32 {}
-impl Zeroable for f64 {}
-
-impl<T, const N: usize> Zeroable for [T; N] where T: Zeroable {}
+impl<T> Drop for Array<T> {
+    fn drop(&mut self) {
+        let objsize = std::mem::size_of::<T>();
+        let layout = Layout::from_size_align(self.size * objsize, 8).unwrap();
+        unsafe {
+            dealloc(self.ptr as *mut u8, layout);
+        }
+    }
+}

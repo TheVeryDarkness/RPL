@@ -37,6 +37,7 @@ where
 {
     type Output = T;
 
+    #[rpl::dump_mir(dump_cfg, dump_ddg)]
     fn index(&self, idx: usize) -> &Self::Output {
         unsafe {
             let mut count = idx;

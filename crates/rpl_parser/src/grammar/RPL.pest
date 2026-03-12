@@ -794,6 +794,10 @@ MirCopyNonOverlapping = {
     LabelWithColon? ~ kw_copy_nonoverlapping ~ LeftParen ~ MirOperand ~ Comma ~ MirOperand ~ Comma ~ MirOperand ~ RightParen
 }
 
+MirDiverge = {
+    LabelWithColon? ~ Word ~ Bang ~ LeftParen ~ RightParen
+}
+
 MirAssign = {
     LabelWithColon? ~ MirPlace ~ Assign ~ MirRvalueOrCall
 }
@@ -806,6 +810,7 @@ MirStmt = {
   | MirLoop
   | MirSwitchInt
   | MirCopyNonOverlapping ~ SemiColon
+  | MirDiverge ~ SemiColon
 }
 
 MirBody = {

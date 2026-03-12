@@ -396,7 +396,7 @@ impl<'pcx> HasBasicBlocks for pat::FnPatternBody<'pcx> {
     type BasicBlockData = pat::BasicBlockData<'pcx>;
 
     fn basic_blocks(&self) -> &IndexSlice<Self::BasicBlock, Self::BasicBlockData> {
-        &self.basic_blocks
+        self.basic_blocks()
     }
 }
 

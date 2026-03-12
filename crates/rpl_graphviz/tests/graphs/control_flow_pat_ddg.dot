@@ -5,7 +5,7 @@ subgraph cluster_bb0 {
     bb0OUT [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">?bb0[OUT]</td></tr></table>>];
     bb0stmt0 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?0 = _</td></tr></table>>];
     bb0stmt1 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">_?1 = _</td></tr></table>>];
-    bb0stmt2 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">switchInt(copy _?1) -&gt; [false: ?bb2, otherwise: ?bb3]</td></tr></table>>];
+    bb0stmt2 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td  align="center" colspan="1"></td></tr><tr><td align="left">switchInt(copy _?1) -&gt; [false: ?bb1, otherwise: ?bb3]</td></tr></table>>];
     bb0stmt0 -> bb0OUT [label="_?0"];
     bb0stmt1 -> bb0OUT [label="_?1"];
     bb0stmt1 -> bb0stmt2 [label="_?1"];
@@ -28,9 +28,9 @@ subgraph cluster_bb3 {
     bb3stmt0 -> bb3OUT [label="_?0"];
     bb3IN -> bb3OUT [label="_?1"];
 }
-    bb0OUT -> bb2IN [label="0"];
+    bb0OUT -> bb1IN [label="0"];
     bb0OUT -> bb3IN [label="otherwise"];
-    bb2OUT -> bb1IN [label="goto"];
-    bb3OUT -> bb1IN [label="goto"];
+    bb1OUT -> bb2IN [label="goto"];
+    bb3OUT -> bb2IN [label="goto"];
     bb0stmt0 -> bb3stmt0 [label="_?0"];
 }

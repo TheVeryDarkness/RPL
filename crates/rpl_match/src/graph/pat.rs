@@ -17,11 +17,11 @@ pub fn pat_program_dep_graph(patterns: &pat::FnPatternBody<'_>, pointer_bytes: u
 
 pub fn pat_data_dep_graph(patterns: &pat::FnPatternBody<'_>, cfg: &PatControlFlowGraph) -> PatDataDepGraph {
     let mut graph = DataDepGraph::new(
-        patterns.basic_blocks.len(),
+        patterns.basic_blocks().len(),
         |bb| patterns[bb].num_statements_and_terminator(),
         patterns.locals.len(),
     );
-    for (bb, block) in patterns.basic_blocks.iter_enumerated() {
+    for (bb, block) in patterns.basic_blocks().iter_enumerated() {
         BlockDataDepGraphVisitor::new(&mut graph.blocks[bb]).visit_basic_block_data(bb, block);
     }
     #[cfg(not(feature = "interblock_edges"))]
@@ -32,7 +32,7 @@ pub fn pat_data_dep_graph(patterns: &pat::FnPatternBody<'_>, cfg: &PatControlFlo
 }
 
 pub fn pat_control_flow_graph(patterns: &pat::FnPatternBody<'_>, pointer_bytes: u64) -> PatControlFlowGraph {
-    ControlFlowGraph::new(patterns.basic_blocks.len(), |block| {
+    ControlFlowGraph::new(patterns.basic_blocks().len(), |block| {
         normalized_terminator_edges(patterns[block].terminator.as_ref(), pointer_bytes)
     })
 }
@@ -69,7 +69,7 @@ pub fn normalized_terminator_edges(
         None | Some(Return | PatEnd) => TerminatorEdges::None,
         Some(&Goto(target) | &Drop { target, .. }) => TerminatorEdges::Single(target),
         Some(&Call { target, .. }) => TerminatorEdges::AssignOnReturn {
-            return_: Box::new([target]),
+            return_: target.map_or_else(|| Box::new([]) as Box<[_]>, |target| Box::new([target])),
             cleanup: None,
         },
         Some(SwitchInt { targets, .. }) => {

@@ -9,6 +9,7 @@ extern crate rustc_arena;
 extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_middle;
+extern crate rustc_session;
 extern crate rustc_span;
 
 use std::fs::File;
@@ -28,6 +29,7 @@ use rpl_meta::context::MetaContext;
 use rpl_meta::symbol_table::{SymbolTable, WithPath};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::FxHashMap;
+use rustc_session::EarlyDiagCtxt;
 use rustc_span::Symbol;
 
 fn read_from_file(file: &str) -> std::io::Result<String> {
@@ -42,6 +44,92 @@ fn write_to_file(file: &str, content: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
+fn test_case(
+    imports: &[String],
+    pat: String,
+    cfg_file: &str,
+    ddg_file: &str,
+    cfg_expected_file: &str,
+    ddg_expected_file: &str,
+) {
+    static LOGGER: LazyLock<()> = LazyLock::new(|| {
+        rustc_driver::init_rustc_env_logger(&EarlyDiagCtxt::new(rustc_session::config::ErrorOutputType::default()));
+    });
+    rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+        static ARENA: LazyLock<Arena> = LazyLock::new(|| Arena::default());
+        static MCTX: LazyLock<MetaContext> = LazyLock::new(|| MetaContext::new(&ARENA));
+
+        let () = &*LOGGER;
+
+        let imports: Vec<&'static pairs::UsePath<'static>> = imports
+            .iter()
+            .map(|import| {
+                &*Box::leak(Box::new(
+                    pairs::UsePath::try_parse(ARENA.alloc_str(import)).unwrap_or_else(|err| panic!("{err}")),
+                ))
+            })
+            .collect();
+        let pat = pat.replace("$ ", "$");
+        let pat = ARENA.alloc_str(&pat);
+        let pat_item = pairs::RPLPatternItem::try_parse(pat).unwrap_or_else(|err| panic!("{err}"));
+        let pat_item = &*Box::leak(Box::new(pat_item));
+        let mut errors = Vec::new();
+        let path = Path::new(file!());
+        MCTX.set_active_path(Some(path));
+        let symbol_tables = SymbolTable::collect_symbol_tables(&MCTX, &imports, std::iter::once(pat_item), &mut errors);
+        if !errors.is_empty() {
+            for error in &errors {
+                eprintln!("{error}");
+            }
+            panic!("Errors during symbol table collection");
+        }
+        let symbol_tables = &*Box::leak(Box::new(symbol_tables));
+        PatternCtxt::entered_no_tcx(move |pcx| {
+            let pat = pcx.new_pattern();
+            let ident = Symbol::intern(pat_item.Identifier().span.as_str());
+            pat.add_pattern_item(WithPath::new(path, pat_item), &symbol_tables, pat::PattOrUtil::Patt);
+            let patterns = pat
+                .patt_block
+                .get(&ident)
+                .unwrap()
+                .expect_rust_items()
+                .fns
+                .iter()
+                .next()
+                .unwrap()
+                .body
+                .unwrap();
+            let mut cfg = Vec::new();
+            pat_cfg_to_graphviz(&patterns, &mut cfg, &Default::default()).unwrap();
+            let cfg = String::from_utf8(cfg).unwrap();
+            let mut ddg = Vec::new();
+            pat_ddg_to_graphviz(&patterns, &mut ddg, &Default::default()).unwrap();
+            let ddg = String::from_utf8(ddg).unwrap();
+
+            let cfg_expected = read_from_file(cfg_file).unwrap_or_default();
+            let ddg_expected = read_from_file(ddg_file).unwrap_or_default();
+
+            if cfg_expected != cfg {
+                write_to_file(cfg_expected_file, cfg.as_bytes()).unwrap();
+            }
+
+            if ddg_expected != ddg {
+                write_to_file(ddg_expected_file, ddg.as_bytes()).unwrap();
+            }
+            write_to_file(cfg_file, cfg.as_bytes()).unwrap();
+            write_to_file(ddg_file, ddg.as_bytes()).unwrap();
+            assert_eq!(
+                cfg, cfg_expected,
+                "CFG mismatch, see {cfg_file} and {cfg_expected_file}"
+            );
+            assert_eq!(
+                ddg, ddg_expected,
+                "DDG mismatch, see {ddg_file} and {ddg_expected_file}"
+            );
+        });
+    })
+}
+
 macro_rules! test_case {
     ( $(#[$meta:meta])* fn $name:ident() {
         $(let imports = $imports:expr;)?
@@ -50,78 +138,31 @@ macro_rules! test_case {
         #[test]
         $(#[$meta])*
         fn $name() {
-            rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
-                static ARENA: LazyLock<Arena> = LazyLock::new(|| Arena::default());
-                static MCTX: LazyLock<MetaContext> = LazyLock::new(|| MetaContext::new(&ARENA));
+            let cfg_file = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/graphs/",
+                stringify!($name),
+                "_pat_cfg.dot"
+            );
+            let ddg_file = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/graphs/",
+                stringify!($name),
+                "_pat_ddg.dot"
+            );
 
-                let imports: [String; _] = [];
-                $(let imports: [String; _] = $imports;)?
-                let imports: Vec<&'static pairs::UsePath<'static>> = imports.iter().map(|import| &*Box::leak(Box::new(pairs::UsePath::try_parse(ARENA.alloc_str(import)).unwrap_or_else(|err| panic!("{err}"))))).collect();
-                let pat: String = $pattern;
-                let pat = pat.replace("$ ", "$");
-                let pat = ARENA.alloc_str(&pat);
-                let pat_item = pairs::RPLPatternItem::try_parse(pat).unwrap_or_else(|err| panic!("{err}"));
-                let pat_item = &*Box::leak(Box::new(pat_item));
-                let mut errors = Vec::new();
-                let path = Path::new(file!());
-                MCTX.set_active_path(Some(path));
-                let symbol_tables = SymbolTable::collect_symbol_tables(
-                    &MCTX,
-                    &imports,
-                    std::iter::once(pat_item), &mut errors
-                );
-                if !errors.is_empty() {
-                    for error in &errors {
-                        eprintln!("{error}");
-                    }
-                    panic!("Errors during symbol table collection");
-                }
-                let symbol_tables = &*Box::leak(Box::new(symbol_tables));
-                PatternCtxt::entered_no_tcx(move |pcx| {
-                    let pat = pcx.new_pattern();
-                    let ident = Symbol::intern(pat_item.Identifier().span.as_str());
-                    pat.add_pattern_item(
-                        WithPath::new(path, pat_item),
-                        &symbol_tables,
-                        pat::PattOrUtil::Patt,
-                    );
-                    let patterns = pat.patt_block
-                        .get(&ident)
-                        .unwrap()
-                        .expect_rust_items()
-                        .fns
-                        .iter()
-                        .next()
-                        .unwrap()
-                        .body
-                        .unwrap();
-                    let mut cfg = Vec::new();
-                    pat_cfg_to_graphviz(&patterns, &mut cfg, &Default::default()).unwrap();
-                    let cfg = String::from_utf8(cfg).unwrap();
-                    let mut ddg = Vec::new();
-                    pat_ddg_to_graphviz(&patterns, &mut ddg, &Default::default()).unwrap();
-                    let ddg = String::from_utf8(ddg).unwrap();
-
-                    let cfg_file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/graphs/", stringify!($name), "_pat_cfg.dot");
-                    let ddg_file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/graphs/", stringify!($name), "_pat_ddg.dot");
-
-                    let cfg_expected = read_from_file(cfg_file).unwrap_or_default();
-                    let ddg_expected = read_from_file(ddg_file).unwrap_or_default();
-
-                    let cfg_expected_file = concat!(env!("CARGO_TARGET_TMPDIR"), "/", stringify!($name), "_pat_cfg.dot");
-                    let ddg_expected_file = concat!(env!("CARGO_TARGET_TMPDIR"), "/", stringify!($name), "_pat_ddg.dot");
-
-                    if cfg_expected != cfg {
-                        write_to_file(cfg_expected_file, cfg.as_bytes()).unwrap();
-                    }
-
-                    if ddg_expected != ddg {
-                        write_to_file(ddg_expected_file , ddg.as_bytes()).unwrap();
-                    }
-                    assert_eq!(cfg, cfg_expected, "CFG mismatch, see {cfg_file} and {cfg_expected_file}");
-                    assert_eq!(ddg, ddg_expected, "DDG mismatch, see {ddg_file} and {ddg_expected_file}");
-                });
-            })
+            let cfg_expected_file = concat!(env!("CARGO_TARGET_TMPDIR"), "/", stringify!($name), "_pat_cfg.dot");
+            let ddg_expected_file = concat!(env!("CARGO_TARGET_TMPDIR"), "/", stringify!($name), "_pat_ddg.dot");
+            let imports: [String; _] = [];
+            $(let imports: [String; _] = $imports;)?
+            test_case(
+                &imports,
+                $pattern,
+                cfg_file,
+                ddg_file,
+                cfg_expected_file,
+                ddg_expected_file,
+            );
         }
     }
 }
@@ -196,6 +237,32 @@ test_case! {
                 let $ptr: *const $T = copy $ptr_mut as *const $T (PtrToPtr);
                 let $elem: $T = copy (*$ptr);
             }
+        }.to_string();
+    }
+}
+
+test_case! {
+    fn cve_2020_35893() {
+        let pattern = quote!{
+            pattern_checked_mut_ptr_casted_offset[$T: type, $U1: type, $U2: type] =
+                fn $pattern($len: $U1, ..) -> _ {
+                    'ptr:
+                    let $ptr: *mut $T; // _9
+                    let $ptr_1: *mut $T; // _8
+                    let $len2: $U2; // _10
+                    let $cmp: bool = Lt(copy $len, _); // _3
+                    switchInt(move $cmp) {
+                        false => {
+                            // _ = std::rt::panic_fmt(_);
+                            diverge!();
+                        }
+                        _ => {
+                            $len2 = copy $len as $U2 (IntToInt);
+                            'offset:
+                            $ptr_1 = Offset(copy $ptr, copy $len2);
+                        }
+                    }
+                }
         }.to_string();
     }
 }

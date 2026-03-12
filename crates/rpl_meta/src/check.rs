@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use impls::CheckImplCtxt;
-use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice7, Choice12, Choice14};
+use parser::generics::{Choice2, Choice3, Choice4, Choice5, Choice6, Choice8, Choice12, Choice14};
 use parser::{SpanWrapper, pairs};
 use rpl_constraints::predicates::{PredicateConjunction, PredicateError};
 use rustc_data_structures::fx::FxHashMap;
@@ -339,27 +339,30 @@ impl<'i> CheckFnCtxt<'i, '_> {
 
     fn check_mir_stmt(&mut self, mctx: &MetaContext<'i>, stmt: &'i pairs::MirStmt<'i>) {
         match stmt.deref() {
-            Choice7::_0(mir_call) => {
+            Choice8::_0(mir_call) => {
                 let call = mir_call.get_matched().0.MirCall();
                 self.check_mir_call(mctx, call);
             },
-            Choice7::_1(mir_drop) => {
+            Choice8::_1(mir_drop) => {
                 let place = mir_drop.get_matched().0.MirPlace();
                 self.check_mir_place(mctx, place);
             },
-            Choice7::_2(control) => {
+            Choice8::_2(control) => {
                 let control = control.get_matched().0;
                 self.check_mir_control(mctx, control);
             },
-            Choice7::_3(mir_assign) => {
+            Choice8::_3(mir_assign) => {
                 let mir_assign = mir_assign.get_matched().0;
                 self.check_mir_place(mctx, mir_assign.MirPlace());
                 self.check_mir_rvalue_or_call(mctx, mir_assign.MirRvalueOrCall());
             },
-            Choice7::_4(mir_loop) => self.check_mir_loop(mctx, mir_loop),
-            Choice7::_5(mir_switchint) => self.check_mir_switch_int(mctx, mir_switchint),
-            Choice7::_6(mir_copy_non_overlapping) => {
+            Choice8::_4(mir_loop) => self.check_mir_loop(mctx, mir_loop),
+            Choice8::_5(mir_switchint) => self.check_mir_switch_int(mctx, mir_switchint),
+            Choice8::_6(mir_copy_non_overlapping) => {
                 self.check_mir_copy_non_overlapping(mctx, mir_copy_non_overlapping.get_matched().0);
+            },
+            Choice8::_7(mir_special) => {
+                self.check_mir_special(mctx, mir_special.get_matched().0);
             },
         }
     }
@@ -393,6 +396,11 @@ impl<'i> CheckFnCtxt<'i, '_> {
         self.check_mir_operand(mctx, src);
         self.check_mir_operand(mctx, dst);
         self.check_mir_operand(mctx, count);
+    }
+
+    fn check_mir_special(&mut self, mctx: &MetaContext<'i>, mir_special: &'i pairs::MirDiverge<'i>) {
+        let (_, _, _, _, _) = mir_special.get_matched();
+        _ = mctx;
     }
 
     fn check_switch_int_value(&mut self, mctx: &MetaContext<'i>, value: &'i pairs::MirSwitchValue<'i>) {

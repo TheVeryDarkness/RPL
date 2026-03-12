@@ -10,6 +10,9 @@ pub struct Array<T> {
     ptr: *mut T,
 }
 
+unsafe impl<T: Sync> Sync for Array<T> {}
+unsafe impl<T: Send> Send for Array<T> {}
+
 impl<T> Array<T> {
     /// Convert to slice
     pub fn to_slice<'a>(&'a self) -> &'a [T] {
@@ -24,35 +27,6 @@ impl<T> Array<T> {
     /// The length of the array (number of elements T)
     pub fn len(&self) -> usize {
         self.size
-    }
-}
-
-impl<T> Index<usize> for Array<T> {
-    type Output = T;
-
-    // #[rpl::dump_mir(dump_cfg, dump_ddg)]
-    fn index<'a>(&'a self, idx: usize) -> &'a Self::Output {
-        &self.to_slice()[idx]
-    }
-}
-
-impl<T> IndexMut<usize> for Array<T> {
-    fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Self::Output {
-        &mut self.to_slice_mut()[idx]
-    }
-}
-
-impl<T> Index<Range<usize>> for Array<T> {
-    type Output = [T];
-
-    fn index<'a>(&'a self, idx: Range<usize>) -> &'a Self::Output {
-        &self.to_slice()[idx]
-    }
-}
-
-impl<T> IndexMut<Range<usize>> for Array<T> {
-    fn index_mut<'a>(&'a mut self, idx: Range<usize>) -> &'a mut Self::Output {
-        &mut self.to_slice_mut()[idx]
     }
 }
 

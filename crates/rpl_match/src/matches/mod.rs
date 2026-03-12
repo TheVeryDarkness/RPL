@@ -379,7 +379,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         }
     }
     fn new_checking(cx: &'a CheckMirCtxt<'a, 'pcx, 'tcx>) -> Matching<'tcx> {
-        let num_blocks = cx.mir_pat.basic_blocks.len();
+        let num_blocks = cx.mir_pat.basic_blocks().len();
         let num_locals = cx.mir_pat.locals.len();
         let mir_statements = IndexVec::from_fn_n(
             |bb| MirStatementBackMatch::new(cx.body[bb].statements.len()),
