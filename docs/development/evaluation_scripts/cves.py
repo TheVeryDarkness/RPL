@@ -264,7 +264,11 @@ crates = [
 ]
 
 
-target = Path(os.path.dirname(__file__), "../../../target/cve_evaluation")
+target = Path(os.path.expanduser("~/cve_evaluation"))
+print(f"Will storing results in {target}, is it ok? (y/n)")
+if input().strip().lower() != "y":
+    print("Aborting.")
+    sys.exit(1)
 if target.exists():
     shutil.rmtree(target)
 target.mkdir(parents=True, exist_ok=True)
@@ -280,6 +284,8 @@ for crate in crates:
 
 lib = Path(target, "lib")
 lib.mkdir(parents=True, exist_ok=True)
+
+print(lib)
 
 cargo_toml = Path(lib, "Cargo.toml")
 cargo_toml.write_text(
@@ -302,6 +308,36 @@ pin-project = "1.0"
 """
 )
 
+# Install required Rust toolchains and components for rapx
+subprocess.run(
+    [
+        "rustup",
+        "component",
+        "add",
+        "--toolchain",
+        "nightly-2025-12-06",
+        "rust-src",
+        "rustc-dev",
+        "llvm-tools-preview",
+    ],
+    check=True,
+)
+subprocess.run(
+    ["cargo", "+nightly-2025-12-06", "install", "rapx@0.6.252"],
+    check=True,
+)
+
+
+def store(result: "subprocess.CompletedProcess[str]", tool: str, file: str):
+    stderr = Path(target, "log", tool, file).with_suffix(".stderr")
+    stderr.parent.mkdir(parents=True, exist_ok=True)
+    stderr.write_text(result.stderr)
+
+    stdout = Path(target, "log", tool, file).with_suffix(".stdout")
+    stdout.parent.mkdir(parents=True, exist_ok=True)
+    stdout.write_text(result.stdout)
+
+
 # Check all files with tools to ensure they compile without errors
 for crate in crates:
     for cve in crate.cves:
@@ -319,28 +355,22 @@ for crate in crates:
                 capture_output=True,
                 text=True,
             )
-            stderr = Path(target, "log/clippy", file).with_suffix(".stderr")
-            stderr.parent.mkdir(parents=True, exist_ok=True)
-            stderr.write_text(result.stderr)
+            store(result, "clippy", file)
 
             # cargo rudra
             result = subprocess.run(
-                ["cargo", "rudra"],
+                ["cargo", "+nightly-2025-02-14", "rudra"],
                 cwd=lib,
                 capture_output=True,
                 text=True,
             )
-            stderr = Path(target, "log/rudra", file).with_suffix(".stderr")
-            stderr.parent.mkdir(parents=True, exist_ok=True)
-            stderr.write_text(result.stderr)
+            store(result, "rudra", file)
 
             # cargo rapx
             result = subprocess.run(
-                ["cargo", "rapx", "-FM"],
+                ["cargo", "+nightly-2025-12-06", "rapx", "-F", "-M"],
                 cwd=lib,
                 capture_output=True,
                 text=True,
             )
-            stderr = Path(target, "log/rapx", file).with_suffix(".stderr")
-            stderr.parent.mkdir(parents=True, exist_ok=True)
-            stderr.write_text(result.stderr)
+            store(result, "rapx", file)
