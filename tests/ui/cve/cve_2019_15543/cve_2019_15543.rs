@@ -1,4 +1,5 @@
 //@check-pass: no pattern
+//@ignore-target: windows
 
 // See https://github.com/gnzlbg/slice_deque/blob/621274a01226a8a700f6bf9c8cf5a9909567867b
 #![allow(deprecated)]
