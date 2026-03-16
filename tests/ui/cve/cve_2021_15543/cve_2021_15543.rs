@@ -380,7 +380,7 @@ impl<T> SliceDeque<T> {
             new_head += cap as isize;
             debug_assert!(new_head >= 0);
             self.tail_ += cap;
-        } else if new_head as usize >= cap {
+        } else if new_head as usize > cap {
             // cannot panic because new_head >= 0
             // If the new head is larger than the capacity, we shift the range
             // by -capacity to move it towards the first mirrored

@@ -1,6 +1,6 @@
 //@check-pass: no pattern
 
-// See https://github.com/gnzlbg/slice_deque/blob/50db625cf281c64528bd352ba58c0420aa7508a4
+// See https://github.com/gnzlbg/slice_deque/blob/621274a01226a8a700f6bf9c8cf5a9909567867b
 #![allow(deprecated)]
 #![allow(invalid_value)]
 #![allow(unsafe_op_in_unsafe_fn)]
@@ -61,8 +61,10 @@ mod intrinsics {
 ///
 /// It is implemented with a growable virtual ring buffer.
 pub struct SliceDeque<T> {
-    /// Elements in the queue.
-    elems_: NonNull<[T]>,
+    /// Index of the first element in the queue.
+    head_: usize,
+    /// Index of one past the last element in the queue.
+    tail_: usize,
     /// Mirrored memory buffer.
     buf: Buffer<T>,
 }
@@ -79,12 +81,10 @@ impl<T> SliceDeque<T> {
     /// ```
     #[inline]
     pub fn new() -> Self {
-        unsafe {
-            let buf = Buffer::new();
-            Self {
-                elems_: nonnull_raw_slice(buf.ptr(), 0),
-                buf,
-            }
+        Self {
+            head_: 0,
+            tail_: 0,
+            buf: Buffer::new(),
         }
     }
 
@@ -104,6 +104,30 @@ impl<T> SliceDeque<T> {
         // Note: the buffer length is not necessarily a power of two
         // debug_assert!(self.buf.len() % 2 == 0);
         self.buf.len() / 2
+    }
+
+    /// Largest tail value
+    #[inline]
+    fn tail_upper_bound(&self) -> usize {
+        self.capacity() * 2
+    }
+
+    /// Largest head value
+    #[inline]
+    fn head_upper_bound(&self) -> usize {
+        self.capacity()
+    }
+
+    /// Get index to the head
+    #[inline]
+    fn head(&self) -> usize {
+        self.head_
+    }
+
+    /// Get index to the tail
+    #[inline]
+    fn tail(&self) -> usize {
+        self.tail_
     }
 
     /// Provides a reference to the last element, or `None` if the deque is
@@ -141,7 +165,8 @@ impl<T> SliceDeque<T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        let l = self.as_slice().len();
+        let l = self.tail() - self.head();
+        debug_assert!(self.tail() >= self.head());
         debug_assert!(l <= self.capacity());
         l
     }
@@ -164,13 +189,21 @@ impl<T> SliceDeque<T> {
     /// Extracts a slice containing the entire deque.
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        unsafe { self.elems_.as_ref() }
+        unsafe {
+            let ptr = self.buf.ptr();
+            let ptr = ptr.add(self.head());
+            slice::from_raw_parts(ptr, self.len())
+        }
     }
 
     /// Extracts a mutable slice containing the entire deque.
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe { self.elems_.as_mut() }
+        unsafe {
+            let ptr = self.buf.ptr();
+            let ptr = ptr.add(self.head());
+            slice::from_raw_parts_mut(ptr, self.len())
+        }
     }
     /// Attempts to reserve capacity for inserting at least `additional`
     /// elements without reallocating. Does nothing if the capacity is already
@@ -212,11 +245,13 @@ impl<T> SliceDeque<T> {
             }
 
             // Exchange buffers
-            crate::mem::swap(&mut self.buf, &mut new_buffer);
+            mem::swap(&mut self.buf, &mut new_buffer);
 
-            // Correct the slice - we copied to the
-            // beginning of the of the new buffer:
-            self.elems_ = nonnull_raw_slice(self.buf.ptr(), len);
+            // Correct head and tail (we copied to the
+            // beginning of the of the new buffer)
+            self.head_ = 0;
+            self.tail_ = len;
+
             Ok(())
         }
     }
@@ -328,50 +363,42 @@ impl<T> SliceDeque<T> {
     /// tail of the deque points to within the allocated buffer.
     #[inline]
     pub unsafe fn move_head_unchecked(&mut self, x: isize) {
+        // Make sure that the head does not wrap over the tail:
+        debug_assert!(x >= -((self.capacity() - self.len()) as isize));
+        debug_assert!(x <= self.len() as isize);
+        let head = self.head() as isize;
+        let mut new_head = head + x;
+        let tail = self.tail() as isize;
         let cap = self.capacity();
-        let len = self.len();
-        // Make sure that the begin does not wrap over the end:
-        debug_assert!(x >= -((cap - len) as isize));
-        debug_assert!(x <= len as isize);
+        debug_assert!(new_head <= tail);
+        debug_assert!(tail - new_head <= cap as isize);
 
-        // Obtain the begin of the slice and offset it by x:
-        let mut new_begin = unsafe { self.as_mut_ptr().offset(x) } as usize;
-
-        // Compute the boundaries of the first and second memory regions:
-        let first_region_begin = unsafe { self.buf.ptr() } as usize;
-        let region_size = Buffer::<T>::size_in_bytes(self.buf.len()) / 2;
-        debug_assert!(cap * mem::size_of::<T>() <= region_size);
-        let second_region_begin = first_region_begin + region_size;
-
-        // If the new begin is not inside the first memory region, we shift it
-        // by the region size into it:
-        if new_begin < first_region_begin {
-            new_begin += region_size;
-        } else if new_begin >= second_region_begin {
-            // Should be within the second region:
-            debug_assert!(new_begin < second_region_begin + region_size);
-            new_begin -= region_size;
+        if intrinsics::unlikely(new_head < 0) {
+            // If the new head is negative we shift the range by capacity to
+            // move it towards the second mirrored memory region.
+            debug_assert!(tail < cap as isize);
+            new_head += cap as isize;
+            debug_assert!(new_head >= 0);
+            self.tail_ += cap;
+        } else if new_head as usize >= cap {
+            // cannot panic because new_head >= 0
+            // If the new head is larger than the capacity, we shift the range
+            // by -capacity to move it towards the first mirrored
+            // memory region.
+            debug_assert!(tail >= cap as isize);
+            new_head -= cap as isize;
+            debug_assert!(new_head >= 0);
+            self.tail_ -= cap;
         }
-        debug_assert!(new_begin >= first_region_begin);
-        debug_assert!(new_begin < second_region_begin);
 
-        // The new begin is now in the first memory region:
-        let new_begin = new_begin as *mut T;
-        debug_assert!(in_bounds(
-            unsafe { slice::from_raw_parts(self.buf.ptr() as *mut u8, region_size) },
-            new_begin as *mut u8
-        ));
+        self.head_ = new_head as usize;
+        debug_assert!(self.len() as isize == (tail - head) - x);
+        debug_assert!(self.head() <= self.tail());
 
-        let new_len = len as isize - x;
-        debug_assert!(
-            new_len >= 0,
-            "len = {}, x = {}, new_len = {}",
-            len,
-            x,
-            new_len
-        );
-        debug_assert!(new_len <= cap as isize);
-        self.elems_ = unsafe { nonnull_raw_slice(new_begin, new_len as usize) };
+        debug_assert!(self.tail() <= self.tail_upper_bound());
+        debug_assert!(self.head() <= self.head_upper_bound());
+
+        debug_assert!(self.head() != self.capacity());
     }
 }
 
