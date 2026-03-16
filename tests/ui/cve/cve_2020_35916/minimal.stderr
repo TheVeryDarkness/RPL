@@ -1,0 +1,11 @@
+error: it is undefined behavior to create a mutable reference from a const pointer, even if the pointer is derived from a mutable reference
+  --> tests/ui/cve/cve_2020_35916/minimal.rs:8:18
+   |
+LL |         unsafe { &mut *(slice.as_ptr() as *mut Self) }
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `core::slice::as_mut_ptr` to get a mutable pointer from a mutable reference, and then cast it to the desired type
+   = note: `#[deny(rpl::mut_ref_from_const_ptr)]` on by default
+
+error: aborting due to 1 previous error
+
