@@ -20,6 +20,8 @@ use ui_test::{Args, Config, Match, error_on_output_conflict};
 
 extern crate byte_slice_cast;
 extern crate bytes;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+extern crate mach;
 // extern crate cassandra_cpp_sys;
 extern crate futures;
 extern crate if_chain;
@@ -51,6 +53,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "itertools",
     "libc",
     "log",
+    "mach",
     "memmap",
     "num_derive",
     "num_rational",

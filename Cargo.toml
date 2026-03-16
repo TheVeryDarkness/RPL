@@ -72,6 +72,7 @@ tokio-util = { version = "0.2", features = ["codec"] }
 bytes = "0.5.6"
 log = "0.4"
 # cassandra-cpp-sys = "1.1.1"
+mach = { version = "0.2", default-features = false }
 
 [package]
 name = "rpl"
@@ -129,6 +130,9 @@ tokio.workspace = true
 tokio-util.workspace = true
 bytes.workspace = true
 # cassandra-cpp-sys.workspace = true
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.mach]
+workspace = true
 
 [features]
 default = []
