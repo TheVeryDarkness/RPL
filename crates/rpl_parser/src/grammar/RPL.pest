@@ -876,7 +876,7 @@ ImplKind = {
 }
 
 Impl = {
-    kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace
+    kw_unsafe? ~ kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace
 }
 
 RustItem                = {

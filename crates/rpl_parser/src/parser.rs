@@ -8881,14 +8881,14 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#Impl , "Corresponds to expression: `(kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Impl , super :: super :: generics :: Seq6 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_impl :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#ImplKind :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Fn :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#WhereBlock :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#Impl , "Corresponds to expression: `(kw_unsafe? ~ kw_impl ~ ImplKind? ~ Type ~ LeftBrace ~ (Fn ~ WhereBlock?)* ~ RightBrace)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Impl , super :: super :: generics :: Seq7 :: < (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#kw_unsafe :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#kw_impl :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#ImplKind :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: generics :: Rep :: < 'i , INHERITED , super :: super :: generics :: Seq2 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Fn :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#WhereBlock :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightBrace :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#Impl<'i, INHERITED> {
             #[doc = "A helper function to access [`Fn`]."]
             #[allow(non_snake_case)]
             pub fn r#Fn<'s>(&'s self) -> ::pest_typed::re_exported::Vec<&'s super::super::rules::r#Fn<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.4.matched;
+                    let res = &res.content.5.matched;
                     {
                         let res = res
                             .content
@@ -8912,7 +8912,7 @@ pub mod rules_impl {
             ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#ImplKind<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.1.matched;
+                    let res = &res.content.2.matched;
                     {
                         let res = res.as_ref().map(|res| res);
                         res
@@ -8924,7 +8924,7 @@ pub mod rules_impl {
             pub fn r#LeftBrace<'s>(&'s self) -> &'s super::super::rules::r#LeftBrace<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.3.matched;
+                    let res = &res.content.4.matched;
                     res
                 }
             }
@@ -8933,7 +8933,7 @@ pub mod rules_impl {
             pub fn r#RightBrace<'s>(&'s self) -> &'s super::super::rules::r#RightBrace<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.5.matched;
+                    let res = &res.content.6.matched;
                     res
                 }
             }
@@ -8942,7 +8942,7 @@ pub mod rules_impl {
             pub fn r#Type<'s>(&'s self) -> &'s super::super::rules::r#Type<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.2.matched;
+                    let res = &res.content.3.matched;
                     res
                 }
             }
@@ -8955,7 +8955,7 @@ pub mod rules_impl {
             > {
                 let res = &*self.content;
                 {
-                    let res = &res.content.4.matched;
+                    let res = &res.content.5.matched;
                     {
                         let res = res
                             .content
@@ -8980,8 +8980,22 @@ pub mod rules_impl {
             pub fn r#kw_impl<'s>(&'s self) -> &'s super::super::rules::r#kw_impl<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.0.matched;
+                    let res = &res.content.1.matched;
                     res
+                }
+            }
+            #[doc = "A helper function to access [`kw_unsafe`]."]
+            #[allow(non_snake_case)]
+            pub fn r#kw_unsafe<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#kw_unsafe<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
                 }
             }
         }
