@@ -106,6 +106,28 @@ impl<T> SliceDeque<T> {
         self.buf.len() / 2
     }
 
+    /// Provides a reference to the last element, or `None` if the deque is
+    /// empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use slice_deque::SliceDeque;
+    /// let mut deq = SliceDeque::new();
+    /// assert_eq!(deq.back(), None);
+    ///
+    /// deq.push_back(1);
+    /// deq.push_back(2);
+    /// assert_eq!(deq.back(), Some(&2));
+    /// deq.push_front(3);
+    /// assert_eq!(deq.back(), Some(&2));
+    /// ```
+    #[inline]
+    pub fn back(&self) -> Option<&T> {
+        let last_idx = self.len().wrapping_sub(1);
+        self.get(last_idx)
+    }
+
     /// Number of elements in the ring buffer.
     ///
     /// # Examples
@@ -503,34 +525,6 @@ impl<T> Drop for Buffer<T> {
         let buffer_size_in_bytes = Self::size_in_bytes(self.len());
         let first_half_ptr = self.ptr.as_ptr() as *mut u8;
         unsafe { deallocate_mirrored(first_half_ptr, buffer_size_in_bytes) };
-    }
-}
-
-#[test]
-fn test_deque() {
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub struct Foo {
-        a: i64,
-        b: Option<(bool, i64)>,
-    }
-
-    let mut deque = SliceDeque::new();
-
-    for n in 0..=1000 {
-        for i in 0..n {
-            deque.push_front(Foo { a: 42, b: None });
-        }
-        let n = (1 + deque.len()) / 2; // Randomly pop about half of the elements.
-        for i in 0..n {
-            assert_eq!(deque.pop_front(), Some(Foo { a: 42, b: None }));
-            if !deque.is_empty() {
-                // this assertion fails (becomes corrupt after pop_front())
-                assert_eq!(
-                    unsafe { *deque.get_unchecked(deque.len() - 1) },
-                    Foo { a: 42, b: None }
-                );
-            }
-        }
     }
 }
 
@@ -1517,4 +1511,19 @@ mod mirrored {
     /// Prints last os error at `location`.
     #[cfg(not(all(debug_assertions, feature = "use_std")))]
     fn print_error(_location: &str) {}
+}
+
+fn main() {
+    const C: [i16; 3] = [42; 3];
+
+    let mut deque = SliceDeque::new();
+    for _ in 0..918 {
+        deque.push_front(C);
+    }
+
+    for _ in 0..237 {
+        assert_eq!(deque.pop_front(), Some(C));
+        assert!(!deque.is_empty());
+        assert_eq!(*deque.back().unwrap(), C); // fails B != C
+    }
 }
