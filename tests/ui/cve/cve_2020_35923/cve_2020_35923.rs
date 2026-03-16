@@ -1,5 +1,3 @@
-//@check-pass: no pattern yet
-
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{AddAssign, Deref, DivAssign, MulAssign, RemAssign, SubAssign};
@@ -102,6 +100,10 @@ impl<T: Float + RemAssign> RemAssign<T> for NotNan<T> {
 impl<T: Float> Ord for NotNan<T> {
     fn cmp(&self, other: &NotNan<T>) -> Ordering {
         match self.partial_cmp(&other) {
+            //~^ unreachable_unchecked_depend_on_option
+            //~| unreachable_unchecked_depend_on_option
+            //~| unreachable_unchecked_depend_on_option
+            //~| unreachable_unchecked_depend_on_option
             Some(ord) => ord,
             None => unsafe { std::hint::unreachable_unchecked() },
         }

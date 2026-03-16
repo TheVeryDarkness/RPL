@@ -1,0 +1,38 @@
+error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:102:15
+   |
+LL |         match self.partial_cmp(&other) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `Option::unwrap_unchecked` which is more concise
+   = note: `#[deny(rpl::unreachable_unchecked_depend_on_option)]` on by default
+
+error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:102:15
+   |
+LL |         match self.partial_cmp(&other) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `Option::unwrap_unchecked` which is more concise
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:102:15
+   |
+LL |         match self.partial_cmp(&other) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `Option::unwrap_unchecked` which is more concise
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:102:15
+   |
+LL |         match self.partial_cmp(&other) {
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using `Option::unwrap_unchecked` which is more concise
+   = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
+
+error: aborting due to 4 previous errors
+
