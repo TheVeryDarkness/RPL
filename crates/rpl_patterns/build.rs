@@ -39,7 +39,7 @@ fn main() {
 macro_rules! default_pattern {
     ($path:literal) => {
         (
-            concat!("/rpl/docs/patterns-pest/", $path),
+            concat!("docs/patterns-pest/", $path),
             include_str!(concat!("../../../docs/patterns-pest/", $path)),
         )
     };
