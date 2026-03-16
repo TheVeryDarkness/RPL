@@ -41,6 +41,8 @@ extern crate smallvec;
 extern crate syn;
 extern crate tokio;
 extern crate tokio_util;
+#[cfg(target_os = "windows")]
+extern crate winapi;
 
 mod test_utils;
 
@@ -74,6 +76,8 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tokio",
     "tokio_util",
     // "cassandra_cpp_sys", for cve_2024_27284
+    #[cfg(target_os = "windows")]
+    "windows",
 ];
 
 /// Produces a string with an `--extern` flag for all UI test crate

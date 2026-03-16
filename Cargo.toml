@@ -74,6 +74,7 @@ bytes = "0.5.6"
 log = "0.4"
 # cassandra-cpp-sys = "1.1.1"
 mach = { version = "0.2", default-features = false }
+winapi = "0.3.0"
 
 [package]
 name = "rpl"
@@ -130,6 +131,7 @@ radium.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 bytes.workspace = true
+winapi.workspace = true
 # cassandra-cpp-sys.workspace = true
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.mach]

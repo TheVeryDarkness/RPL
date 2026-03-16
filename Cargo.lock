@@ -1520,6 +1520,7 @@ dependencies = [
  "tracing",
  "ui_test",
  "walkdir",
+ "winapi 0.3.9",
 ]
 
 [[package]]
