@@ -243,6 +243,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             ) => self.match_place(place_pat, place),
             // Trivial matches, do not need to print
             (pat::TerminatorKind::Goto(_), mir::TerminatorKind::Goto { .. })
+            | (pat::TerminatorKind::Unreachable, mir::TerminatorKind::Unreachable)
             | (pat::TerminatorKind::Return, mir::TerminatorKind::Return)
             | (pat::TerminatorKind::PatEnd, _) => return true,
             (
@@ -254,6 +255,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 | pat::TerminatorKind::Goto(_)
                 | pat::TerminatorKind::Call { .. }
                 | pat::TerminatorKind::Drop { .. }
+                | pat::TerminatorKind::Unreachable
                 | pat::TerminatorKind::Return,
                 // | pat::TerminatorKind::PatEnd,
                 mir::TerminatorKind::Goto { .. }

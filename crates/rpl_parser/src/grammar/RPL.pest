@@ -64,6 +64,7 @@ kw_Ctor         = @{ "Ctor" ~ !WordFollowing }
 kw_from         = @{ "from" ~ !WordFollowing }
 kw_of           = @{ "of" ~ !WordFollowing }
 kw_raw          = @{ "raw" ~ !WordFollowing }
+kw_unreachable  = @{ "unreachable" ~ !WordFollowing }
 // Soft Keyword
 kw_drop      = @{ "drop" ~ !WordFollowing }
 kw_break     = @{ "break" ~ !WordFollowing }
@@ -750,6 +751,10 @@ MirDrop = {
     LabelWithColon? ~ kw_drop ~ LeftParen ~ MirPlace ~ RightParen
 }
 
+MirUnreachable = {
+    LabelWithColon? ~ kw_unreachable
+}
+
 Label = {
     Quote ~ LabelName
 }
@@ -803,6 +808,7 @@ MirAssign = {
 MirStmt = {
     MirCallIgnoreRet ~ SemiColon
   | MirDrop ~ SemiColon
+  | MirUnreachable ~ SemiColon
   | MirControl ~ SemiColon
   | MirAssign ~ SemiColon
   | MirLoop

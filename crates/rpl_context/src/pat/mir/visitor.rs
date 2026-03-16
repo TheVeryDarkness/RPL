@@ -241,6 +241,7 @@ pub trait PatternVisitor<'pcx>: Sized {
             TerminatorKind::Drop { place, target: _ } => {
                 self.visit_place(place, PlaceContext::MutatingUse(MutatingUseContext::Drop), location)
             },
+            TerminatorKind::Unreachable => {},
             TerminatorKind::SwitchInt {
                 ref operand,
                 ref targets,
