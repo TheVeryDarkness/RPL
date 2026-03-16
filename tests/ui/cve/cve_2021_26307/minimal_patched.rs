@@ -1,4 +1,5 @@
 //@only-target: x86_64
+//@check-pass: no pattern
 
 /// Uses Rust's `cpuid` function from the `arch` module.
 pub mod native_cpuid {

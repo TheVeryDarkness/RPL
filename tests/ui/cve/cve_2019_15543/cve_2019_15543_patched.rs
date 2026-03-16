@@ -6,6 +6,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 #![allow(rpl::generic_function_marked_inline)]
 #![allow(rpl::private_function_marked_inline)]
+#![allow(rpl::ptr_offset_with_cast)]
 use core::ptr::NonNull;
 use core::{cmp, convert, fmt, hash, iter, mem, ops, ptr, slice, str};
 use mirrored::{allocate_mirrored, allocation_granularity, deallocate_mirrored};
