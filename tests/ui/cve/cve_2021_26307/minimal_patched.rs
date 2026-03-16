@@ -2,7 +2,7 @@
 
 /// Uses Rust's `cpuid` function from the `arch` module.
 pub mod native_cpuid {
-    use super::CpuIdResult;
+    use self::arch::CpuidResult as CpuIdResult;
 
     #[cfg(all(target_arch = "x86", not(target_env = "sgx"), target_feature = "sse"))]
     use core::arch::x86 as arch;
