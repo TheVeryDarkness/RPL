@@ -77,7 +77,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tokio_util",
     // "cassandra_cpp_sys", for cve_2024_27284
     #[cfg(target_os = "windows")]
-    "windows",
+    "winapi",
 ];
 
 /// Produces a string with an `--extern` flag for all UI test crate
