@@ -1,9 +1,9 @@
-//@check-pass: no pattern yet
+//@rustc-env: RPL_PATS=docs/patterns-pest/cve/CVE-2021-15551.rpl
 //! See <https://github.com/servo/rust-smallvec/glob/88b62b65fae5bc144d9e9cacf0778c8ed1ed509b>
 #![allow(deprecated)]
 #![allow(unsafe_op_in_unsafe_fn)]
-#![allow(rpl::private_function_marked_inline)]
-#![allow(rpl::generic_function_marked_inline)]
+// #![allow(rpl::private_function_marked_inline)]
+// #![allow(rpl::generic_function_marked_inline)]
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
@@ -251,7 +251,7 @@ impl<A: Array> SmallVec<A> {
                     return;
                 }
             }
-            deallocate(ptr, cap);
+            deallocate(ptr, cap); //~double_drop_on_corner_case
         }
     }
 }
