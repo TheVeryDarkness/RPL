@@ -1298,7 +1298,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
     fn return_block(&mut self) -> BasicBlock {
         if let Some(return_idx) = self.return_ {
-            return_idx.into()
+            return_idx
         } else {
             let return_block = self.pattern.basic_blocks.push(BasicBlockData::default());
             self.pattern.basic_blocks[return_block].set_terminator(TerminatorKind::Return);
