@@ -478,6 +478,7 @@ pub enum RawStatement<'pcx> {
     Drop(Option<Label>, Place<'pcx>),
     Break,
     Continue,
+    Return,
     Loop(Vec<RawStatement<'pcx>>),
     SwitchInt {
         label: Option<Label>,
@@ -592,8 +593,9 @@ impl<'pcx> RawStatement<'pcx> {
     pub fn from_control(control: &pairs::MirControl<'pcx>) -> Self {
         let (_label, break_or_continue, _label2) = control.get_matched();
         match break_or_continue {
-            Choice2::_0(_break) => Self::Break,
-            Choice2::_1(_continue) => Self::Continue,
+            Choice3::_0(_break) => Self::Break,
+            Choice3::_1(_continue) => Self::Continue,
+            Choice3::_2(_return) => Self::Return,
         }
     }
 
@@ -1165,6 +1167,7 @@ impl From<FieldIdx> for FieldAcc {
 pub struct FnPatternBodyBuilder<'pcx> {
     pattern: FnPatternBody<'pcx>,
     loop_stack: Vec<Loop>,
+    return_: Option<BasicBlock>,
     current: BasicBlock,
 }
 
@@ -1200,6 +1203,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         Self {
             pattern,
             loop_stack: Vec::new(),
+            return_: None,
             current,
         }
     }
@@ -1255,7 +1259,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     }
 
     #[allow(unused)]
-    fn mk_return(&mut self, ty: Ty<'pcx>) -> Local {
+    fn mk_returned_local(&mut self, ty: Ty<'pcx>) -> Local {
         *self.pattern.return_idx.insert(self.pattern.locals.push(ty))
     }
 
@@ -1272,6 +1276,17 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     fn next_block(&mut self) -> BasicBlock {
         self.new_block_if_terminated();
         self.pattern.basic_blocks.next_index()
+    }
+
+    fn return_block(&mut self) -> BasicBlock {
+        if let Some(return_idx) = self.return_ {
+            return_idx.into()
+        } else {
+            let return_block = self.pattern.basic_blocks.push(BasicBlockData::default());
+            self.pattern.basic_blocks[return_block].set_terminator(TerminatorKind::Return);
+            self.return_ = Some(return_block);
+            return_block
+        }
     }
 
     pub fn mk_raw_stmts(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) {
@@ -1300,6 +1315,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             RawStatement::Drop(label, place) => self.mk_drop(label, place),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),
+            RawStatement::Return => self.mk_return(),
             RawStatement::Loop(stmts) => self.mk_loop(stmts),
             RawStatement::SwitchInt {
                 label,
@@ -1483,6 +1499,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     pub fn mk_continue(&mut self) -> Location {
         let enter = self.loop_stack.last().expect("no loop to continue").enter;
         self.mk_goto(enter)
+    }
+    pub fn mk_return(&mut self) -> Location {
+        let return_ = self.return_block();
+        self.mk_goto(return_)
     }
 }
 

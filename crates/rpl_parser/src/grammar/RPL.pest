@@ -69,6 +69,7 @@ kw_drop      = @{ "drop" ~ !WordFollowing }
 kw_break     = @{ "break" ~ !WordFollowing }
 kw_continue  = @{ "continue" ~ !WordFollowing }
 kw_loop      = @{ "loop" ~ !WordFollowing }
+kw_return    = @{ "return" ~ !WordFollowing }
 kw_switchInt = @{ "switchInt" ~ !WordFollowing }
 kw_true      = @{ "true" ~ !WordFollowing }
 kw_false     = @{ "false" ~ !WordFollowing }
@@ -155,6 +156,7 @@ Keywords = @{
   | kw_break
   | kw_continue
   | kw_loop
+  | kw_return
   | kw_switchInt
   | kw_true
   | kw_false
@@ -757,7 +759,7 @@ LabelWithColon = {
 }
 
 MirControl = {
-    LabelWithColon? ~ (kw_break | kw_continue) ~ Label?
+    LabelWithColon? ~ (kw_break | kw_continue | kw_return) ~ Label?
 }
 
 MirStmtBlock = {

@@ -549,6 +549,101 @@ test_case! {
     }
 }
 
+test_case! {
+    fn cve_2021_15551_divergent() {
+        let pattern = quote!{
+            divergent[$T: type] = {
+                pub fn $grow(..) -> _ {
+                    type RawVecInner = alloc::raw_vec::RawVecInner;
+                    type NonNullU8 = core::ptr::NonNull<u8>;
+                    type UniqueU8 = core::ptr::Unique<u8>;
+                    type RawVecT = alloc::raw_vec::RawVec<$T>;
+                    type VecT = alloc::vec::Vec<$T>;
+
+                    let $cmp_2: bool = Not(_);
+                    let $cmp_1: bool = Ne(_, _);
+                    let $ptr: *mut $T;
+                    let $ptr_1: *const u8;
+                    let $non_null: NonNullU8;
+                    let $unique: UniqueU8;
+                    let $raw_vec_inner: RawVecInner;
+                    let $raw_vec: RawVecT;
+                    let $vec: VecT;
+                    switchInt(move $cmp_1) {
+                        false => {
+                            switchInt(move $cmp_2) {
+                                false => {
+                                }
+                                _ => {
+                                    return;
+                                }
+                            }
+                        }
+                        _ => {
+                        }
+                    }
+                    'src:
+                    $ptr_1 = copy $ptr as *const u8 (PtrToPtr);
+                    $non_null = NonNullU8 { pointer: copy $ptr_1 };
+                    $unique = UniqueU8 { pointer: move $non_null, _marker: _ };
+                    $raw_vec_inner = RawVecInner { ptr: move $unique, cap: _, alloc: _ };
+                    $raw_vec = RawVecT { inner: move $raw_vec_inner, _marker: _ };
+                    $vec = VecT { buf: move $raw_vec, len: _ };
+                    drop($vec);
+                }
+            }
+        }.to_string();
+    }
+}
+
+test_case! {
+    fn cve_2021_15551_congruence() {
+        let pattern = quote!{
+            congruence[$T: type] = {
+                pub fn $grow(..) -> _ {
+                    type RawVecInner = alloc::raw_vec::RawVecInner;
+                    type NonNullU8 = core::ptr::NonNull<u8>;
+                    type UniqueU8 = core::ptr::Unique<u8>;
+                    type RawVecT = alloc::raw_vec::RawVec<$T>;
+                    type VecT = alloc::vec::Vec<$T>;
+
+                    let $cmp_2: bool = Not(_);
+                    let $cmp_1: bool = Ne(_, _);
+                    let $ptr: *mut $T;
+                    let $ptr_1: *const u8;
+                    let $non_null: NonNullU8;
+                    let $unique: UniqueU8;
+                    let $raw_vec_inner: RawVecInner;
+                    let $raw_vec: RawVecT;
+                    let $vec: VecT;
+                    switchInt(move $cmp_1) {
+                        false => {
+                            switchInt(move $cmp_2) {
+                                false => {
+                                }
+                                _ => {
+                                    return;
+                                }
+                            }
+                        }
+                        _ => {
+                            return;
+                        }
+                    }
+                    'src:
+                    $ptr_1 = copy $ptr as *const u8 (PtrToPtr);
+                    $non_null = NonNullU8 { pointer: copy $ptr_1 };
+                    $unique = UniqueU8 { pointer: move $non_null, _marker: _ };
+                    $raw_vec_inner = RawVecInner { ptr: move $unique, cap: _, alloc: _ };
+                    $raw_vec = RawVecT { inner: move $raw_vec_inner, _marker: _ };
+                    $vec = VecT { buf: move $raw_vec, len: _ };
+                    drop($vec);
+                }
+            }
+        }.to_string();
+    }
+}
+
 // macro_rules! test_case {
 //     ( $(#[$meta:meta])* fn $name:ident() {
 //         meta!($($rpl_meta:tt)*);

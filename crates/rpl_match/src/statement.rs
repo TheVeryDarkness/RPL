@@ -605,6 +605,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             && self.ty().match_generic_args(&gargs_pat, gargs, generics)
     }
 
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_aggregate(
         &self,
         agg_kind_pat: &pat::AggKind<'pcx>,
@@ -644,14 +645,14 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 | mir::AggregateKind::RawPtr(..),
             ) => false,
         };
-        debug!(
-            ?agg_kind_pat,
-            ?operands_pat,
-            ?agg_kind,
-            ?operands,
-            matched,
-            "match_aggregate",
-        );
+        // debug!(
+        //     ?agg_kind_pat,
+        //     ?operands_pat,
+        //     ?agg_kind,
+        //     ?operands,
+        //     matched,
+        //     "match_aggregate",
+        // );
         matched
     }
 
