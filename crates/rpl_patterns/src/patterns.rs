@@ -65,6 +65,7 @@ pub fn patterns() -> Vec<(&'static str, &'static str)> {
         "cve/CVE-2021-15551.rpl",
         "cve/CVE-2021-25904.rpl",
         "cve/CVE-2021-25905.rpl",
+        "cve/CVE-2021-26307.rpl",
         "cve/CVE-2021-27376.rpl",
         "cve/CVE-2021-29941-2.rpl",
         "cve/CVE-2022-23639.rpl",
