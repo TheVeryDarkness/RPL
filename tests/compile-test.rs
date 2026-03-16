@@ -53,6 +53,7 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "itertools",
     "libc",
     "log",
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     "mach",
     "memmap",
     "num_derive",
