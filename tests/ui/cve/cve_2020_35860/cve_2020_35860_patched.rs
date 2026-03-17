@@ -21,7 +21,7 @@ pub struct CBox<D: ?Sized>
 where
     D: DisposeRef,
 {
-    pub ptr: *mut D::RefTo,
+    ptr: *mut D::RefTo,
 }
 
 impl<D: ?Sized> CBox<D>
@@ -30,7 +30,7 @@ where
 {
     #[inline(always)]
     /// Wrap the pointer in a `CBox`.
-    pub fn new(ptr: *mut D::RefTo) -> Self {
+    pub unsafe fn new(ptr: *mut D::RefTo) -> Self {
         //~^ ERROR: it usually isn't necessary to apply #[inline] to generic functions
         CBox { ptr }
     }
@@ -55,7 +55,6 @@ impl<'a> Deref for CBox<str> {
     fn deref(&self) -> &str {
         unsafe {
             let text = CStr::from_ptr(self.ptr);
-            //~^ ERROR: Dereference of a possibly null pointer
 
             std::str::from_utf8_unchecked(text.to_bytes())
         }

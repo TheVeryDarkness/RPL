@@ -54,7 +54,7 @@ impl<'a> Deref for CBox<str> {
     type Target = str;
     fn deref(&self) -> &str {
         unsafe {
-            let text = CStr::from_ptr(self.ptr);
+            let text = CStr::from_ptr(self.as_ptr());
             //~^ ERROR: Dereference of a possibly null pointer
 
             std::str::from_utf8_unchecked(text.to_bytes())
