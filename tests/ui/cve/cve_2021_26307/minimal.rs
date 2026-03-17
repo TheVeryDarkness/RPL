@@ -1,5 +1,5 @@
 //@only-target: x86_64
-//@check-pass: no pattern
+//@compile-flags: -Zinline-mir=false
 
 /// Uses Rust's `cpuid` function from the `arch` module.
 pub mod native_cpuid {
@@ -12,6 +12,7 @@ pub mod native_cpuid {
 
     pub fn cpuid_count(a: u32, c: u32) -> CpuIdResult {
         let result = unsafe { self::arch::__cpuid_count(a, c) };
+        //~^ unchecked_cpuid
 
         CpuIdResult {
             eax: result.eax,
