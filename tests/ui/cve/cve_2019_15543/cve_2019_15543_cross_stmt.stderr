@@ -1,0 +1,18 @@
+error: suspicious manual implementation of integer wrapping, where `mut new_head > cap` is checked, but `mut new_head -= $b1` is performed
+  --> tests/ui/cve/cve_2019_15543/cve_2019_15543_cross_stmt.rs:391:13
+   |
+LL |         let mut new_head = head + x;
+   |             ------------ wrapped integer here
+LL |         let tail = self.tail() as isize;
+LL |         let cap = self.capacity();
+   |             --- the upper bound here
+...
+LL |             new_head -= cap_;
+   |             ^^^^^^^^^^^^^^^^
+   |
+   = help: please check if it matches your expectation when `mut new_head == cap`
+   = note: `-D rpl::suspicious-integer-wrap` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::suspicious_integer_wrap)]`
+
+error: aborting due to 1 previous error
+

@@ -58,7 +58,7 @@ impl<T> Slab<T> {
             //~| ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
             last_elem_ptr = self.mem.offset((self.len - 1) as isize);
-            //~| ptr_offset_with_cast
+            //~^ ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
 
             elem = ptr::read(elem_ptr);

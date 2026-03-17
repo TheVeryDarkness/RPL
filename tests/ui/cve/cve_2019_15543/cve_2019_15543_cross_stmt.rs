@@ -386,9 +386,9 @@ impl<T> SliceDeque<T> {
             // If the new head is larger than the capacity, we shift the range
             // by -capacity to move it towards the first mirrored
             // memory region.
-            let cap = cap as isize;
-            debug_assert!(tail >= cap);
-            new_head -= cap; //~ suspicious_integer_wrap
+            let cap_ = cap as isize;
+            debug_assert!(tail >= cap_);
+            new_head -= cap_; //~ suspicious_integer_wrap
             debug_assert!(new_head >= 0);
             self.tail_ -= cap;
         }

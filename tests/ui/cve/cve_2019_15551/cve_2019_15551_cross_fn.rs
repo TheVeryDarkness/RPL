@@ -225,7 +225,7 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    unsafe fn realloc_on_heap(new_cap: usize, len: usize, ptr: *mut A::Item) {
+    unsafe fn realloc_on_heap(&mut self, new_cap: usize, len: usize, ptr: *mut A::Item) {
         let mut vec = Vec::with_capacity(new_cap);
         let new_alloc = vec.as_mut_ptr();
         mem::forget(vec);
@@ -250,7 +250,7 @@ impl<A: Array> SmallVec<A> {
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
                 self.capacity = len;
             } else if new_cap != cap {
-                self.realloc_on_heap(new_cap, cap, len);
+                self.realloc_on_heap(new_cap, len, ptr);
                 if unspilled {
                     return;
                 }

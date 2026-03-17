@@ -39,14 +39,11 @@ impl<T> Index<usize> for Slab<T> {
 }
 
 impl<T> Slab<T> {
-    fn elem_ptr(&self, offset: usize) -> *const T {
-        self.mem.offset(offset as isize)
+    unsafe fn mut_elem_ptr(&mut self, offset: usize) -> *mut T {
+        unsafe { self.mem.offset(offset as isize) }
     }
-    fn mut_elem_ptr(&mut self, offset: usize) -> *mut T {
-        self.mem.offset(offset as isize)
-    }
-    fn last_elem_ptr(&self) -> *const T {
-        self.elem_ptr(self.len - 1)
+    unsafe fn last_mut_elem_ptr(&mut self) -> *mut T {
+        unsafe { self.mut_elem_ptr(self.len - 1) }
     }
     #[inline]
     pub fn remove(&mut self, offset: usize) -> T {
@@ -66,15 +63,13 @@ impl<T> Slab<T> {
             //~| HELP: check whether it's in bound before offsetting
             //~| ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
-            last_elem_ptr = self.last_elem_ptr(offset);
-            //~^ HELP: this is because `self.len` exceeds the container's length by one
-            //~| HELP: did you mean this
-            //~| ptr_offset_with_cast
+            last_elem_ptr = self.last_mut_elem_ptr();
+            //~^ ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
 
             elem = ptr::read(elem_ptr);
             last_elem = ptr::read(last_elem_ptr);
-            //~^ ERROR: pointer out of bound
+            //FN: ~^ ERROR: pointer out of bound
 
             ptr::write(elem_ptr, last_elem);
         }

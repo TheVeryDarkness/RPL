@@ -1,9 +1,20 @@
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::{AddAssign, Deref, DivAssign, MulAssign, RemAssign, SubAssign};
+use std::ops::{
+    Add, AddAssign, Deref, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign,
+};
 use std::panic;
 
-pub trait Float: Copy + PartialOrd + std::fmt::Debug {
+pub trait Float:
+    Copy
+    + PartialOrd
+    + Add<Output = Self>
+    + Sub<Output = Self>
+    + Div<Output = Self>
+    + Mul<Output = Self>
+    + Rem<Output = Self>
+    + std::fmt::Debug
+{
     fn is_nan(self) -> bool;
 }
 
@@ -57,6 +68,17 @@ impl<T: Float> Deref for NotNan<T> {
 
 impl<T: Float + PartialEq> Eq for NotNan<T> {}
 
+/// Adds two NotNans.
+///
+/// Panics if the computation results in NaN
+impl<T: Float> Add for NotNan<T> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        self + other.0
+    }
+}
+
 /// Adds a float directly.
 ///
 /// Panics if the provided value is NaN or the computation results in NaN
@@ -68,6 +90,12 @@ impl<T: Float> Add<T> for NotNan<T> {
     }
 }
 
+impl<T: Float + AddAssign> AddAssign for NotNan<T> {
+    fn add_assign(&mut self, other: Self) {
+        *self += other.0;
+    }
+}
+
 /// Adds a float directly.
 ///
 /// Panics if the provided value is NaN.
@@ -75,6 +103,14 @@ impl<T: Float + AddAssign> AddAssign<T> for NotNan<T> {
     fn add_assign(&mut self, other: T) {
         self.0 += other;
         assert!(!self.0.is_nan(), "Addition resulted in NaN");
+    }
+}
+
+impl<T: Float> Sub for NotNan<T> {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        self - other.0
     }
 }
 
@@ -89,6 +125,12 @@ impl<T: Float> Sub<T> for NotNan<T> {
     }
 }
 
+impl<T: Float + SubAssign> SubAssign for NotNan<T> {
+    fn sub_assign(&mut self, other: Self) {
+        *self -= other.0
+    }
+}
+
 /// Subtracts a float directly.
 ///
 /// Panics if the provided value is NaN or the computation results in NaN
@@ -96,6 +138,14 @@ impl<T: Float + SubAssign> SubAssign<T> for NotNan<T> {
     fn sub_assign(&mut self, other: T) {
         self.0 -= other;
         assert!(!self.0.is_nan(), "Subtraction resulted in NaN");
+    }
+}
+
+impl<T: Float> Mul for NotNan<T> {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        self * other.0
     }
 }
 
@@ -110,6 +160,12 @@ impl<T: Float> Mul<T> for NotNan<T> {
     }
 }
 
+impl<T: Float + MulAssign> MulAssign for NotNan<T> {
+    fn mul_assign(&mut self, other: Self) {
+        *self *= other.0
+    }
+}
+
 /// Multiplies a float directly.
 ///
 /// Panics if the provided value is NaN.
@@ -117,6 +173,14 @@ impl<T: Float + MulAssign> MulAssign<T> for NotNan<T> {
     fn mul_assign(&mut self, other: T) {
         self.0 *= other;
         assert!(!self.0.is_nan(), "Multiplication resulted in NaN");
+    }
+}
+
+impl<T: Float> Div for NotNan<T> {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        self / other.0
     }
 }
 
@@ -131,6 +195,12 @@ impl<T: Float> Div<T> for NotNan<T> {
     }
 }
 
+impl<T: Float + DivAssign> DivAssign for NotNan<T> {
+    fn div_assign(&mut self, other: Self) {
+        *self /= other.0;
+    }
+}
+
 /// Divides a float directly.
 ///
 /// Panics if the provided value is NaN or the computation results in NaN
@@ -138,6 +208,14 @@ impl<T: Float + DivAssign> DivAssign<T> for NotNan<T> {
     fn div_assign(&mut self, other: T) {
         self.0 /= other;
         assert!(!self.0.is_nan(), "Division resulted in NaN");
+    }
+}
+
+impl<T: Float> Rem for NotNan<T> {
+    type Output = Self;
+
+    fn rem(self, other: Self) -> Self {
+        self % other.0
     }
 }
 
@@ -149,6 +227,12 @@ impl<T: Float> Rem<T> for NotNan<T> {
 
     fn rem(self, other: T) -> Self {
         NotNan::new(self.0 % other).expect("Rem resulted in NaN")
+    }
+}
+
+impl<T: Float + RemAssign> RemAssign for NotNan<T> {
+    fn rem_assign(&mut self, other: Self) {
+        *self %= other.0
     }
 }
 

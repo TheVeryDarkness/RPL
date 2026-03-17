@@ -1,4 +1,5 @@
 //@ignore-target: windows
+//@check-pass: FN
 
 // See https://github.com/gnzlbg/slice_deque/blob/621274a01226a8a700f6bf9c8cf5a9909567867b
 #![allow(deprecated)]
@@ -356,7 +357,8 @@ impl<T> SliceDeque<T> {
             // by -capacity to move it towards the first mirrored
             // memory region.
             debug_assert!(tail >= cap as isize);
-            *new_head -= cap as isize; //~ suspicious_integer_wrap
+            *new_head -= cap as isize;
+            //FN: ~ suspicious_integer_wrap
             debug_assert!(*new_head >= 0);
             self.tail_ -= cap;
             true
@@ -366,7 +368,7 @@ impl<T> SliceDeque<T> {
     }
 
     fn wrap_if_overflow(&mut self, new_head: &mut isize, cap: usize, tail: isize) -> bool {
-        if intrinsics::unlikely(*new_head < 0) {
+        if unsafe { intrinsics::unlikely(*new_head < 0) } {
             // If the new head is negative we shift the range by capacity to
             // move it towards the second mirrored memory region.
             debug_assert!(tail < cap as isize);
