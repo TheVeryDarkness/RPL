@@ -26,8 +26,8 @@ impl Session<'_> {
         let table = if let Some(table) = table {
             let table = str_to_cstring(table)?;
             table.as_ptr()
-            //~^ NOTE: the `std::ffi::CString` value is dropped here
         } else {
+            //~^ NOTE: the `std::ffi::CString` value is dropped here
             std::ptr::null()
         };
         unsafe { check!(ffi::sqlite3session_attach(self.sess, table)) };

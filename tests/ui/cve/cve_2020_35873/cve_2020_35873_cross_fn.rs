@@ -1,3 +1,4 @@
+//@check-pass: FN
 #![allow(dangling_pointers_from_temporaries)]
 
 struct Session<'a> {
@@ -21,7 +22,7 @@ macro_rules! check {
 }
 
 fn str_to_char_ptr(s: &str) -> Result<*const i8, Error> {
-    Ok(str_to_cstring(table)?.table.as_ptr())
+    Ok(str_to_cstring(s)?.as_ptr())
 }
 
 impl Session<'_> {
@@ -29,13 +30,13 @@ impl Session<'_> {
     pub fn attach(&mut self, table: Option<&str>) -> Result<(), Error> {
         let table = if let Some(table) = table {
             str_to_char_ptr(table)?
-            //~^ NOTE: the `std::ffi::CString` value is dropped here
+            //FN ~^ NOTE: the `std::ffi::CString` value is dropped here
         } else {
             std::ptr::null()
         };
         unsafe { check!(ffi::sqlite3session_attach(self.sess, table)) };
-        //~^ ERROR: use a pointer from `std::ffi::CString` after dropped
-        //~| NOTE: `#[deny(rpl::use_after_drop)]` on by default
+        //FN ~^ ERROR: use a pointer from `std::ffi::CString` after dropped
+        //FN ~| NOTE: `#[deny(rpl::use_after_drop)]` on by default
         Ok(())
     }
 }

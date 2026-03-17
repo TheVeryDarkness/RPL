@@ -53,6 +53,8 @@ impl<T> Slab<T> {
 
         let offset = offset as isize;
         let len = self.len as isize;
+        //~^ HELP: this is because `self.len` exceeds the container's length by one
+        //~| HELP: did you mean this
 
         unsafe {
             elem_ptr = self.mem.offset(offset);
@@ -61,9 +63,7 @@ impl<T> Slab<T> {
             //~| ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
             last_elem_ptr = self.mem.offset(len);
-            //~^ HELP: this is because `self.len` exceeds the container's length by one
-            //~| HELP: did you mean this
-            //~| ptr_offset_with_cast
+            //~^ ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
 
             elem = ptr::read(elem_ptr);

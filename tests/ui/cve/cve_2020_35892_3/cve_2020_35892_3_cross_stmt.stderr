@@ -1,0 +1,95 @@
+error: usage of the `offset` pointer method with a usize casted to an isize.
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:16:41
+   |
+LL |                 let elem_ptr = self.mem.offset(x as isize);
+   |                                         ^^^^^^^^^^^^^^^^^^
+   |
+   = help: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
+   = note: `-D rpl::ptr-offset-with-cast` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::ptr_offset_with_cast)]`
+
+error: usage of the `offset` pointer method with a usize casted to an isize.
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:32:31
+   |
+LL |         unsafe { &(*(self.mem.offset(index as isize))) }
+   |                               ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
+
+error: it is an undefined behavior to offset a pointer using an unchecked integer
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:32:31
+   |
+LL |         unsafe { &(*(self.mem.offset(index as isize))) }
+   |                      -------- ^^^^^^^^^^^^^^^^^^^^^^ offset here
+   |                      |
+   |                      pointer used here
+   |
+   = help: check whether it's in bound before offsetting
+   = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
+   = note: `-D rpl::unchecked-pointer-offset` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::unchecked_pointer_offset)]`
+
+error: usage of the `offset` pointer method with a usize casted to an isize.
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:60:33
+   |
+LL |             elem_ptr = self.mem.offset(offset);
+   |                                 ^^^^^^^^^^^^^^
+   |
+   = help: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
+
+error: usage of the `offset` pointer method with a usize casted to an isize.
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:65:38
+   |
+LL |             last_elem_ptr = self.mem.offset(len);
+   |                                      ^^^^^^^^^^^
+   |
+   = help: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
+
+error: it is an undefined behavior to offset a pointer using an unchecked integer
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:60:33
+   |
+LL |             elem_ptr = self.mem.offset(offset);
+   |                        -------- ^^^^^^^^^^^^^^ offset here
+   |                        |
+   |                        pointer used here
+   |
+   = help: check whether it's in bound before offsetting
+   = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
+
+error: pointer out of bound
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:70:25
+   |
+LL |         let len = self.len as isize;
+   |                   -------- help: did you mean this: `(self.len - 1)`
+...
+LL |             last_elem_ptr = self.mem.offset(len);
+   |                                      ----------- pointer created here
+...
+LL |             last_elem = ptr::read(last_elem_ptr);
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^ pointer read here
+   |
+help: this is because `self.len` exceeds the container's length by one
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:55:19
+   |
+LL |         let len = self.len as isize;
+   |                   ^^^^^^^^
+   = note: `#[deny(rpl::offset_by_one)]` on by default
+
+error: it usually isn't necessary to apply #[inline] to generic functions
+  --> tests/ui/cve/cve_2020_35892_3/cve_2020_35892_3_cross_stmt.rs:43:5
+   |
+LL |       #[inline]
+   |       --------- `#[inline]` here
+LL | /     pub fn remove(&mut self, offset: usize) -> T {
+...  |
+LL | |         return elem;
+LL | |     }
+   | |_____^ `#[inline]` applied here
+   |
+   = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
+   = note: generic functions are always `#[inline]` (monomorphization)
+   = note: `-D rpl::generic-function-marked-inline` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::generic_function_marked_inline)]`
+
+error: aborting due to 8 previous errors
+
