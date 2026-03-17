@@ -24,7 +24,8 @@ impl Session<'_> {
     //#[rpl::dump_mir(dump_cfg, dump_ddg)]
     pub fn attach(&mut self, table: Option<&str>) -> Result<(), Error> {
         let table = if let Some(table) = table {
-            str_to_cstring(table)?.as_ptr()
+            let table = str_to_cstring(table)?;
+            table.as_ptr()
             //~^ NOTE: the `std::ffi::CString` value is dropped here
         } else {
             std::ptr::null()

@@ -1,4 +1,5 @@
 //@check-pass
+#![allow(dangling_pointers_from_temporaries)]
 use std::ptr;
 
 struct Session<'a> {

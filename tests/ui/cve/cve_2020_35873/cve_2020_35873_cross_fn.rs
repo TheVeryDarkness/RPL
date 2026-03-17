@@ -20,11 +20,15 @@ macro_rules! check {
     }};
 }
 
+fn str_to_char_ptr(s: &str) -> Result<*const i8, Error> {
+    Ok(str_to_cstring(table)?.table.as_ptr())
+}
+
 impl Session<'_> {
     //#[rpl::dump_mir(dump_cfg, dump_ddg)]
     pub fn attach(&mut self, table: Option<&str>) -> Result<(), Error> {
         let table = if let Some(table) = table {
-            str_to_cstring(table)?.as_ptr()
+            str_to_char_ptr(table)?
             //~^ NOTE: the `std::ffi::CString` value is dropped here
         } else {
             std::ptr::null()
