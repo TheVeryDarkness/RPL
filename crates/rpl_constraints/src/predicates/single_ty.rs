@@ -38,6 +38,21 @@ pub fn is_not_unpin<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty
     !ty.is_unpin(tcx, typing_env)
 }
 
+/// Check if ty is send.
+#[instrument(level = "debug", skip(tcx), ret)]
+pub fn is_send<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
+    use rustc_infer::infer::TyCtxtInferExt;
+    let infcx = tcx.infer_ctxt().build(TypingMode::PostAnalysis);
+    let trait_def_id = tcx.get_diagnostic_item(sym::Send).unwrap();
+
+    rustc_trait_selection::traits::type_known_to_meet_bound_modulo_regions(
+        &infcx,
+        typing_env.param_env,
+        ty,
+        trait_def_id,
+    )
+}
+
 /// Check if ty is sync.
 #[instrument(level = "debug", skip(tcx), ret)]
 pub fn is_sync<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {

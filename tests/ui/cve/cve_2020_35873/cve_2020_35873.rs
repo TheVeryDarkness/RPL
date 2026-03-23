@@ -1,3 +1,4 @@
+#![allow(dangling_pointers_from_temporaries)]
 
 struct Session<'a> {
     sess: *mut ffi::Session,
@@ -23,7 +24,6 @@ impl Session<'_> {
     //#[rpl::dump_mir(dump_cfg, dump_ddg)]
     pub fn attach(&mut self, table: Option<&str>) -> Result<(), Error> {
         let table = if let Some(table) = table {
-            #[allow(dangling_pointers_from_temporaries)]
             str_to_cstring(table)?.as_ptr()
             //~^ NOTE: the `std::ffi::CString` value is dropped here
         } else {

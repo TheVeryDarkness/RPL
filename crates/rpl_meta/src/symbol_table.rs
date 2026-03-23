@@ -889,10 +889,10 @@ pub struct ImplInner<'i> {
 impl<'i> ImplInner<'i> {
     pub fn new(impl_pat: &'i pairs::Impl<'i>) -> Self {
         let impl_pat = impl_pat.get_matched();
-        let trait_ = impl_pat.1.as_ref().map(|trait_| trait_.get_matched().0);
+        let trait_ = impl_pat.2.as_ref().map(|trait_| trait_.get_matched().0);
         Self {
             trait_,
-            ty: impl_pat.2,
+            ty: impl_pat.3,
             fns: FxHashMap::default(),
         }
     }

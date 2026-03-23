@@ -243,6 +243,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             ) => self.match_place(place_pat, place),
             // Trivial matches, do not need to print
             (pat::TerminatorKind::Goto(_), mir::TerminatorKind::Goto { .. })
+            | (pat::TerminatorKind::Unreachable, mir::TerminatorKind::Unreachable)
             | (pat::TerminatorKind::Return, mir::TerminatorKind::Return)
             | (pat::TerminatorKind::PatEnd, _) => return true,
             (
@@ -254,6 +255,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 | pat::TerminatorKind::Goto(_)
                 | pat::TerminatorKind::Call { .. }
                 | pat::TerminatorKind::Drop { .. }
+                | pat::TerminatorKind::Unreachable
                 | pat::TerminatorKind::Return,
                 // | pat::TerminatorKind::PatEnd,
                 mir::TerminatorKind::Goto { .. }
@@ -605,6 +607,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             && self.ty().match_generic_args(&gargs_pat, gargs, generics)
     }
 
+    #[instrument(level = "trace", skip(self), ret)]
     fn match_aggregate(
         &self,
         agg_kind_pat: &pat::AggKind<'pcx>,
@@ -644,14 +647,14 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 | mir::AggregateKind::RawPtr(..),
             ) => false,
         };
-        debug!(
-            ?agg_kind_pat,
-            ?operands_pat,
-            ?agg_kind,
-            ?operands,
-            matched,
-            "match_aggregate",
-        );
+        // debug!(
+        //     ?agg_kind_pat,
+        //     ?operands_pat,
+        //     ?agg_kind,
+        //     ?operands,
+        //     matched,
+        //     "match_aggregate",
+        // );
         matched
     }
 

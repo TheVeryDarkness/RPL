@@ -1,0 +1,17 @@
+error: it is unsound to cast between `u64` and `AtomicU64`
+  --> tests/ui/cve/cve_2022_23639/cve_2022_23639_cross_stmt.rs:53:25
+   |
+LL |                 let a = self.value.get();
+   |                         ---------------- u64 created here
+LL |                 let a = a as *const $atomic;
+   |                         ^^^^^^^^^^^^^^^^^^^ casted here
+...
+LL | impl_arithmetic!(u64, AtomicU64, "let a = AtomicCell::new(7u64);");
+   | ------------------------------------------------------------------ in this macro invocation
+   |
+   = note: the alignment of `u64` is smaller than `AtomicU64` on many 32-bits platforms
+   = note: `#[deny(rpl::unsound_cast_between_u64_and_atomic_u64)]` on by default
+   = note: this error originates in the macro `impl_arithmetic` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error
+

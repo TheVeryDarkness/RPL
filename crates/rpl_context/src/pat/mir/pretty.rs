@@ -117,6 +117,9 @@ impl fmt::Debug for TerminatorKind<'_> {
             TerminatorKind::Drop { place, target } => {
                 write!(f, "drop({place:?}) -> {target:?}")
             },
+            TerminatorKind::Unreachable => {
+                write!(f, "unreachable")
+            },
             TerminatorKind::SwitchInt { operand, targets } => write!(f, "switchInt({operand:?}) -> {targets:?}"),
             TerminatorKind::Goto(basic_block) => write!(f, "goto {basic_block:?}"),
             TerminatorKind::Return => f.write_str("return"),

@@ -179,12 +179,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
-name = "bytes"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f61dac84819c6588b558454b194026eb1f09c293b9036ae9b159e74e73ab6cf9"
-
-[[package]]
 name = "camino"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1050,6 +1044,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04cbf5b083de1c7e0222a7a51dbfdba1cbe1c6ab0b15e29fff3f6c077fd9cd9f"
 
 [[package]]
+name = "mach"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86dd2487cdfea56def77b88438a2c915fb45113c5319bfe7e14306ca4cd0b0e1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1483,7 +1486,7 @@ version = "0.1.0"
 dependencies = [
  "anstream",
  "byte-slice-cast",
- "bytes 1.10.0",
+ "bytes",
  "color-print",
  "filetime",
  "futures",
@@ -1491,6 +1494,7 @@ dependencies = [
  "itertools 0.12.1",
  "libc",
  "log",
+ "mach",
  "memmap",
  "num-derive",
  "num-rational",
@@ -1516,6 +1520,7 @@ dependencies = [
  "tracing",
  "ui_test",
  "walkdir",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1609,6 +1614,7 @@ dependencies = [
  "pretty_assertions",
  "rpl_constraints",
  "rpl_parser",
+ "rpl_patterns",
  "schemars",
  "serde",
  "serde_json",
@@ -1647,6 +1653,10 @@ dependencies = [
  "serde_json",
  "thiserror",
 ]
+
+[[package]]
+name = "rpl_patterns"
+version = "0.1.0"
 
 [[package]]
 name = "rpl_resolve"
@@ -2075,7 +2085,7 @@ version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6703a273949a90131b290be1fe7b039d0fc884aa1935860dfcbe056f28cd8092"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "memchr",
  "pin-project-lite 0.1.12",
 ]
@@ -2086,7 +2096,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "571da51182ec208780505a32528fc5512a8fe1443ab960b3f2f3ef093cd16930"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "futures-core",
  "futures-sink",
  "log",

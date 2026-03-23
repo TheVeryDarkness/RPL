@@ -4,7 +4,7 @@ use std::ops::Index;
 
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
-use rpl_parser::generics::{Choice5, Choice6, Choice7, Choice12};
+use rpl_parser::generics::{Choice5, Choice6, Choice8, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_hir::Target;
@@ -116,7 +116,7 @@ impl<'pcx> BasicBlockData<'pcx> {
             // Here the `goto ?bb` termiantor comes from `break` or `continue`,
             // plus the `return` termnator, are all skipped because thay are
             // abnormal control flows.
-            Some(TerminatorKind::Goto(_) | TerminatorKind::Return) => {},
+            Some(TerminatorKind::Goto(_) | TerminatorKind::Return | TerminatorKind::Unreachable) => {},
             Some(terminator @ (TerminatorKind::SwitchInt { .. } | TerminatorKind::PatEnd)) => {
                 panic!("expect `{:?}`, but found `{terminator:?}`", TerminatorKind::Goto(block));
             },
@@ -475,9 +475,11 @@ pub enum RawStatement<'pcx> {
     Call(Option<Label>, Place<'pcx>, Call<'pcx>),
     CallIgnoreRet(Option<Label>, Call<'pcx>),
     CopyNonOverlapping(Option<Label>, Operand<'pcx>, Operand<'pcx>, Operand<'pcx>),
+    Unreachable(Option<Label>),
     Drop(Option<Label>, Place<'pcx>),
     Break,
     Continue,
+    Return,
     Loop(Vec<RawStatement<'pcx>>),
     SwitchInt {
         label: Option<Label>,
@@ -495,15 +497,18 @@ impl<'pcx> RawStatement<'pcx> {
     ) -> Self {
         let p = stmt.path;
         match stmt.inner.deref() {
-            Choice7::_0(call_ignore_ret) => {
+            Choice8::_0(call_ignore_ret) => {
                 Self::from_call_ignore_ret(with_path(p, call_ignore_ret.get_matched().0), pcx, sym_tab)
             },
-            Choice7::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
-            Choice7::_2(control) => Self::from_control(control.get_matched().0),
-            Choice7::_3(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
-            Choice7::_4(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
-            Choice7::_5(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
-            Choice7::_6(copy_non_overlapping) => {
+            Choice8::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
+            Choice8::_2(unreachable_) => {
+                Self::from_unreachable(WithPath::new(p, unreachable_.get_matched().0), pcx, sym_tab)
+            },
+            Choice8::_3(control) => Self::from_control(control.get_matched().0),
+            Choice8::_4(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
+            Choice8::_5(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
+            Choice8::_6(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
+            Choice8::_7(copy_non_overlapping) => {
                 Self::from_copy_non_overlapping(WithPath::new(p, copy_non_overlapping.get_matched().0), pcx, sym_tab)
             },
         }
@@ -573,6 +578,19 @@ impl<'pcx> RawStatement<'pcx> {
         )
     }
 
+    pub fn from_unreachable(
+        unreachable_: WithPath<'pcx, &pairs::MirUnreachable<'pcx>>,
+        _pcx: PatCtxt<'pcx>,
+        _sym_tab: &FnSymbolTable<'pcx>,
+    ) -> Self {
+        let (label, _) = unreachable_.get_matched();
+        Self::Unreachable(
+            label
+                .as_ref()
+                .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
+        )
+    }
+
     pub fn from_loop(
         loop_: WithPath<'pcx, &'pcx pairs::MirLoop<'pcx>>,
         pcx: PatCtxt<'pcx>,
@@ -592,8 +610,9 @@ impl<'pcx> RawStatement<'pcx> {
     pub fn from_control(control: &pairs::MirControl<'pcx>) -> Self {
         let (_label, break_or_continue, _label2) = control.get_matched();
         match break_or_continue {
-            Choice2::_0(_break) => Self::Break,
-            Choice2::_1(_continue) => Self::Continue,
+            Choice3::_0(_break) => Self::Break,
+            Choice3::_1(_continue) => Self::Continue,
+            Choice3::_2(_return) => Self::Return,
         }
     }
 
@@ -713,6 +732,7 @@ pub enum TerminatorKind<'pcx> {
         place: Place<'pcx>,
         target: BasicBlock,
     },
+    Unreachable,
     Return,
     /// Pattern ends here
     PatEnd,
@@ -1165,6 +1185,7 @@ impl From<FieldIdx> for FieldAcc {
 pub struct FnPatternBodyBuilder<'pcx> {
     pattern: FnPatternBody<'pcx>,
     loop_stack: Vec<Loop>,
+    return_: Option<BasicBlock>,
     current: BasicBlock,
 }
 
@@ -1200,6 +1221,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         Self {
             pattern,
             loop_stack: Vec::new(),
+            return_: None,
             current,
         }
     }
@@ -1255,7 +1277,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     }
 
     #[allow(unused)]
-    fn mk_return(&mut self, ty: Ty<'pcx>) -> Local {
+    fn mk_returned_local(&mut self, ty: Ty<'pcx>) -> Local {
         *self.pattern.return_idx.insert(self.pattern.locals.push(ty))
     }
 
@@ -1272,6 +1294,17 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     fn next_block(&mut self) -> BasicBlock {
         self.new_block_if_terminated();
         self.pattern.basic_blocks.next_index()
+    }
+
+    fn return_block(&mut self) -> BasicBlock {
+        if let Some(return_idx) = self.return_ {
+            return_idx
+        } else {
+            let return_block = self.pattern.basic_blocks.push(BasicBlockData::default());
+            self.pattern.basic_blocks[return_block].set_terminator(TerminatorKind::Return);
+            self.return_ = Some(return_block);
+            return_block
+        }
     }
 
     pub fn mk_raw_stmts(&mut self, stmts: impl IntoIterator<Item = RawStatement<'pcx>>) {
@@ -1298,8 +1331,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 })),
             ),
             RawStatement::Drop(label, place) => self.mk_drop(label, place),
+            RawStatement::Unreachable(label) => self.mk_unreachable(label),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),
+            RawStatement::Return => self.mk_return(),
             RawStatement::Loop(stmts) => self.mk_loop(stmts),
             RawStatement::SwitchInt {
                 label,
@@ -1396,6 +1431,15 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
 
         loc
     }
+    fn mk_unreachable(&mut self, label: Option<Label>) -> Location {
+        let loc = self.set_terminator(TerminatorKind::Unreachable);
+
+        if let Some(label) = label {
+            self.pattern.labels.insert(label, Spanned::Location(loc));
+        }
+
+        loc
+    }
     pub fn mk_switch_int(
         &mut self,
         label: Option<Label>,
@@ -1483,6 +1527,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
     pub fn mk_continue(&mut self) -> Location {
         let enter = self.loop_stack.last().expect("no loop to continue").enter;
         self.mk_goto(enter)
+    }
+    pub fn mk_return(&mut self) -> Location {
+        let return_ = self.return_block();
+        self.mk_goto(return_)
     }
 }
 

@@ -256,7 +256,7 @@ impl<'pcx> RustItems<'pcx> {
         constraints: Constraints,
     ) {
         let p = rust_impl.path;
-        let (_, impl_kind, ty, _, fns, _) = rust_impl.get_matched();
+        let (_, _, impl_kind, ty, _, fns, _) = rust_impl.get_matched();
         let impl_sym_tab = symbol_table.get_impl(ty, impl_kind.as_ref()).unwrap();
         let ty = Ty::from(WithPath::new(p, ty), self.pcx, symbol_table);
         let trait_id = impl_kind

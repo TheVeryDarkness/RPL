@@ -22,6 +22,7 @@ rpl_mir_graph = { path = "./crates/rpl_mir_graph" }
 rpl_mir_transform = { path = "./crates/rpl_mir_transform" }
 rpl_utils = { path = "./crates/rpl_utils" }
 rpl_meta = { path = "./crates/rpl_meta" }
+rpl_patterns = { path = "./crates/rpl_patterns" }
 rpl_constraints = { path = "./crates/rpl_constraints" }
 rpl_resolve = { path = "./crates/rpl_resolve" }
 rustc_tools_util = "0.3.0"
@@ -69,9 +70,11 @@ pin-project = "1.0"
 radium = "0.3"
 tokio = { version = "0.2.25", features = ["io-util"] }
 tokio-util = { version = "0.2", features = ["codec"] }
-bytes = "1.10"
+bytes = "0.5.6"
 log = "0.4"
 # cassandra-cpp-sys = "1.1.1"
+mach = { version = "0.2", default-features = false }
+winapi = "0.3.0"
 
 [package]
 name = "rpl"
@@ -128,7 +131,11 @@ radium.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 bytes.workspace = true
+winapi.workspace = true
 # cassandra-cpp-sys.workspace = true
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.mach]
+workspace = true
 
 [features]
 default = []

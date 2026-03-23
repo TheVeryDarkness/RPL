@@ -13,7 +13,7 @@ pub struct AtomicCell<T: ?Sized> {
     value: UnsafeCell<T>,
 }
 
-impl<T> AtomicCell<T> {                     
+impl<T> AtomicCell<T> {
     /// Creates a new atomic cell initialized with `val`.
     ///
     /// # Examples
@@ -50,18 +50,11 @@ macro_rules! impl_arithmetic {
             #[inline]
             pub fn fetch_add(&self, val: $t) -> $t {
                 let a = unsafe { &*(self.value.get() as *const $atomic) };
+                //~^ ERROR: it is unsound to cast between `u64` and `AtomicU64`
                 a.fetch_add(val, Ordering::AcqRel)
             }
         }
     };
 }
 
-// impl_arithmetic!(u64, AtomicU64, "let a = AtomicCell::new(7u64);");
-
-impl AtomicCell<u64> {
-    pub fn fetch_add(&self, val: u64) -> u64 {
-        let a = unsafe { &*(self.value.get() as *const AtomicU64) };
-                        //~^ ERROR: it is unsound to cast between `u64` and `AtomicU64`
-        a.fetch_add(val, Ordering::AcqRel)
-    }
-}
+impl_arithmetic!(u64, AtomicU64, "let a = AtomicCell::new(7u64);");

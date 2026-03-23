@@ -20,6 +20,8 @@ use ui_test::{Args, Config, Match, error_on_output_conflict};
 
 extern crate byte_slice_cast;
 extern crate bytes;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+extern crate mach;
 // extern crate cassandra_cpp_sys;
 extern crate futures;
 extern crate if_chain;
@@ -39,6 +41,8 @@ extern crate smallvec;
 extern crate syn;
 extern crate tokio;
 extern crate tokio_util;
+#[cfg(target_os = "windows")]
+extern crate winapi;
 
 mod test_utils;
 
@@ -51,6 +55,8 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "itertools",
     "libc",
     "log",
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    "mach",
     "memmap",
     "num_derive",
     "num_rational",
@@ -70,6 +76,8 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tokio",
     "tokio_util",
     // "cassandra_cpp_sys", for cve_2024_27284
+    #[cfg(target_os = "windows")]
+    "winapi",
 ];
 
 /// Produces a string with an `--extern` flag for all UI test crate

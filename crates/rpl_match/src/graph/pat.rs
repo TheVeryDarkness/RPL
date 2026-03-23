@@ -64,9 +64,9 @@ pub fn normalized_terminator_edges(
     terminator: Option<&pat::TerminatorKind<'_>>,
     pointer_bytes: u64,
 ) -> PatTerminatorEdges {
-    use pat::TerminatorKind::{Call, Drop, Goto, PatEnd, Return, SwitchInt};
+    use pat::TerminatorKind::{Call, Drop, Goto, PatEnd, Return, SwitchInt, Unreachable};
     match terminator {
-        None | Some(Return | PatEnd) => TerminatorEdges::None,
+        None | Some(Return | PatEnd | Unreachable) => TerminatorEdges::None,
         Some(&Goto(target) | &Drop { target, .. }) => TerminatorEdges::Single(target),
         Some(&Call { target, .. }) => TerminatorEdges::AssignOnReturn {
             return_: Box::new([target]),
