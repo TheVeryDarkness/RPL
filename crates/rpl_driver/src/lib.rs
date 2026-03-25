@@ -26,6 +26,7 @@ use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
 use rpl_match::graph::{self, MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
+use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::{CheckMirCtxt, pat};
 use rpl_match::{MatchComposedPattern, MirGraph, Reachability, check2};
 use rpl_meta::context::MetaContext;
@@ -123,14 +124,14 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
     //     Ok(())
     // });
 
-    // let mut check_ctxt = CheckFnCtxt {
-    //     tcx,
-    //     pcx,
-    //     body_caches: RefCell::default(),
-    // };
-    // tcx.hir().walk_toplevel_module(&mut check_ctxt);
+    let mut check_ctxt = CheckFnCtxt {
+        tcx,
+        pcx,
+        body_caches: RefCell::default(),
+    };
+    tcx.hir().walk_toplevel_module(&mut check_ctxt);
 
-    walk2(tcx, pcx);
+    // walk2(tcx, pcx);
 
     rpl_utils::visit_crate(tcx);
 
@@ -255,6 +256,8 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
 }
 
 impl<'tcx, 'pcx> MatchComposedPattern<'pcx, 'tcx> for CheckFnCtxt<'pcx, 'tcx> {
+    type Matched = Matched<'tcx>;
+    type NormalizedMatched = NormalizedMatched<'tcx>;
     fn pcx(&self) -> PatCtxt<'pcx> {
         self.pcx
     }

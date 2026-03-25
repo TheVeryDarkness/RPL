@@ -1,6 +1,8 @@
 use core::fmt;
 use std::collections::HashMap;
+use std::ops::Index;
 
+use either::Either;
 use rpl_constraints::Const;
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_parser::generics::{Choice2, Choice3};
@@ -10,13 +12,14 @@ use rustc_errors::MultiSpan;
 use rustc_hir::FnDecl;
 use rustc_hir::def_id::LocalDefId;
 use rustc_index::IndexVec;
-use rustc_middle::mir::{Body, PlaceRef};
+use rustc_middle::mir::{Body, Local, Location, PlaceRef};
 use rustc_middle::ty::Ty;
 use rustc_span::{Span, Symbol};
 
 use super::non_local_meta_vars::{ConstVarIdx, PlaceVarIdx, TyVarIdx};
-use crate::pat::NonLocalMetaVars;
+use crate::pat::{self, NonLocalMetaVars};
 
+/// Get matched results of meta variables.
 pub trait MatchedMetaVars<'tcx>: fmt::Debug {
     /// Get the matched type of the type meta variable at `idx`.
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
@@ -24,6 +27,13 @@ pub trait MatchedMetaVars<'tcx>: fmt::Debug {
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
     /// Get the matched place of the place meta variable at `idx`.
     fn place_meta_var(&self, idx: PlaceVarIdx) -> PlaceRef<'tcx>;
+}
+
+pub trait MatchedLocalVars<'tcx>: fmt::Debug {
+    /// Get the matched local of the local meta variable at `idx`.
+    fn local(&self, idx: pat::Local) -> Local;
+    /// Get the matched location of the local meta variable at `idx`.
+    fn location(&self, idx: pat::Location) -> Either<Local, Location>;
 }
 
 pub trait Matched<'tcx>: fmt::Debug + MatchedMetaVars<'tcx> {

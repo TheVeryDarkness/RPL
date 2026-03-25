@@ -2,13 +2,15 @@ use rpl_constraints::predicates::{
     BodyInfoCache, PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm,
 };
 use rpl_constraints::{Const, Constraints};
-use rpl_context::pat::{self, ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
+use rpl_context::pat::{
+    self, ConstVarIdx, LabelMap, Matched, MatchedLocalVars, MatchedMetaVars, PlaceVarIdx, Spanned, TyVarIdx,
+};
 use rpl_meta::symbol_table::MetaVariable;
 use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::Symbol;
 
-use crate::matches::{Matched, StatementMatch};
+use crate::matches::StatementMatch;
 
 /// PredicateArgInstance is the matched instance of a [PredicateArg]
 #[allow(unused)]
@@ -22,24 +24,24 @@ enum PredicateArgInstance<'tcx> {
     Path(Vec<Symbol>),       // mapped from [PredicateArg::Path]
 }
 
-pub struct PredicateEvaluator<'e, 'm, 'tcx> {
-    // 'e means eval, 'm means meta
+/// `'e` for eval, `'m` for meta, and `M` for matched
+pub struct PredicateEvaluator<'e, 'm, 'tcx, M> {
     tcx: TyCtxt<'tcx>,
     typing_env: ty::TypingEnv<'tcx>,
     body: &'e mir::Body<'tcx>,
     label_map: &'e LabelMap,
-    matched: &'e Matched<'tcx>,
+    matched: &'e M,
     body_cache: &'e BodyInfoCache,
     symbol_table: &'e pat::FnSymbolTable<'m>,
 }
 
-impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
+impl<'e, 'm, 'tcx, M: MatchedMetaVars<'tcx> + MatchedLocalVars<'tcx>> PredicateEvaluator<'e, 'm, 'tcx, M> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         typing_env: ty::TypingEnv<'tcx>,
         body: &'e mir::Body<'tcx>,
         label_map: &'e LabelMap,
-        matched: &'e Matched<'tcx>,
+        matched: &'e M,
         body_cache: &'e BodyInfoCache,
         symbol_table: &'e pat::FnSymbolTable<'m>,
     ) -> Self {
@@ -187,9 +189,10 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     .get(label)
                     .ok_or_else(|| format!("label `{}` not found in {:?}", label, self.label_map))?;
                 match pat_loc {
-                    Spanned::Local(local) => Ok(PredicateArgInstance::Local(self.matched[*local])),
+                    Spanned::Local(local) => Ok(PredicateArgInstance::Local(self.matched.local(*local))),
                     Spanned::Location(location) => {
-                        let stmt_match = self.matched[*location];
+                        let stmt_match = self.matched.location(*location);
+                        let stmt_match: StatementMatch = stmt_match.into();
                         match stmt_match {
                             StatementMatch::Location(loc) => Ok(PredicateArgInstance::Location(loc)),
                             StatementMatch::Arg(local) => Ok(PredicateArgInstance::Local(local)),
@@ -204,24 +207,24 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     match meta_var {
                         MetaVariable::Type(idx, _) => {
                             let ty_var_idx: TyVarIdx = idx.into();
-                            let ty = self.matched[ty_var_idx];
+                            let ty = self.matched.type_meta_var(ty_var_idx);
                             Ok(PredicateArgInstance::Ty(ty))
                         },
                         MetaVariable::Const(idx, _, _) => {
                             let const_var_idx: ConstVarIdx = idx.into();
-                            let const_var = self.matched[const_var_idx];
+                            let const_var = self.matched.const_meta_var(const_var_idx);
                             Ok(PredicateArgInstance::Const(const_var))
                         },
                         MetaVariable::Place(idx, _, _) => {
                             let place_var_idx: PlaceVarIdx = idx.into();
-                            let place_var = self.matched[place_var_idx];
+                            let place_var = self.matched.place_meta_var(place_var_idx);
                             Ok(PredicateArgInstance::Place(place_var))
                         },
                         MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
                     }
                 } else if let Some(idx) = self.symbol_table.inner.try_get_local_idx(name.as_str()) {
                     let local = pat::Local::from_usize(idx);
-                    let local = self.matched[local];
+                    let local = self.matched.local(local);
                     Ok(PredicateArgInstance::Local(local))
                 } else {
                     Err(format!(

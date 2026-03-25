@@ -35,7 +35,7 @@ mod utils;
 pub use attr::PatAttr;
 pub use error::DynamicError;
 pub use item::*;
-pub use matched::{Matched, Matched2, MatchedMap, MatchedMetaVars, MatchedMetaVars2, MirGraphs};
+pub use matched::{Matched, Matched2, MatchedLocalVars, MatchedMap, MatchedMetaVars, MatchedMetaVars2, MirGraphs};
 pub use mir::*;
 pub use non_local_meta_vars::*;
 pub(crate) use table::TableHead;
