@@ -40,6 +40,7 @@ pub mod graph; // FIXME: visibility
 mod match2;
 pub mod matches; // FIXME: visibility
 pub mod mir; // FIXME: visibility
+mod normalized;
 mod place;
 pub mod predicate_evaluator;
 mod reachability;

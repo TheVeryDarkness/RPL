@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Index;
 
+use either::Either;
 use rpl_constraints::Const;
 use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{LabelMap, Spanned};
@@ -69,6 +70,27 @@ impl Matched<'_> {
             Spanned::Body => body.span,
             Spanned::Output => decl.output.span(),
         }
+    }
+}
+
+impl<'tcx> pat::MatchedMetaVars<'tcx> for Matched<'tcx> {
+    fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
+        self.ty_vars[idx]
+    }
+    fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
+        self.const_vars[idx]
+    }
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
+        self.place_vars[idx]
+    }
+}
+
+impl<'tcx> pat::MatchedLocalVars<'tcx> for Matched<'tcx> {
+    fn local(&self, idx: pat::Local) -> mir::Local {
+        self.locals[idx]
+    }
+    fn location(&self, idx: pat::Location) -> Either<mir::Local, mir::Location> {
+        self.basic_blocks[idx.block].statements[idx.statement_index].into()
     }
 }
 
@@ -283,6 +305,21 @@ impl From<mir::Local> for StatementMatch {
 impl From<mir::Location> for StatementMatch {
     fn from(loc: mir::Location) -> Self {
         StatementMatch::Location(loc)
+    }
+}
+
+impl From<Either<mir::Local, mir::Location>> for StatementMatch {
+    fn from(stmt: Either<mir::Local, mir::Location>) -> Self {
+        stmt.either(Self::Arg, Self::Location)
+    }
+}
+
+impl From<StatementMatch> for Either<mir::Local, mir::Location> {
+    fn from(stmt: StatementMatch) -> Self {
+        match stmt {
+            StatementMatch::Arg(arg) => Either::Left(arg),
+            StatementMatch::Location(loc) => Either::Right(loc),
+        }
     }
 }
 

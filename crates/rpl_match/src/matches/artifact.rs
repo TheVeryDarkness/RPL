@@ -57,10 +57,12 @@ pub struct NormalizedMatched<'tcx> {
     extra: SortedMap<Symbol, NormalizedSpanned>,
 }
 
-impl<'tcx> NormalizedMatched<'tcx> {
+impl<'tcx> crate::normalized::NormalizedMatched<'tcx> for NormalizedMatched<'tcx> {
+    type Matched = Matched<'tcx>;
+
     /// Create a new [`NormalizedMatched`] from a [`Matched`] and a [`pat::LabelMap`].
     #[instrument(level = "trace", ret)]
-    pub fn new(matched: &Matched<'tcx>, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
+    fn new(matched: &Self::Matched, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
@@ -79,7 +81,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             )
             .collect();
 
-        NormalizedMatched {
+        Self {
             ty_vars,
             const_vars,
             place_vars,
@@ -92,7 +94,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
     /// This is useful for normalizing patterns that have been matched against a different set of
     /// meta variables.
     #[instrument(level = "trace", ret)]
-    pub fn normalize(matched_map: &MatchedMap, matched_from: &Matched<'tcx>, label_map_from: &pat::LabelMap) -> Self {
+    fn normalize(matched_map: &MatchedMap, matched_from: &Matched<'tcx>, label_map_from: &pat::LabelMap) -> Self {
         let ty_vars = IndexVec::from_fn_n(
             |i| matched_from.ty_vars[matched_map.ty_vars[i]],
             matched_map.ty_vars.len(),
@@ -131,7 +133,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
     /// This is useful for normalizing patterns that have been matched against a different set of
     /// meta variables.
     #[instrument(level = "trace", ret)]
-    pub fn map(self, matched_map: &MatchedMap) -> Self {
+    fn map(self, matched_map: &MatchedMap) -> Self {
         let ty_vars = IndexVec::from_fn_n(|i| self.ty_vars[matched_map.ty_vars[i]], matched_map.ty_vars.len());
         let const_vars = IndexVec::from_fn_n(
             |i| self.const_vars[matched_map.const_vars[i]],
@@ -156,7 +158,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
     }
 
     #[instrument(level = "trace", ret)]
-    pub fn has_same_head(&self, other: &Self) -> bool {
+    fn has_same_head(&self, other: &Self) -> bool {
         self.ty_vars.len() == other.ty_vars.len()
             && self.const_vars.len() == other.const_vars.len()
             && self.place_vars.len() == other.place_vars.len()

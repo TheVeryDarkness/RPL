@@ -1,8 +1,10 @@
+use std::fmt;
 use std::ops::DerefMut;
 
 use either::Either;
 use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
+use rpl_context::pat::{MatchedLocalVars, MatchedMetaVars};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir::FnHeader;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -11,13 +13,15 @@ use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Symbol;
 
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph};
-use crate::matches::Matched;
-use crate::matches::artifact::NormalizedMatched;
 use crate::mir::pat;
 use crate::mir::pat::PatternItem;
+use crate::normalized::NormalizedMatched;
 use crate::predicate_evaluator::PredicateEvaluator;
 
 pub trait MatchComposedPattern<'pcx, 'tcx> {
+    type Matched: fmt::Debug + MatchedMetaVars<'tcx> + MatchedLocalVars<'tcx>;
+    type NormalizedMatched: fmt::Debug + NormalizedMatched<'tcx, Matched = Self::Matched>;
+
     fn pcx(&self) -> PatCtxt<'pcx>;
     fn tcx(&self) -> TyCtxt<'tcx>;
     fn body_caches(&self) -> impl DerefMut<Target = FxHashMap<DefId, BodyInfoCache>>;
@@ -33,7 +37,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         fn_pat: &'a pat::FnPattern<'pcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> Vec<Matched<'tcx>>;
+    ) -> Vec<Self::Matched>;
 
     #[expect(clippy::too_many_arguments)]
     #[instrument(level = "trace", skip(self, rpl_rust_items, header, body, mir_cfg, mir_ddg), fields(pat_name = ?name))]
@@ -48,7 +52,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         let iter = rpl_rust_items.impls.values().flat_map(move |impl_pat| {
             // FIXME: check impl_pat.ty and impl_pat.trait_id
             impl_pat
@@ -81,7 +85,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
                         (matched, labels, attr_map.clone())
                     })
                 })
-                .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map))
+                .map(|(matched, label_map, attr_map)| Self::NormalizedMatched::new(&matched, label_map, &attr_map))
         });
         rpl_rust_items.post_process(iter)
     }
@@ -99,7 +103,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         let positive: Vec<_> = pat_op
             .positive
             .iter()
@@ -146,7 +150,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         match pat_item {
             PatternItem::RustItems(rust_items) => Either::Left(self.impl_matched(
                 name, rust_items, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
@@ -170,7 +174,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         let iter = rpl_rust_items
             .fns
             .iter()
@@ -214,7 +218,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         let positive: Vec<_> = pat_op
             .positive
             .iter()
@@ -261,7 +265,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         body: &'a mir::Body<'tcx>,
         mir_cfg: &'a MirControlFlowGraph,
         mir_ddg: &'a MirDataDepGraph,
-    ) -> impl Iterator<Item = NormalizedMatched<'tcx>> {
+    ) -> impl Iterator<Item = Self::NormalizedMatched> {
         match pat_item {
             PatternItem::RustItems(rust_items) => Either::Left(self.fn_matched(
                 name, rust_items, def_id, header, has_self, self_ty, body, mir_cfg, mir_ddg,
@@ -278,7 +282,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         name: Symbol,
         fn_pat: &pat::FnPattern<'pcx>,
         body: &mir::Body<'tcx>,
-        matched: &Matched<'tcx>,
+        matched: &Self::Matched,
     ) -> bool {
         let mut cache = self.body_caches();
         let typing_env = ty::TypingEnv::post_analysis(self.tcx(), body.source.def_id());
