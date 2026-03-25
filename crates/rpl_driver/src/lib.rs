@@ -342,7 +342,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
                     ) {
                         let error = pattern
-                            .get_diag(name, source_map, None, body, decl, &matched)
+                            .get_diag(name, source_map, (body, decl, None), &matched)
                             .unwrap_or_else(identity);
                         self.tcx.emit_node_span_lint(
                             error.lint(),
@@ -378,7 +378,7 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
                     ) {
                         let error = pattern
-                            .get_diag(name, source_map, fn_name, body, decl, &matched)
+                            .get_diag(name, source_map, (body, decl, fn_name), &matched)
                             .unwrap_or_else(identity);
                         self.tcx.emit_node_span_lint(
                             error.lint(),
@@ -503,7 +503,7 @@ fn walk2<'pcx, 'tcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>) {
                             let bottom = matched.bottom();
                             // let matched = NormalizedMatched::new(&matched, label_map, &attr_map);
                             let error = pattern
-                                .get_diag2(name, source_map, bottom, &graphs, &matched)
+                                .get_diag(name, source_map, &graphs, &matched)
                                 .unwrap_or_else(identity);
                             tcx.emit_node_span_lint(
                                 error.lint(),

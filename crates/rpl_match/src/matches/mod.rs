@@ -10,6 +10,7 @@ use rpl_mir_graph::TerminatorEdges;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_hir::FnDecl;
+use rustc_hir::def_id::LocalDefId;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::PlaceContext;
@@ -80,8 +81,8 @@ impl<'tcx> pat::MatchedMetaVars<'tcx> for Matched<'tcx> {
     fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
         self.const_vars[idx]
     }
-    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
-        self.place_vars[idx]
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx, bottom: LocalDefId) -> (LocalDefId, PlaceRef<'tcx>) {
+        (bottom, self.place_vars[idx])
     }
 }
 
@@ -97,8 +98,16 @@ impl<'tcx> pat::MatchedLocalVars<'tcx> for Matched<'tcx> {
 #[derive(Debug)]
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
-impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
-    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+impl<'a, 'tcx> pat::Matched<'a, 'tcx, (&'a mir::Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)>
+    for MatchedWithLabelMap<'_, 'tcx>
+{
+    fn bottom_span(&self, (body, _, _): (&'a mir::Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)) -> Span {
+        body.span
+    }
+    fn bottom_name(&self, (_, _, name): (&'a mir::Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)) -> Option<Symbol> {
+        name
+    }
+    fn span(&self, (body, decl, _): (&'a mir::Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>), name: &str) -> Span {
         let MatchedWithLabelMap(labels, matched, attr) = self;
         let name = Symbol::intern(name);
         labels
@@ -117,8 +126,8 @@ impl<'tcx> pat::MatchedMetaVars<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
     fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
         self.1.const_vars[idx]
     }
-    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
-        self.1.place_vars[idx]
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx, bottom: LocalDefId) -> (LocalDefId, PlaceRef<'tcx>) {
+        (bottom, self.1.place_vars[idx])
     }
 }
 

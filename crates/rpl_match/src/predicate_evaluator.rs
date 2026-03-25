@@ -3,9 +3,10 @@ use rpl_constraints::predicates::{
 };
 use rpl_constraints::{Const, Constraints};
 use rpl_context::pat::{
-    self, ConstVarIdx, LabelMap, Matched, MatchedLocalVars, MatchedMetaVars, PlaceVarIdx, Spanned, TyVarIdx,
+    self, ConstVarIdx, LabelMap, MatchedLocalVars, MatchedMetaVars, PlaceVarIdx, Spanned, TyVarIdx,
 };
 use rpl_meta::symbol_table::MetaVariable;
+use rustc_hir::def_id::LocalDefId;
 use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::Symbol;
@@ -16,18 +17,19 @@ use crate::matches::StatementMatch;
 #[allow(unused)]
 #[derive(Clone, Debug)]
 enum PredicateArgInstance<'tcx> {
-    Location(mir::Location), // mapped from [PredicateArg::Label]
-    Local(mir::Local),       // mapped from [PredicateArg::Local]
-    Ty(Ty<'tcx>),            // mapped from [PredicateArg::MetaVar]
-    Const(Const<'tcx>),      // mapped from [PredicateArg::MetaVar]
-    Place(PlaceRef<'tcx>),   // mapped from [PredicateArg::MetaVar]
-    Path(Vec<Symbol>),       // mapped from [PredicateArg::Path]
+    Location(mir::Location),           // mapped from [PredicateArg::Label]
+    Local(mir::Local),                 // mapped from [PredicateArg::Local]
+    Ty(Ty<'tcx>),                      // mapped from [PredicateArg::MetaVar]
+    Const(Const<'tcx>),                // mapped from [PredicateArg::MetaVar]
+    Place(LocalDefId, PlaceRef<'tcx>), // mapped from [PredicateArg::MetaVar]
+    Path(Vec<Symbol>),                 // mapped from [PredicateArg::Path]
 }
 
 /// `'e` for eval, `'m` for meta, and `M` for matched
 pub struct PredicateEvaluator<'e, 'm, 'tcx, M> {
     tcx: TyCtxt<'tcx>,
     typing_env: ty::TypingEnv<'tcx>,
+    bottom: LocalDefId,
     body: &'e mir::Body<'tcx>,
     label_map: &'e LabelMap,
     matched: &'e M,
@@ -39,6 +41,7 @@ impl<'e, 'm, 'tcx, M: MatchedMetaVars<'tcx> + MatchedLocalVars<'tcx>> PredicateE
     pub fn new(
         tcx: TyCtxt<'tcx>,
         typing_env: ty::TypingEnv<'tcx>,
+        bottom: LocalDefId,
         body: &'e mir::Body<'tcx>,
         label_map: &'e LabelMap,
         matched: &'e M,
@@ -48,6 +51,7 @@ impl<'e, 'm, 'tcx, M: MatchedMetaVars<'tcx> + MatchedLocalVars<'tcx>> PredicateE
         Self {
             tcx,
             typing_env,
+            bottom,
             body,
             label_map,
             matched,
@@ -217,8 +221,8 @@ impl<'e, 'm, 'tcx, M: MatchedMetaVars<'tcx> + MatchedLocalVars<'tcx>> PredicateE
                         },
                         MetaVariable::Place(idx, _, _) => {
                             let place_var_idx: PlaceVarIdx = idx.into();
-                            let place_var = self.matched.place_meta_var(place_var_idx);
-                            Ok(PredicateArgInstance::Place(place_var))
+                            let (def_id, place_var) = self.matched.place_meta_var(place_var_idx, self.bottom);
+                            Ok(PredicateArgInstance::Place(def_id, place_var))
                         },
                         MetaVariable::AdtPat(_, _) => Err(format!("meta_var `{}` is an ADT pattern", name)),
                     }

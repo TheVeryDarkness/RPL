@@ -79,7 +79,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
                         mir_ddg,
                     )
                     .into_iter()
-                    .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
+                    .filter(move |matched| self.check_constraints(name, fn_pat, def_id, body, matched))
                     .map(move |matched| {
                         let labels = &fn_pat.expect_body().labels;
                         (matched, labels, attr_map.clone())
@@ -194,7 +194,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
                     mir_ddg,
                 )
                 .into_iter()
-                .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
+                .filter(move |matched| self.check_constraints(name, fn_pat, def_id, body, matched))
                 .map(move |matched| {
                     let labels = &fn_pat.expect_body().labels;
                     (matched, labels, attr_map.clone())
@@ -281,6 +281,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         &self,
         name: Symbol,
         fn_pat: &pat::FnPattern<'pcx>,
+        bottom: LocalDefId,
         body: &mir::Body<'tcx>,
         matched: &Self::Matched,
     ) -> bool {
@@ -292,6 +293,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
         let evaluator = PredicateEvaluator::new(
             self.tcx(),
             typing_env,
+            bottom,
             body,
             &fn_pat.expect_body().labels,
             matched,

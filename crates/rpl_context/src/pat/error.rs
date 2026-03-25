@@ -16,16 +16,12 @@ use rpl_parser::pairs::diagMessageInner;
 use rpl_parser::{SpanWrapper, pairs};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::{Applicability, LintDiagnostic, MultiSpan};
-use rustc_hir::FnDecl;
-use rustc_hir::def_id::LocalDefId;
 use rustc_lint::{Level, Lint};
-use rustc_middle::mir::Body;
 use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 use thiserror::Error;
 
 use super::Matched;
-use crate::pat::matched::Matched2;
 use crate::pat::{ConstVarIdx, TyVarIdx};
 
 /// A dynamic error that can be used to report user-defined errors
@@ -517,22 +513,18 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         Ok(builder)
     }
-    pub(crate) fn build<'tcx>(
+    pub(crate) fn build<'a, 'tcx, Cx: Copy, M: Matched<'a, 'tcx, Cx>>(
         &self,
-        source_map: &SourceMap,
-        fn_name: Option<Symbol>,
-        body: &Body<'tcx>,
-        decl: &FnDecl<'tcx>,
-        matched: &impl Matched<'tcx>,
+        source_map: &'a SourceMap,
+        cx: Cx,
+        matched: &'a M,
     ) -> DynamicError {
-        struct Formatter<'a, 'tcx, M: Matched<'tcx>> {
+        struct Formatter<'a, Cx, M> {
             source_map: &'a SourceMap,
-            fn_name: Option<Symbol>,
-            body: &'a Body<'tcx>,
-            decl: &'a FnDecl<'tcx>,
+            cx: Cx,
             matched: &'a M,
         }
-        impl<'tcx, M: Matched<'tcx>> Formatter<'_, 'tcx, M> {
+        impl<'a, 'tcx, Cx: Copy, M: Matched<'a, 'tcx, Cx>> Formatter<'a, Cx, M> {
             fn format(&self, message: &Vec<SubMsg>) -> String {
                 let mut s = String::new();
                 for msg in message {
@@ -547,10 +539,10 @@ impl<'i> DynamicErrorBuilder<'i> {
                             s.push_str(&const_.to_string());
                         },
                         SubMsg::FnName => {
-                            s.push_str(self.fn_name.unwrap().as_str());
+                            s.push_str(self.matched.bottom_name(self.cx).unwrap().as_str());
                         },
                         SubMsg::Label(local) => {
-                            let local_name = self.matched.span(self.body, self.decl, local.as_str());
+                            let local_name = self.matched.span(self.cx, local.as_str());
                             s.push_str(&self.source_map.span_to_snippet(local_name).unwrap());
                         },
                     }
@@ -560,29 +552,27 @@ impl<'i> DynamicErrorBuilder<'i> {
         }
         let formatter = Formatter {
             source_map,
-            fn_name,
-            body,
-            decl,
+            cx,
             matched,
         };
         let primary = (
             formatter.format(&self.primary.0),
-            matched.multi_span(body, decl, &self.primary.1),
+            matched.multi_span(cx, &self.primary.1),
         );
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (formatter.format(label), matched.span(body, decl, span)))
+            .map(|(label, span)| (formatter.format(label), matched.span(cx, span)))
             .collect();
         let notes = self
             .notes
             .iter()
-            .map(|(note, span)| (formatter.format(note), span.map(|span| matched.span(body, decl, span))))
+            .map(|(note, span)| (formatter.format(note), span.map(|span| matched.span(cx, span))))
             .collect();
         let helps = self
             .helps
             .iter()
-            .map(|(help, span)| (formatter.format(help), span.map(|span| matched.span(body, decl, span))))
+            .map(|(help, span)| (formatter.format(help), span.map(|span| matched.span(cx, span))))
             .collect();
         let suggestions = self
             .suggestions
@@ -591,93 +581,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                 (
                     formatter.format(suggestion),
                     formatter.format(code),
-                    matched.span(body, decl, span),
-                    *applicability,
-                )
-            })
-            .collect();
-        let lint = self.lint;
-        DynamicError {
-            primary,
-            labels,
-            notes,
-            helps,
-            suggestions,
-            lint,
-        }
-    }
-    pub(crate) fn build2<'tcx>(
-        &self,
-        source_map: &SourceMap,
-        bottom: LocalDefId,
-        fns: &FxHashMap<LocalDefId, (Option<Symbol>, &Body<'tcx>, &FnDecl<'tcx>)>,
-        matched: &impl Matched2<'tcx>,
-    ) -> DynamicError {
-        struct Formatter<'a, 'tcx, M: Matched2<'tcx>> {
-            source_map: &'a SourceMap,
-            bottom: LocalDefId,
-            fns: &'a FxHashMap<LocalDefId, (Option<Symbol>, &'a Body<'tcx>, &'a FnDecl<'tcx>)>,
-            matched: &'a M,
-        }
-        impl<'tcx, M: Matched2<'tcx>> Formatter<'_, 'tcx, M> {
-            fn format(&self, message: &Vec<SubMsg>) -> String {
-                let mut s = String::new();
-                for msg in message {
-                    match msg {
-                        SubMsg::Str(smsg) => s.push_str(smsg),
-                        SubMsg::Ty(idx) => {
-                            let ty = self.matched.type_meta_var(*idx);
-                            s.push_str(&ty.to_string());
-                        },
-                        SubMsg::Const(idx) => {
-                            let const_ = self.matched.const_meta_var(*idx);
-                            s.push_str(&const_.to_string());
-                        },
-                        SubMsg::FnName => {
-                            s.push_str(self.fns[&self.bottom].0.unwrap().as_str());
-                        },
-                        SubMsg::Label(local) => {
-                            let local_name = self.matched.span(self.fns, local.as_str());
-                            s.push_str(&self.source_map.span_to_snippet(local_name).unwrap());
-                        },
-                    }
-                }
-                s
-            }
-        }
-        let formatter = Formatter {
-            source_map,
-            bottom,
-            fns,
-            matched,
-        };
-        let primary = (
-            formatter.format(&self.primary.0),
-            matched.multi_span(fns, &self.primary.1),
-        );
-        let labels = self
-            .labels
-            .iter()
-            .map(|(label, span)| (formatter.format(label), matched.span(fns, span)))
-            .collect();
-        let notes = self
-            .notes
-            .iter()
-            .map(|(note, span)| (formatter.format(note), span.map(|span| matched.span(fns, span))))
-            .collect();
-        let helps = self
-            .helps
-            .iter()
-            .map(|(help, span)| (formatter.format(help), span.map(|span| matched.span(fns, span))))
-            .collect();
-        let suggestions = self
-            .suggestions
-            .iter()
-            .map(|(suggestion, code, span, applicability)| {
-                (
-                    formatter.format(suggestion),
-                    formatter.format(code),
-                    matched.span(fns, span),
+                    matched.span(cx, span),
                     *applicability,
                 )
             })
