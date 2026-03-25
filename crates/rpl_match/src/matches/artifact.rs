@@ -2,6 +2,7 @@ use rpl_constraints::attributes::ExtraSpan;
 use rpl_context::pat::{MatchedMap, Spanned};
 use rustc_data_structures::sorted_map::SortedMap;
 use rustc_hir::FnDecl;
+use rustc_hir::def_id::LocalDefId;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Local, PlaceRef};
 use rustc_middle::ty::Ty;
@@ -171,8 +172,14 @@ impl<'tcx> crate::normalized::NormalizedMatched<'tcx> for NormalizedMatched<'tcx
     }
 }
 
-impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+impl<'a, 'tcx> pat::Matched<'a, 'tcx, (&'a Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)> for NormalizedMatched<'tcx> {
+    fn bottom_name(&self, (_, _, name): (&'a Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)) -> Option<Symbol> {
+        name
+    }
+    fn bottom_span(&self, (body, _, _): (&'a Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>)) -> Span {
+        body.span
+    }
+    fn span(&self, (body, decl, _): (&'a Body<'tcx>, &'a FnDecl<'tcx>, Option<Symbol>), name: &str) -> Span {
         let labels = &self.extra;
         let symbol = Symbol::intern(name);
         debug_assert!(
@@ -189,7 +196,7 @@ impl<'tcx> pat::MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
     fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
         self.const_vars[idx]
     }
-    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> PlaceRef<'tcx> {
-        self.place_vars[idx]
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx, bottom: LocalDefId) -> (LocalDefId, PlaceRef<'tcx>) {
+        (bottom, self.place_vars[idx])
     }
 }

@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
 use std::hash::Hash;
 use std::ops::{Deref, Index};
 

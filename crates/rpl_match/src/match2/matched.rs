@@ -2,12 +2,12 @@ use std::ops::Index;
 
 use rpl_constraints::Const;
 use rpl_constraints::attributes::ExtraSpan;
-use rpl_context::pat::{self, Matched2, MatchedMetaVars2, Spanned};
+use rpl_context::pat::{self, MatchedMetaVars, Spanned};
 use rustc_data_structures::sorted_map::SortedMap;
 use rustc_hir::def_id::LocalDefId;
 use rustc_index::IndexVec;
 use rustc_middle::{mir, ty};
-use rustc_span::Symbol;
+use rustc_span::{Span, Symbol};
 
 use crate::match2::with_call_stack::WithCallStack;
 use crate::matches::artifact::NormalizedSpanned;
@@ -52,21 +52,25 @@ impl Matched<'_> {
     }
 }
 
-impl<'tcx> MatchedMetaVars2<'tcx> for NormalizedMatched<'tcx> {
+impl<'tcx> MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> ty::Ty<'tcx> {
         self.ty_vars[idx]
     }
-
     fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
         self.const_vars[idx]
     }
-
-    fn place_meta_var(&self, idx: pat::PlaceVarIdx) -> (LocalDefId, mir::PlaceRef<'tcx>) {
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx, _: LocalDefId) -> (LocalDefId, mir::PlaceRef<'tcx>) {
         self.place_vars[idx]
     }
 }
-impl<'tcx> Matched2<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, fns: &impl pat::MirGraphs<'tcx>, name: &str) -> rustc_span::Span {
+impl<'a, 'tcx, Cx: pat::MirGraphs<'tcx>> pat::Matched<'a, 'tcx, &'a Cx> for NormalizedMatched<'tcx> {
+    fn bottom_span(&self, cx: &Cx) -> Span {
+        cx.get_fn(self.bottom).1.span
+    }
+    fn bottom_name(&self, cx: &Cx) -> Option<Symbol> {
+        cx.get_fn(self.bottom).0
+    }
+    fn span(&self, fns: &Cx, name: &str) -> Span {
         let labels = &self.extra;
         let i = Symbol::intern(name);
         let (id, span) = &labels[&i];

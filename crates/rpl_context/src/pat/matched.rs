@@ -1,6 +1,5 @@
 use core::fmt;
 use std::collections::HashMap;
-use std::ops::Index;
 
 use either::Either;
 use rpl_constraints::Const;
@@ -26,7 +25,7 @@ pub trait MatchedMetaVars<'tcx>: fmt::Debug {
     /// Get the matched constant of the constant meta variable at `idx`.
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
     /// Get the matched place of the place meta variable at `idx`.
-    fn place_meta_var(&self, idx: PlaceVarIdx) -> PlaceRef<'tcx>;
+    fn place_meta_var(&self, idx: PlaceVarIdx, bottom: LocalDefId) -> (LocalDefId, PlaceRef<'tcx>);
 }
 
 pub trait MatchedLocalVars<'tcx>: fmt::Debug {
@@ -36,12 +35,16 @@ pub trait MatchedLocalVars<'tcx>: fmt::Debug {
     fn location(&self, idx: pat::Location) -> Either<Local, Location>;
 }
 
-pub trait Matched<'tcx>: fmt::Debug + MatchedMetaVars<'tcx> {
+pub trait Matched<'a, 'tcx, Cx: Copy>: fmt::Debug + MatchedMetaVars<'tcx> {
+    /// Get the span that covers the bottom function.
+    fn bottom_span(&self, cx: Cx) -> Span;
+    /// Get the name of the bottom function.
+    fn bottom_name(&self, cx: Cx) -> Option<Symbol>;
     /// Get the span of a labeled statement by the name of the label.
-    fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span;
+    fn span(&self, cx: Cx, name: &str) -> Span;
     /// Get the multi-span of multiple labeled statements by the names of the labels.
-    fn multi_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &[&str]) -> MultiSpan {
-        let spans = name.iter().map(|n| self.span(body, decl, n)).collect();
+    fn multi_span(&self, cx: Cx, name: &[&str]) -> MultiSpan {
+        let spans = name.iter().map(|n| self.span(cx, n)).collect();
         MultiSpan::from_spans(spans)
     }
 }
@@ -49,25 +52,6 @@ pub trait Matched<'tcx>: fmt::Debug + MatchedMetaVars<'tcx> {
 pub trait MirGraphs<'tcx>: fmt::Debug {
     /// Get the name, the MIR body, and the function declaration of the function with `def_id`.
     fn get_fn(&self, def_id: LocalDefId) -> (Option<Symbol>, &Body<'tcx>, &FnDecl<'tcx>);
-}
-
-pub trait MatchedMetaVars2<'tcx>: fmt::Debug {
-    /// Get the matched type of the type meta variable at `idx`.
-    fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
-    /// Get the matched constant of the constant meta variable at `idx`.
-    fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;
-    /// Get the matched place of the place meta variable at `idx`.
-    fn place_meta_var(&self, idx: PlaceVarIdx) -> (LocalDefId, PlaceRef<'tcx>);
-}
-
-pub trait Matched2<'tcx>: fmt::Debug + MatchedMetaVars2<'tcx> {
-    /// Get the span of a labeled statement by the name of the label.
-    fn span(&self, fns: &impl MirGraphs<'tcx>, name: &str) -> Span;
-    /// Get the multi-span of multiple labeled statements by the names of the labels.
-    fn multi_span(&self, fns: &impl MirGraphs<'tcx>, names: &[&str]) -> MultiSpan {
-        let spans = names.iter().map(|n| self.span(fns, n)).collect();
-        MultiSpan::from_spans(spans)
-    }
 }
 
 impl<'tcx> MirGraphs<'tcx> for FxHashMap<LocalDefId, (Option<Symbol>, &Body<'tcx>, &FnDecl<'tcx>)> {
