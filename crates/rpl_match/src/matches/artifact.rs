@@ -63,7 +63,7 @@ impl<'tcx> crate::normalized::NormalizedMatched<'tcx> for NormalizedMatched<'tcx
 
     /// Create a new [`NormalizedMatched`] from a [`Matched`] and a [`pat::LabelMap`].
     #[instrument(level = "trace", ret)]
-    fn new(matched: &Self::Matched, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
+    fn new(_: LocalDefId, matched: &Self::Matched, label_map: &pat::LabelMap, extra_spans: &ExtraSpan<'tcx>) -> Self {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
@@ -90,44 +90,44 @@ impl<'tcx> crate::normalized::NormalizedMatched<'tcx> for NormalizedMatched<'tcx
         }
     }
 
-    /// Map [`Matched`] from one pattern to another.
-    ///
-    /// This is useful for normalizing patterns that have been matched against a different set of
-    /// meta variables.
-    #[instrument(level = "trace", ret)]
-    fn normalize(matched_map: &MatchedMap, matched_from: &Matched<'tcx>, label_map_from: &pat::LabelMap) -> Self {
-        let ty_vars = IndexVec::from_fn_n(
-            |i| matched_from.ty_vars[matched_map.ty_vars[i]],
-            matched_map.ty_vars.len(),
-        );
-        let const_vars = IndexVec::from_fn_n(
-            |i| matched_from.const_vars[matched_map.const_vars[i]],
-            matched_map.const_vars.len(),
-        );
-        let place_vars = IndexVec::from_fn_n(
-            |i| matched_from.place_vars[matched_map.place_vars[i]],
-            matched_map.place_vars.len(),
-        );
-        let labels: SortedMap<_, _> = label_map_from
-            .iter()
-            .map(|(label, spanned)| {
-                let mapped_label = *matched_map.labels.get(label).unwrap_or(label);
-                match spanned {
-                    Spanned::Location(location) => (mapped_label, NormalizedSpanned::Location(matched_from[*location])),
-                    Spanned::Local(local) => (mapped_label, NormalizedSpanned::Local(matched_from[*local])),
-                    Spanned::Body => (mapped_label, NormalizedSpanned::Body),
-                    Spanned::Output => (mapped_label, NormalizedSpanned::Output),
-                }
-            })
-            .collect();
+    // /// Map [`Matched`] from one pattern to another.
+    // ///
+    // /// This is useful for normalizing patterns that have been matched against a different set of
+    // /// meta variables.
+    // #[instrument(level = "trace", ret)]
+    // fn normalize(matched_map: &MatchedMap, matched_from: &Matched<'tcx>, label_map_from:
+    // &pat::LabelMap) -> Self {     let ty_vars = IndexVec::from_fn_n(
+    //         |i| matched_from.ty_vars[matched_map.ty_vars[i]],
+    //         matched_map.ty_vars.len(),
+    //     );
+    //     let const_vars = IndexVec::from_fn_n(
+    //         |i| matched_from.const_vars[matched_map.const_vars[i]],
+    //         matched_map.const_vars.len(),
+    //     );
+    //     let place_vars = IndexVec::from_fn_n(
+    //         |i| matched_from.place_vars[matched_map.place_vars[i]],
+    //         matched_map.place_vars.len(),
+    //     );
+    //     let labels: SortedMap<_, _> = label_map_from
+    //         .iter()
+    //         .map(|(label, spanned)| {
+    //             let mapped_label = *matched_map.labels.get(label).unwrap_or(label);
+    //             match spanned {
+    //                 Spanned::Location(location) => (mapped_label,
+    // NormalizedSpanned::Location(matched_from[*location])),                 Spanned::Local(local)
+    // => (mapped_label, NormalizedSpanned::Local(matched_from[*local])),                 
+    // Spanned::Body => (mapped_label, NormalizedSpanned::Body),                 Spanned::Output =>
+    // (mapped_label, NormalizedSpanned::Output),             }
+    //         })
+    //         .collect();
 
-        NormalizedMatched {
-            ty_vars,
-            const_vars,
-            place_vars,
-            extra: labels,
-        }
-    }
+    //     NormalizedMatched {
+    //         ty_vars,
+    //         const_vars,
+    //         place_vars,
+    //         extra: labels,
+    //     }
+    // }
 
     /// Map [`Matched`] from one pattern to another.
     ///

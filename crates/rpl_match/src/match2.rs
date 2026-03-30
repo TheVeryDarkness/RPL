@@ -2,7 +2,8 @@ use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use std::ops::{Deref, Index};
 
-use matched::{Matched, MatchedBlock, StatementMatch};
+pub use matched::{Matched, NormalizedMatched};
+use matched::{MatchedBlock, StatementMatch};
 use mitsein::vec1::Vec1;
 use rpl_constraints::Const;
 use rpl_context::{PatCtxt, pat};
@@ -16,7 +17,7 @@ use rustc_span::{Ident, Symbol};
 pub use with_call_stack::WithCallStack;
 
 use crate::graph::{MirControlFlowGraph, MirDataDepGraph, PatControlFlowGraph, PatDataDepGraph};
-use crate::match2::matched::NormalizedMatched;
+use crate::normalized::NormalizedMatched as _;
 use crate::statement::MatchStatement;
 use crate::ty::MatchTy;
 use crate::{AdtMatch, Reachability};
@@ -1211,7 +1212,7 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
     pat_ddg: &'a PatDataDepGraph,
     fn_pat: &'a pat::FnPattern<'pcx>,
     fns: &'a [MirGraph<'tcx>],
-) -> Vec<NormalizedMatched<'tcx>> {
+) -> Vec<Matched<'tcx>> {
     trace!(?pat_name, ?fn_pat.name, fn_count = ?fns.len(), "check2");
     let places = pat.meta.place_vars.iter().map(|var| var.ty).collect();
     let Some(body) = fn_pat.body else {
@@ -1257,16 +1258,15 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
                         trace!("found full match for function");
                         matched.log_matched();
                     });
-                    let bottom = fn_graph.id;
-                    let label_map = &fn_pat.expect_body().labels;
-                    let attr_map = fn_pat.extra_span(tcx, bottom).unwrap();
-                    let matched = NormalizedMatched::new(bottom, matched, label_map, &attr_map);
+                    // let bottom = fn_graph.id;
+                    // let label_map = &fn_pat.expect_body().labels;
+                    // let attr_map = fn_pat.extra_span(tcx, bottom).unwrap();
+                    // let matched = NormalizedMatched::new(bottom, &matched, label_map, &attr_map);
                     results.push(matched);
                 }
             }
         }
     }
-    let results = FxHashSet::from_iter(results).into_iter().collect::<Vec<_>>();
     debug!(match_count = ?results.len(), "check2 done");
     results
 }

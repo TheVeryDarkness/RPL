@@ -37,7 +37,7 @@ mod compose;
 mod counted;
 mod fns;
 pub mod graph; // FIXME: visibility
-mod match2;
+pub mod match2;
 pub mod matches; // FIXME: visibility
 pub mod mir; // FIXME: visibility
 mod normalized;
