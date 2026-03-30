@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use rpl_constraints::Const;
 use rpl_constraints::attributes::ExtraSpan;
-use rpl_context::pat::{self, MatchedMetaVars, Spanned};
+use rpl_context::pat::{self, MatchedLocalVars, MatchedMetaVars, Spanned};
 use rustc_data_structures::sorted_map::SortedMap;
 use rustc_hir::def_id::LocalDefId;
 use rustc_index::IndexVec;
@@ -11,6 +11,7 @@ use rustc_span::{Span, Symbol};
 
 use crate::match2::with_call_stack::WithCallStack;
 use crate::matches::artifact::NormalizedSpanned;
+use crate::normalized;
 
 pub(crate) type StatementMatch = crate::matches::StatementMatch;
 
@@ -52,7 +53,7 @@ impl Matched<'_> {
     }
 }
 
-impl<'tcx> MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
+impl<'tcx> MatchedMetaVars<'tcx> for Matched<'tcx> {
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> ty::Ty<'tcx> {
         self.ty_vars[idx]
     }
@@ -60,22 +61,19 @@ impl<'tcx> MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
         self.const_vars[idx]
     }
     fn place_meta_var(&self, idx: pat::PlaceVarIdx, _: LocalDefId) -> (LocalDefId, mir::PlaceRef<'tcx>) {
-        self.place_vars[idx]
+        let (def, place) = self.place_vars[idx].def();
+        (def, *place)
     }
 }
-impl<'a, 'tcx, Cx: pat::MirGraphs<'tcx>> pat::Matched<'a, 'tcx, &'a Cx> for NormalizedMatched<'tcx> {
-    fn bottom_span(&self, cx: &Cx) -> Span {
-        cx.get_fn(self.bottom).1.span
+
+impl<'tcx> MatchedLocalVars<'tcx> for Matched<'tcx> {
+    fn local(&self, idx: pat::Local) -> mir::Local {
+        self.locals[idx].value()
     }
-    fn bottom_name(&self, cx: &Cx) -> Option<Symbol> {
-        cx.get_fn(self.bottom).0
-    }
-    fn span(&self, fns: &Cx, name: &str) -> Span {
-        let labels = &self.extra;
-        let i = Symbol::intern(name);
-        let (id, span) = &labels[&i];
-        let (_name, body, decl) = fns.get_fn(*id);
-        span.span(body, decl)
+    fn location(&self, idx: pat::Location) -> either::Either<mir::Local, mir::Location> {
+        self.basic_blocks[idx.block].statements[idx.statement_index]
+            .value()
+            .into()
     }
 }
 
@@ -121,9 +119,43 @@ impl<'tcx> NormalizedMatched<'tcx> {
             Spanned::Output => (label, (bottom, NormalizedSpanned::Output)),
         }
     }
-    pub(crate) fn new(
-        fn_id: LocalDefId,
-        matched: Matched<'tcx>,
+    pub fn bottom(&self) -> LocalDefId {
+        self.bottom
+    }
+}
+
+impl<'tcx> MatchedMetaVars<'tcx> for NormalizedMatched<'tcx> {
+    fn type_meta_var(&self, idx: pat::TyVarIdx) -> ty::Ty<'tcx> {
+        self.ty_vars[idx]
+    }
+    fn const_meta_var(&self, idx: pat::ConstVarIdx) -> Const<'tcx> {
+        self.const_vars[idx]
+    }
+    fn place_meta_var(&self, idx: pat::PlaceVarIdx, _: LocalDefId) -> (LocalDefId, mir::PlaceRef<'tcx>) {
+        self.place_vars[idx]
+    }
+}
+impl<'a, 'tcx, Cx: pat::MirGraphs<'tcx>> pat::Matched<'a, 'tcx, &'a Cx> for NormalizedMatched<'tcx> {
+    fn bottom_span(&self, cx: &Cx) -> Span {
+        cx.get_fn(self.bottom).1.span
+    }
+    fn bottom_name(&self, cx: &Cx) -> Option<Symbol> {
+        cx.get_fn(self.bottom).0
+    }
+    fn span(&self, fns: &Cx, name: &str) -> Span {
+        let labels = &self.extra;
+        let i = Symbol::intern(name);
+        let (id, span) = &labels[&i];
+        let (_name, body, decl) = fns.get_fn(*id);
+        span.span(body, decl)
+    }
+}
+impl<'tcx> normalized::NormalizedMatched<'tcx> for NormalizedMatched<'tcx> {
+    type Matched = Matched<'tcx>;
+
+    fn new(
+        bottom: LocalDefId,
+        matched: &Self::Matched,
         label_map: &pat::LabelMap,
         extra_spans: &ExtraSpan<'tcx>,
     ) -> Self {
@@ -136,24 +168,56 @@ impl<'tcx> NormalizedMatched<'tcx> {
             .collect();
         let labels: SortedMap<_, (LocalDefId, NormalizedSpanned)> = label_map
             .iter()
-            .map(|(label, spanned)| Self::map_spanned(*label, spanned, fn_id, &matched))
+            .map(|(label, spanned)| Self::map_spanned(*label, spanned, bottom, &matched))
             .chain(
                 extra_spans
                     .iter()
-                    .map(|(label, span)| (*label, (fn_id, NormalizedSpanned::Span(span.span())))),
+                    .map(|(label, span)| (*label, (bottom, NormalizedSpanned::Span(span.span())))),
             )
             .collect();
 
         NormalizedMatched {
-            bottom: fn_id,
+            bottom,
             ty_vars,
             const_vars,
             place_vars,
             extra: labels,
         }
     }
-    pub fn bottom(&self) -> LocalDefId {
-        self.bottom
+
+    // fn normalize(matched_map: &pat::MatchedMap, matched_from: &Self::Matched, label_map_from:
+    // &pat::LabelMap) -> Self {}
+
+    fn map(self, matched_map: &pat::MatchedMap) -> Self {
+        let bottom = self.bottom;
+        let ty_vars = matched_map.map_ty_vars(&self.ty_vars);
+        let const_vars = matched_map.map_const_vars(&self.const_vars);
+        let place_vars = matched_map.map_place_vars(&self.place_vars);
+        let extra: SortedMap<_, (LocalDefId, NormalizedSpanned)> = self
+            .extra
+            .iter()
+            .map(|(label, spanned)| (matched_map.labels[label], *spanned))
+            .collect();
+
+        NormalizedMatched {
+            bottom,
+            ty_vars,
+            const_vars,
+            place_vars,
+            extra,
+        }
+    }
+
+    fn has_same_head(&self, other: &Self) -> bool {
+        self.ty_vars.len() == other.ty_vars.len()
+            && self.const_vars.len() == other.const_vars.len()
+            && self.place_vars.len() == other.place_vars.len()
+            && self.extra.len() == other.extra.len()
+            && self
+                .extra
+                .iter()
+                .zip(other.extra.iter())
+                .all(|((label1, _), (label2, _))| label1 == label2)
     }
 }
 

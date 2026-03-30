@@ -153,4 +153,13 @@ impl MatchedMap {
             labels,
         }
     }
+    pub fn map_ty_vars<T: Clone>(&self, ty_vars: &IndexVec<TyVarIdx, T>) -> IndexVec<TyVarIdx, T> {
+        IndexVec::from_fn_n(|i| ty_vars[self.ty_vars[i]].clone(), ty_vars.len())
+    }
+    pub fn map_const_vars<T: Clone>(&self, const_vars: &IndexVec<ConstVarIdx, T>) -> IndexVec<ConstVarIdx, T> {
+        IndexVec::from_fn_n(|i| const_vars[self.const_vars[i]].clone(), const_vars.len())
+    }
+    pub fn map_place_vars<T: Clone>(&self, place_vars: &IndexVec<PlaceVarIdx, T>) -> IndexVec<PlaceVarIdx, T> {
+        IndexVec::from_fn_n(|i| place_vars[self.place_vars[i]].clone(), place_vars.len())
+    }
 }

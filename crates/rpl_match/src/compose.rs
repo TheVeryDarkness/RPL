@@ -85,7 +85,9 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
                         (matched, labels, attr_map.clone())
                     })
                 })
-                .map(|(matched, label_map, attr_map)| Self::NormalizedMatched::new(&matched, label_map, &attr_map))
+                .map(move |(matched, label_map, attr_map)| {
+                    Self::NormalizedMatched::new(def_id, &matched, label_map, &attr_map)
+                })
         });
         rpl_rust_items.post_process(iter)
     }
@@ -200,7 +202,7 @@ pub trait MatchComposedPattern<'pcx, 'tcx> {
                     (matched, labels, attr_map.clone())
                 })
             })
-            .map(|(matched, label_map, attr_map)| NormalizedMatched::new(&matched, label_map, &attr_map));
+            .map(move |(matched, label_map, attr_map)| NormalizedMatched::new(def_id, &matched, label_map, &attr_map));
 
         rpl_rust_items.post_process(iter)
     }
