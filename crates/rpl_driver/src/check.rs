@@ -10,6 +10,7 @@ use rpl_match::graph::{self, MirControlFlowGraph, MirDataDepGraph};
 use rpl_match::matches::Matched;
 use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::mir::{CheckMirCtxt, pat};
+use rpl_match::predicate_evaluator::PredicateEvaluator;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::intravisit::{self, Visitor};
@@ -122,7 +123,15 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     }
 }
 
-impl<'tcx, 'pcx> MatchComposedPattern<'pcx, 'tcx> for CheckFnCtxt<'pcx, 'tcx> {
+type Cx<'a, 'tcx> = (
+    &'a mir::Body<'tcx>,
+    bool,
+    Option<ty::Ty<'tcx>>,
+    &'a MirControlFlowGraph,
+    &'a MirDataDepGraph,
+);
+
+impl<'a, 'tcx, 'pcx> MatchComposedPattern<'a, 'pcx, 'tcx, Cx<'a, 'tcx>> for CheckFnCtxt<'pcx, 'tcx> {
     type Matched = Matched<'tcx>;
     type NormalizedMatched = NormalizedMatched<'tcx>;
     fn pcx(&self) -> PatCtxt<'pcx> {
@@ -134,22 +143,53 @@ impl<'tcx, 'pcx> MatchComposedPattern<'pcx, 'tcx> for CheckFnCtxt<'pcx, 'tcx> {
     fn body_caches(&self) -> impl DerefMut<Target = FxHashMap<DefId, BodyInfoCache>> {
         self.body_caches.borrow_mut()
     }
-    fn check_mir<'a>(
+    fn check_mir(
         tcx: TyCtxt<'tcx>,
         pcx: PatCtxt<'pcx>,
-        body: &'a mir::Body<'tcx>,
-        has_self: bool,
-        self_ty: Option<ty::Ty<'tcx>>,
         pat: &'pcx pat::RustItems<'pcx>,
         pat_name: Symbol,
         fn_pat: &'a pat::FnPattern<'pcx>,
-        mir_cfg: &'a MirControlFlowGraph,
-        mir_ddg: &'a MirDataDepGraph,
+        (body, has_self, self_ty, mir_cfg, mir_ddg): Cx<'a, 'tcx>,
     ) -> Vec<Matched<'tcx>> {
         CheckMirCtxt::new(
             tcx, pcx, body, has_self, self_ty, pat, pat_name, fn_pat, mir_cfg, mir_ddg,
         )
         .check()
+    }
+    fn check_constraints(
+        &self,
+        name: Symbol,
+        fn_pat: &pat::FnPattern<'tcx>,
+        bottom: LocalDefId,
+        matched: &Self::Matched,
+        (body, has_self, self_ty, mir_cfg, mir_ddg): Cx<'a, 'tcx>,
+    ) -> bool {
+        let mut cache = self.body_caches();
+        let typing_env = ty::TypingEnv::post_analysis(self.tcx(), body.source.def_id());
+        let cache = cache
+            .entry(body.source.def_id())
+            .or_insert_with(|| BodyInfoCache::new(self.tcx(), typing_env, body));
+        let evaluator = PredicateEvaluator::new(
+            self.tcx(),
+            typing_env,
+            bottom,
+            body,
+            &fn_pat.expect_body().labels,
+            matched,
+            cache,
+            fn_pat.symbol_table,
+        );
+        evaluator.evaluate_constraint(&fn_pat.constraints)
+    }
+    fn filter(
+        &self,
+        _: Symbol,
+        fn_pat: &pat::FnPattern<'pcx>,
+        bottom: LocalDefId,
+        header: Option<FnHeader>,
+        (body, ..): Cx<'a, 'tcx>,
+    ) -> bool {
+        fn_pat.filter(self.tcx, bottom, header, body)
     }
 }
 
@@ -206,7 +246,11 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, pat_item) in &pattern.patt_block {
                     for matched in self.impl_matched_pat_item(
-                        name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
+                        name,
+                        pat_item,
+                        def_id,
+                        header,
+                        (body, has_self, self_ty, &mir_cfg, &mir_ddg),
                     ) {
                         let error = pattern
                             .get_diag(name, source_map, (body, decl, None), &matched)
@@ -242,7 +286,11 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
             self.pcx.for_each_rpl_pattern(|_id, pattern| {
                 for (&name, pat_item) in &pattern.patt_block {
                     for matched in self.fn_matched_pat_item(
-                        name, pat_item, def_id, header, has_self, self_ty, body, &mir_cfg, &mir_ddg,
+                        name,
+                        pat_item,
+                        def_id,
+                        header,
+                        (body, has_self, self_ty, &mir_cfg, &mir_ddg),
                     ) {
                         let error = pattern
                             .get_diag(name, source_map, (body, decl, fn_name), &matched)
