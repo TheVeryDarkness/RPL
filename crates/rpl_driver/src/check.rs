@@ -148,7 +148,7 @@ impl<'a, 'tcx, 'pcx> MatchComposedPattern<'a, 'pcx, 'tcx, Cx<'a, 'tcx>> for Chec
         pcx: PatCtxt<'pcx>,
         pat: &'pcx pat::RustItems<'pcx>,
         pat_name: Symbol,
-        fn_pat: &'a pat::FnPattern<'pcx>,
+        fn_pat: &pat::FnPattern<'pcx>,
         (body, has_self, self_ty, mir_cfg, mir_ddg): Cx<'a, 'tcx>,
     ) -> Vec<Matched<'tcx>> {
         CheckMirCtxt::new(
@@ -156,10 +156,18 @@ impl<'a, 'tcx, 'pcx> MatchComposedPattern<'a, 'pcx, 'tcx, Cx<'a, 'tcx>> for Chec
         )
         .check()
     }
+    fn check_mir_rust_items(
+        &self,
+        rpl_rust_items: &pat::RustItems<'pcx>,
+        name: Symbol,
+        fn_pat: &'pcx pat::FnPattern<'pcx>,
+        cx: Cx<'a, 'tcx>,
+    ) -> Vec<NormalizedMatched<'tcx>> {
+    }
     fn check_constraints(
         &self,
         name: Symbol,
-        fn_pat: &pat::FnPattern<'tcx>,
+        fn_pat: &pat::FnPattern<'pcx>,
         bottom: LocalDefId,
         matched: &Self::Matched,
         (body, has_self, self_ty, mir_cfg, mir_ddg): Cx<'a, 'tcx>,

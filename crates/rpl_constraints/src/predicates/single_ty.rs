@@ -5,7 +5,7 @@ use rustc_span::{Symbol, sym};
 pub type SingleTyPredsFnPtr = for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, Ty<'tcx>) -> bool;
 
 /// Check if self_ty's trait bounds are all safe.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     const EXCLUDED_DIAG_ITEMS: &[Symbol] = &[sym::Send, sym::Sync];
     typing_env
@@ -26,20 +26,20 @@ pub fn is_all_safe_trait<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx
 }
 
 /// Check if ty is [`Copy`].
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn is_copy<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     tcx.type_is_copy_modulo_regions(typing_env, ty)
 }
 
 /// Check if ty is not unpin.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 #[allow(unused_variables)]
 pub fn is_not_unpin<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     !ty.is_unpin(tcx, typing_env)
 }
 
 /// Check if ty is sync.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn is_sync<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     use rustc_infer::infer::TyCtxtInferExt;
     let infcx = tcx.infer_ctxt().build(TypingMode::PostAnalysis);
@@ -53,21 +53,21 @@ pub fn is_sync<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<
 }
 
 /// Check if ty is integral.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 #[allow(unused_variables)]
 pub fn is_integral<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_integral()
 }
 
 /// Check if ty is a pointer.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 #[allow(unused_variables)]
 pub fn is_ptr<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.is_any_ptr()
 }
 
 /// Check if ty needs to be dropped.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn needs_drop<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
     ty.needs_drop(tcx, typing_env)
 }

@@ -22,6 +22,7 @@ pub struct Matched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, ty::Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, WithCallStack<mir::PlaceRef<'tcx>>>,
+    pub bottom: LocalDefId,
 }
 
 impl Matched<'_> {

@@ -53,6 +53,7 @@ pub use compose::MatchComposedPattern;
 pub(crate) use counted::CountedMatch;
 pub(crate) use fns::MatchFnCtxt;
 pub use match2::{MirGraph, WithCallStack, check2};
+pub use normalized::NormalizedMatched;
 pub(crate) use place::MatchPlaceCtxt;
 pub use reachability::Reachability;
 pub(crate) use ty::{MatchTyCtxt, TryCmpAs};
