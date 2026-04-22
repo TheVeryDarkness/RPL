@@ -59,7 +59,7 @@ impl BodyInfoCache {
             mir::interpret::Scalar::Ptr(_, _) => Some(false),
         }
     }
-    #[instrument(level = "trace", skip(tcx), ret)]
+    #[instrument(level = "trace", skip(tcx, typing_env), ret)]
     fn mir_const_is_null<'tcx>(
         tcx: TyCtxt<'tcx>,
         typing_env: TypingEnv<'tcx>,
@@ -71,7 +71,7 @@ impl BodyInfoCache {
             mir::interpret::Scalar::Ptr(_, _) => Some(false),
         }
     }
-    #[instrument(level = "debug", skip(tcx, body), fields(n = body.local_decls.len()), ret)]
+    #[instrument(level = "debug", skip(tcx, body, typing_env), fields(n = body.local_decls.len()), ret)]
     pub fn new<'tcx>(tcx: TyCtxt<'tcx>, typing_env: TypingEnv<'tcx>, body: &mir::Body<'tcx>) -> Self {
         let n = body.local_decls.len();
 

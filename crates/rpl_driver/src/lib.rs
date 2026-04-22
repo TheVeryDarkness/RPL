@@ -110,10 +110,10 @@ pub fn check_crate<'tcx, 'pcx, 'mcx: 'pcx>(tcx: TyCtxt<'tcx>, pcx: PatCtxt<'pcx>
     //     Ok(())
     // });
 
-    let mut check_ctxt = CheckFnCtxt::new(tcx, pcx);
-    tcx.hir().walk_toplevel_module(&mut check_ctxt);
+    // let mut check_ctxt = CheckFnCtxt::new(tcx, pcx);
+    // tcx.hir().walk_toplevel_module(&mut check_ctxt);
 
-    // walk2(tcx, pcx);
+    check2::walk2(tcx, pcx);
 
     rpl_utils::visit_crate(tcx);
 

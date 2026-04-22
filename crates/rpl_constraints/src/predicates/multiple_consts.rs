@@ -6,7 +6,7 @@ use crate::Const;
 pub type MultipleConstsPredsFnPtr = for<'tcx> fn(TyCtxt<'tcx>, ty::TypingEnv<'tcx>, Vec<Const<'tcx>>) -> bool;
 
 /// Check if those constants are in a strictly increasing order
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn usize_lt<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, consts: Vec<Const<'tcx>>) -> bool {
     consts.windows(2).all(|w| {
         if let (Some(c1), Some(c2)) = (

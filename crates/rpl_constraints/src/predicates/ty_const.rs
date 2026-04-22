@@ -7,7 +7,7 @@ pub type TyConstPredsFnPtr =
     for<'tcx> fn(TyCtxt<'tcx>, body: &mir::Body<'tcx>, ty::TypingEnv<'tcx>, Ty<'tcx>, Const<'tcx>) -> bool;
 
 /// Check if `alignment` is enough for the given type `ty`.
-#[instrument(level = "debug", skip(tcx), ret)]
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn maybe_misaligned<'tcx>(
     tcx: TyCtxt<'tcx>,
     body: &mir::Body<'tcx>,

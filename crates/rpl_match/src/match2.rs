@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::fmt;
 use std::hash::Hash;
 use std::ops::{Deref, Index};
 
@@ -6,10 +7,11 @@ pub use matched::{Matched, NormalizedMatched};
 use matched::{MatchedBlock, StatementMatch};
 use mitsein::vec1::Vec1;
 use rpl_constraints::Const;
+use rpl_context::pat::MirGraphs;
 use rpl_context::{PatCtxt, pat};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustc_hir::FnDecl;
 use rustc_hir::def_id::LocalDefId;
+use rustc_hir::{FnDecl, FnHeader};
 use rustc_index::{Idx, IndexVec};
 use rustc_middle::ty::{TyCtxt, TypingEnv};
 use rustc_middle::{mir, ty};
@@ -34,8 +36,35 @@ pub struct MirGraph<'tcx> {
     pub typing_env: TypingEnv<'tcx>,
     pub id: LocalDefId,
     pub decl: &'tcx FnDecl<'tcx>,
+    pub header: Option<FnHeader>,
     pub name: Option<Ident>,
     pub reachability: Reachability<mir::BasicBlock>,
+}
+impl fmt::Debug for MirGraph<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.id)
+    }
+}
+
+#[derive(Debug)]
+pub struct AllMirGraphs<'tcx>(Vec<MirGraph<'tcx>>);
+impl<'tcx> MirGraphs<'tcx> for AllMirGraphs<'tcx> {
+    fn get_fn(&self, def_id: LocalDefId) -> (Option<Symbol>, &mir::Body<'tcx>, &FnDecl<'tcx>) {
+        let g = self.0.iter().find(|g| g.id == def_id).unwrap();
+        (g.name.map(|n| n.name), g.body, g.decl)
+    }
+}
+impl<'tcx> From<Vec<MirGraph<'tcx>>> for AllMirGraphs<'tcx> {
+    fn from(value: Vec<MirGraph<'tcx>>) -> Self {
+        Self(value)
+    }
+}
+impl<'tcx> Deref for AllMirGraphs<'tcx> {
+    type Target = Vec<MirGraph<'tcx>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Clone)]
@@ -1057,7 +1086,7 @@ impl<'tcx> Matching<'tcx> {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
-    fn to_matched(&self) -> Option<Matched<'tcx>> {
+    fn to_matched(&self, bottom: LocalDefId) -> Option<Matched<'tcx>> {
         self.log_matched();
         Some(Matched {
             basic_blocks: self
@@ -1092,6 +1121,7 @@ impl<'tcx> Matching<'tcx> {
                 .iter()
                 .map(|place_var| place_var.borrow().as_ref().cloned())
                 .collect::<Option<_>>()?,
+            bottom,
         })
     }
 
@@ -1253,7 +1283,7 @@ pub fn check2<'a, 'pcx, 'tcx: 'a>(
     for fn_graph in fns {
         if let Some(matchings) = all_matches.get(&fn_graph.id) {
             for matching in matchings.matches.iter() {
-                if let Some(matched) = matching.to_matched() {
+                if let Some(matched) = matching.to_matched(fn_graph.id) {
                     debug_span!("check2", ?fn_graph.id, ?pat_name, ?fn_pat.name).in_scope(|| {
                         trace!("found full match for function");
                         matched.log_matched();

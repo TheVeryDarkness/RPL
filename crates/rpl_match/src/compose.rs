@@ -8,15 +8,11 @@ use rpl_context::pat::{MatchedLocalVars, MatchedMetaVars};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir::FnHeader;
 use rustc_hir::def_id::{DefId, LocalDefId};
-use rustc_middle::mir;
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::TyCtxt;
 use rustc_span::Symbol;
 
-use crate::graph::{MirControlFlowGraph, MirDataDepGraph};
 use crate::mir::pat;
-use crate::mir::pat::PatternItem;
 use crate::normalized::NormalizedMatched;
-use crate::predicate_evaluator::PredicateEvaluator;
 
 // body: &'a mir::Body<'tcx>,
 // has_self: bool,
@@ -39,6 +35,69 @@ pub trait MatchComposedPattern<'a, 'pcx, 'tcx, Cx: Copy> {
         cx: Cx,
     ) -> Vec<Self::Matched>;
 
+    fn check_mir_rust_items(
+        &self,
+        rpl_rust_items: &pat::RustItems<'pcx>,
+        name: Symbol,
+        fn_pat: &'pcx pat::FnPattern<'pcx>,
+        cx: Cx,
+    ) -> Vec<Self::NormalizedMatched>;
+
+    #[instrument(level = "trace", skip(self, pat_op, fn_pat, cx))]
+    #[expect(clippy::too_many_arguments)]
+    fn check_mir_pat_op(
+        &self,
+        pat_op: &pat::PatternOperation<'pcx>,
+        pat_name: Symbol,
+        fn_pat: &'pcx pat::FnPattern<'pcx>,
+        cx: Cx,
+    ) -> Vec<Self::NormalizedMatched> {
+        let positive: Vec<_> = pat_op
+            .positive
+            .iter()
+            .flat_map(|positive| {
+                self.check_mir_pat_item(&positive.1, positive.0, fn_pat, cx)
+                    .into_iter()
+                    .map(|matched| matched.map(&positive.2))
+            })
+            .collect();
+        let negative: FxHashSet<_> = pat_op
+            .negative
+            .iter()
+            .flat_map(|negative| {
+                self.check_mir_pat_item(&negative.1, negative.0, fn_pat, cx)
+                    .into_iter()
+                    .map(|matched| matched.map(&negative.2))
+            })
+            .collect();
+        debug!(?positive, ?negative, "impl_matched_pat_op");
+
+        let iter = positive
+            .into_iter()
+            .filter(move |matched| {
+                debug_assert!(negative.iter().all(|neg| neg.has_same_head(matched)));
+                !negative.contains(matched)
+            })
+            .collect::<Vec<_>>()
+            .into_iter();
+
+        pat_op.post_process(iter).collect()
+    }
+
+    #[instrument(level = "trace", skip(self, pat_item, fn_pat, cx))]
+    #[expect(clippy::too_many_arguments)]
+    fn check_mir_pat_item(
+        &self,
+        pat_item: &pat::PatternItem<'pcx>,
+        pat_name: Symbol,
+        fn_pat: &'pcx pat::FnPattern<'pcx>,
+        cx: Cx,
+    ) -> Vec<Self::NormalizedMatched> {
+        match pat_item {
+            pat::PatternItem::RustItems(rust_items) => self.check_mir_rust_items(rust_items, pat_name, fn_pat, cx),
+            pat::PatternItem::RPLPatternOperation(pat_op) => self.check_mir_pat_op(pat_op, pat_name, fn_pat, cx),
+        }
+    }
     #[expect(clippy::too_many_arguments)]
     #[instrument(level = "trace", skip(self, rpl_rust_items, header, cx), fields(pat_name = ?name))]
     fn impl_matched(
@@ -121,14 +180,16 @@ pub trait MatchComposedPattern<'a, 'pcx, 'tcx, Cx: Copy> {
     fn impl_matched_pat_item(
         &self,
         name: Symbol,
-        pat_item: &'pcx PatternItem<'pcx>,
+        pat_item: &'pcx pat::PatternItem<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
         cx: Cx,
     ) -> impl Iterator<Item = Self::NormalizedMatched> {
         match pat_item {
-            PatternItem::RustItems(rust_items) => Either::Left(self.impl_matched(name, rust_items, def_id, header, cx)),
-            PatternItem::RPLPatternOperation(pat_op) => {
+            pat::PatternItem::RustItems(rust_items) => {
+                Either::Left(self.impl_matched(name, rust_items, def_id, header, cx))
+            },
+            pat::PatternItem::RPLPatternOperation(pat_op) => {
                 Either::Right(self.impl_matched_pat_op(name, pat_op, def_id, header, cx))
             },
         }
@@ -207,14 +268,16 @@ pub trait MatchComposedPattern<'a, 'pcx, 'tcx, Cx: Copy> {
     fn fn_matched_pat_item(
         &self,
         name: Symbol,
-        pat_item: &'pcx PatternItem<'pcx>,
+        pat_item: &'pcx pat::PatternItem<'pcx>,
         def_id: LocalDefId,
         header: Option<FnHeader>,
         cx: Cx,
     ) -> impl Iterator<Item = Self::NormalizedMatched> {
         match pat_item {
-            PatternItem::RustItems(rust_items) => Either::Left(self.fn_matched(name, rust_items, def_id, header, cx)),
-            PatternItem::RPLPatternOperation(pat_op) => {
+            pat::PatternItem::RustItems(rust_items) => {
+                Either::Left(self.fn_matched(name, rust_items, def_id, header, cx))
+            },
+            pat::PatternItem::RPLPatternOperation(pat_op) => {
                 Either::Right(self.fn_matched_pat_op(name, pat_op, def_id, header, cx))
             },
         }
