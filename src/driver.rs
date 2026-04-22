@@ -24,7 +24,7 @@ use std::path::Path;
 use std::process::exit;
 
 use anstream::println;
-use rpl_interface::{DefaultCallbacks, RplCallbacks, RustcCallbacks};
+use rpl_interface::{DefaultCallbacks, RPL_PATS_ENV, RplCallbacks, RustcCallbacks};
 use rustc_session::EarlyDiagCtxt;
 use rustc_session::config::ErrorOutputType;
 
@@ -221,7 +221,7 @@ pub fn main() {
         let mut args: Vec<String> = orig_args.clone();
         pass_sysroot_env_if_given(&mut args, sys_root_env);
 
-        let rpl_pats_var = env::var("RPL_PATS");
+        let rpl_pats_var = env::var(RPL_PATS_ENV);
         let pattern_paths = match &rpl_pats_var {
             Ok(val) => Some(val.split(':').map(ToString::to_string).collect()),
             Err(env::VarError::NotPresent) => None,
