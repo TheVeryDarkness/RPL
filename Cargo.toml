@@ -77,7 +77,6 @@ log = "0.4"
 winapi = "0.2.8"
 # cassandra-cpp-sys = "1.1.1"
 mach = { version = "0.2", default-features = false }
-winapi = "0.3.0"
 
 [package]
 name = "rpl"
