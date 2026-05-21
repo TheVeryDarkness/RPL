@@ -762,7 +762,9 @@ impl<'pcx> TerminatorKind<'pcx> {
             TerminatorKind::Goto(target)
             | TerminatorKind::Call { target, .. }
             | TerminatorKind::Drop { target, .. } => Box::new(std::iter::once(*target)),
-            TerminatorKind::Return | TerminatorKind::PatEnd => Box::new(std::iter::empty()),
+            TerminatorKind::Return | TerminatorKind::Unreachable | TerminatorKind::PatEnd => {
+                Box::new(std::iter::empty())
+            },
         }
     }
     pub fn successors(&self) -> impl Iterator<Item = BasicBlock> + '_ {
