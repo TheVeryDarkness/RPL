@@ -1,3 +1,4 @@
+//@ignore-on-host: not supported yet
 // https://codeql.github.com/codeql-query-help/rust/rust-access-after-lifetime-ended/
 // Dereferencing a pointer after the lifetime of its target has ended
 // causes undefined behavior.

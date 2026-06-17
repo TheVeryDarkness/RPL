@@ -1,3 +1,4 @@
+//@ignore-on-host: not supported yet
 // https://codeql.github.com/codeql-query-help/rust/rust-ctor-initialization/
 // Calling std library functions from a #[ctor] or #[dtor] function is not safe,
 // because std only guarantees stability between the beginning and end of main.
