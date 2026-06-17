@@ -154,7 +154,15 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
                 self.match_intrinsic(intrinsic_pat, intrinsic)
             },
             (
-                pat::StatementKind::Assign(..) | pat::StatementKind::Intrinsic(..),
+                pat::StatementKind::Move(place_pat),
+                mir::StatementKind::Assign(box (
+                    _,
+                    mir::Rvalue::Use(mir::Operand::Move(place)) | mir::Rvalue::Repeat(mir::Operand::Move(place), _),
+                )),
+                // FIXME: there may be other cases of `Take`.
+            ) => self.match_place(*place_pat, *place),
+            (
+                pat::StatementKind::Assign(..) | pat::StatementKind::Intrinsic(..) | pat::StatementKind::Move(..),
                 mir::StatementKind::Assign(..)
                 | mir::StatementKind::FakeRead(..)
                 | mir::StatementKind::SetDiscriminant { .. }

@@ -4,7 +4,7 @@ use std::ops::Index;
 
 use either::Either;
 use rpl_meta::symbol_table::{LocalSpecial, WithPath};
-use rpl_parser::generics::{Choice5, Choice6, Choice8, Choice12};
+use rpl_parser::generics::{Choice5, Choice6, Choice9, Choice12};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_hir::Target;
@@ -428,6 +428,10 @@ pub enum StatementKind<'pcx> {
     Assign(Place<'pcx>, Rvalue<'pcx>),
     /// Refer to [`mir::StatementKind::Intrinsic`] for more details.
     Intrinsic(NonDivergingIntrinsic<'pcx>),
+    /// Take the ownership of the place, such as moving or dropping a place.
+    ///
+    /// An abstract statement.
+    Move(Place<'pcx>),
 }
 
 pub enum RawDecleration<'pcx> {
@@ -477,6 +481,7 @@ pub enum RawStatement<'pcx> {
     CopyNonOverlapping(Option<Label>, Operand<'pcx>, Operand<'pcx>, Operand<'pcx>),
     Unreachable(Option<Label>),
     Drop(Option<Label>, Place<'pcx>),
+    Move(Option<Label>, Place<'pcx>),
     Break,
     Continue,
     Return,
@@ -497,20 +502,21 @@ impl<'pcx> RawStatement<'pcx> {
     ) -> Self {
         let p = stmt.path;
         match stmt.inner.deref() {
-            Choice8::_0(call_ignore_ret) => {
+            Choice9::_0(call_ignore_ret) => {
                 Self::from_call_ignore_ret(with_path(p, call_ignore_ret.get_matched().0), pcx, sym_tab)
             },
-            Choice8::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
-            Choice8::_2(unreachable_) => {
+            Choice9::_1(drop_) => Self::from_drop(WithPath::new(p, drop_.get_matched().0), pcx, sym_tab),
+            Choice9::_2(unreachable_) => {
                 Self::from_unreachable(WithPath::new(p, unreachable_.get_matched().0), pcx, sym_tab)
             },
-            Choice8::_3(control) => Self::from_control(control.get_matched().0),
-            Choice8::_4(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
-            Choice8::_5(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
-            Choice8::_6(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
-            Choice8::_7(copy_non_overlapping) => {
+            Choice9::_3(control) => Self::from_control(control.get_matched().0),
+            Choice9::_4(assign) => Self::from_assign(WithPath::new(p, assign.get_matched().0), pcx, sym_tab),
+            Choice9::_5(loop_) => Self::from_loop(WithPath::new(p, loop_), pcx, sym_tab),
+            Choice9::_6(switch_int) => Self::from_switch_int(WithPath::new(p, switch_int), pcx, sym_tab),
+            Choice9::_7(copy_non_overlapping) => {
                 Self::from_copy_non_overlapping(WithPath::new(p, copy_non_overlapping.get_matched().0), pcx, sym_tab)
             },
+            Choice9::_8(macro_) => Self::from_macro(WithPath::new(p, macro_.get_matched().0), pcx, sym_tab),
         }
     }
 
@@ -571,6 +577,21 @@ impl<'pcx> RawStatement<'pcx> {
         let (label, _, _, place, _) = drop_.get_matched();
         let place = Place::from(WithPath::new(drop_.path, place), pcx, sym_tab);
         Self::Drop(
+            label
+                .as_ref()
+                .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
+            place,
+        )
+    }
+
+    pub fn from_macro(
+        move_: WithPath<'pcx, &pairs::MirMacro<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &FnSymbolTable<'pcx>,
+    ) -> Self {
+        let (label, _, _, _, place, _) = move_.get_matched();
+        let place = Place::from(WithPath::new(move_.path, place), pcx, sym_tab);
+        Self::Move(
             label
                 .as_ref()
                 .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
@@ -1331,6 +1352,7 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                 })),
             ),
             RawStatement::Drop(label, place) => self.mk_drop(label, place),
+            RawStatement::Move(label, place) => self.mk_move(label, place),
             RawStatement::Unreachable(label) => self.mk_unreachable(label),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),
@@ -1430,6 +1452,10 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
         }
 
         loc
+    }
+    pub fn mk_move(&mut self, label: Option<Label>, place: impl Into<Place<'pcx>>) -> Location {
+        let place = place.into();
+        self.mk_assign(label, StatementKind::Move(place))
     }
     fn mk_unreachable(&mut self, label: Option<Label>) -> Location {
         let loc = self.set_terminator(TerminatorKind::Unreachable);

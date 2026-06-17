@@ -201,9 +201,9 @@ pub trait PatternVisitor<'pcx>: Sized {
         }
     }
     fn super_statement(&mut self, statement: &StatementKind<'pcx>, location: Location) {
-        let store = PlaceContext::MutatingUse(MutatingUseContext::Store);
         match *statement {
             StatementKind::Assign(place, ref rvalue) => {
+                let store = PlaceContext::MutatingUse(MutatingUseContext::Store);
                 self.visit_place(place, store, location);
                 self.visit_rvalue(rvalue, location);
             },
@@ -215,6 +215,10 @@ pub trait PatternVisitor<'pcx>: Sized {
                 self.visit_operand(src, location);
                 self.visit_operand(dst, location);
                 self.visit_operand(count, location);
+            },
+            StatementKind::Move(place) => {
+                let store = PlaceContext::MutatingUse(MutatingUseContext::Drop);
+                self.visit_place(place, store, location);
             },
         }
     }
