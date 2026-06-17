@@ -1,0 +1,25 @@
+pattern access-invalid-pointer
+
+patt {
+    #[deduplicate]
+    #[diag = "access_invalid_pointer"]
+    deref_after_drop[$T: type] = unsafe? fn _(..) {
+        let $ptr: *mut $T;
+        'drop:
+        _ = std::ptr::drop_in_place::<$T>(copy $ptr);
+        'deref:
+        _ = &(*$ptr);
+    }
+}
+
+diag {
+    access_invalid_pointer = {
+        primary(deref) = "dereferencing a pointer after it has been invalidated",
+        label(drop)  = "pointer invalidated by `drop_in_place` here",
+        label(deref) = "dangling pointer dereferenced here",
+        note = "calling `drop_in_place` executes the destructor and invalidates the pointer",
+        help = "rearrange code so that the pointer is dereferenced before calling `drop_in_place`",
+        name = "access_invalid_pointer",
+        level = "deny",
+    }
+}

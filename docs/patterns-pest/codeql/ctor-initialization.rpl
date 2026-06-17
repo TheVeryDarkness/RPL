@@ -1,0 +1,57 @@
+pattern ctor-initialization
+
+patt {
+    use std::fmt::Arguments;
+    use std::io::Stdout;
+    use std::io::Stderr;
+
+    #[deduplicate]
+    #[diag = "ctor_initialization_print"]
+    ctor_println = fn _(..) {
+        'call:
+        let $ret: _ = std::io::_print(_);
+    }
+
+    #[deduplicate]
+    #[diag = "ctor_initialization_stdout"]
+    ctor_stdout = fn _(..) {
+        'call:
+        let $handle: Stdout = std::io::stdout();
+    }
+
+    #[deduplicate]
+    #[diag = "ctor_initialization_stderr"]
+    ctor_stderr = fn _(..) {
+        'call:
+        let $handle: Stderr = std::io::stderr();
+    }
+}
+
+diag {
+    ctor_initialization_print = {
+        primary(call) = "calling `std::io::_print` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc_print::libc_println!`",
+        name = "ctor_initialization",
+        level = "deny",
+    }
+
+    ctor_initialization_stdout = {
+        primary(call) = "calling `std::io::stdout` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc::STDOUT_FILENO`",
+        name = "ctor_initialization",
+        level = "deny",
+    }
+
+    ctor_initialization_stderr = {
+        primary(call) = "calling `std::io::stderr` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc::STDERR_FILENO`",
+        name = "ctor_initialization",
+        level = "deny",
+    }
+}

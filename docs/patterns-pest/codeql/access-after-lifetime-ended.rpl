@@ -1,0 +1,29 @@
+pattern access-after-lifetime-ended
+
+patt {
+    #[deduplicate]
+    #[diag = "access_after_lifetime_ended"]
+    const_ptr[$T: type] = fn _(..) -> *const $T {
+        let $val: $T = _;
+        'dangling:
+        _ = &raw const $val;
+    }
+    #[deduplicate]
+    #[diag = "access_after_lifetime_ended"]
+    mut_ptr[$T: type] = fn _(..) -> *mut $T {
+        let $val: $T = _;
+        'dangling:
+        _ = &raw mut $val;
+    }
+}
+
+diag {
+    access_after_lifetime_ended = {
+        primary(dangling) = "returning a pointer to a local variable whose lifetime is about to end",
+        label(dangling) = "pointer to local variable created here",
+        note = "the local variable will be dropped when the function returns, making the pointer dangling",
+        help = "consider using `Box::new()` to allocate on the heap instead",
+        name = "access_after_lifetime_ended",
+        level = "deny",
+    }
+}
