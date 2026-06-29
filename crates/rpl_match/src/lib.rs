@@ -40,6 +40,7 @@ pub mod mir; // FIXME: visibility
 mod place;
 pub mod predicate_evaluator;
 pub mod resolve;
+pub mod session;
 mod statement;
 mod ty;
 
@@ -47,4 +48,8 @@ pub use adt::{AdtMatch, Candidates, MatchAdtCtxt};
 pub use counted::CountedMatch;
 pub use fns::MatchFnCtxt;
 pub use place::MatchPlaceCtxt;
+pub use session::{
+    BindingSnapshot, CrateItemIndex, FnSlotCandidate, MatchCollectCtxt, MatchSession, MetaBindings,
+    MultiMatched, OwnedLintMatch, SessionConfig, SessionLintTarget, SessionResult,
+};
 pub use ty::{MatchTyCtxt, TryCmpAs};

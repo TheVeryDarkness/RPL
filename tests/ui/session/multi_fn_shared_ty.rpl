@@ -1,0 +1,27 @@
+pattern multi-fn-shared-ty
+
+patt {
+    p[$T: type, $U: type] = {
+        struct $Pair {
+            $first: $T,
+            $second: $U,
+        }
+
+        fn $f1(..) {
+            let $p: $Pair = _;
+        }
+
+        fn $f2(..) {
+            let $q: $Pair = _;
+        }
+    }
+}
+
+diag {
+    p = {
+        primary(f1) = "multi-function pattern with shared type variables matched",
+        label(f1)   = "first function",
+        label(f2)   = "second function",
+        name        = "multi_fn_shared_ty",
+    }
+}

@@ -25,7 +25,7 @@ use crate::ty::MatchTy as _;
 pub mod artifact;
 mod color;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Matched<'tcx> {
     pub basic_blocks: IndexVec<pat::BasicBlock, MatchedBlock>,
     pub locals: IndexVec<pat::Local, mir::Local>,
@@ -105,7 +105,7 @@ impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchedBlock {
     pub statements: Vec<StatementMatch>,
     pub start: Option<mir::BasicBlock>,

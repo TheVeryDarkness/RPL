@@ -157,6 +157,7 @@ impl<'pcx> RustItems<'pcx> {
         let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, constraints);
         let fn_pat = self.pcx.alloc_fn(fn_pat);
         let fn_name = fn_pat.name;
+        self.fns.all_fns.push(fn_pat);
         match fn_name.as_str() {
             "_" => {
                 // unnamed function, add it to the unnamed_fns

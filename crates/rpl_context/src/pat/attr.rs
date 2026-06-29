@@ -75,6 +75,10 @@ impl<'i> PatAttr<'i> {
         }
     }
 
+    pub fn should_deduplicate(&self) -> bool {
+        self.deduplicate
+    }
+
     pub fn post_process<M: Eq + Hash + Debug>(&self, iter: impl Iterator<Item = M>) -> impl Iterator<Item = M> {
         match self.deduplicate {
             true => {

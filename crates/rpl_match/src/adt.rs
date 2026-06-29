@@ -3,6 +3,7 @@ use rpl_context::PatCtxt;
 use rpl_context::pat::{self};
 use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::FxIndexMap;
+use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexSlice, IndexVec};
 use rustc_middle::ty::{self, TyCtxt};
@@ -28,29 +29,51 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         Self { ty, adt_pat }
     }
 
+    /// Resolved type metavar bindings after [`Self::match_adt`].
+    pub fn resolved_ty_bindings(&self) -> IndexVec<pat::TyVarIdx, ty::Ty<'tcx>> {
+        IndexVec::from_fn_n(
+            |i| {
+                let set = self.ty.ty_vars[i].borrow();
+                set.iter()
+                    .copied()
+                    .next()
+                    .unwrap_or_else(|| self.ty.tcx.types.never)
+            },
+            self.ty.ty_vars.len(),
+        )
+    }
+
     #[instrument(level = "trace", skip(self))]
     pub fn match_adt(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
         match (&self.adt_pat.kind, adt.adt_kind()) {
-            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => Some(AdtMatch::new_struct(
-                adt,
-                self.match_fields(&variant_pat.fields, &adt.non_enum_variant().fields)?,
-            )),
-            (pat::AdtKind::Enum(_variants_pat), ty::AdtKind::Enum) => todo!(),
-            /* {
-
-                let mut candidates = VariantCandidates::new(variants_pat.len(), adt.variants());
+            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => {
+                let fields = self.build_field_candidates(&variant_pat.fields, &adt.non_enum_variant().fields)?;
+                self.match_field_candidates(&fields, &variant_pat.fields, 0)
+                    .then(|| AdtMatch::new_struct(adt, fields))
+            },
+            (pat::AdtKind::Enum(variants_pat), ty::AdtKind::Enum) => {
                 for (variant_name, variant_pat) in variants_pat.iter() {
-                    for (variant_idx, variant) in candidates.variants.iter_enumerated() {
-                        if let Some(matched) = self.match_variant(variant_pat, variant, variant_idx) {
-                            candidates[index].candidates.push(matched);
+                    let Some(variant_idx) = adt
+                        .variants()
+                        .iter_enumerated()
+                        .find(|(_, v)| v.name == *variant_name)
+                        .map(|(i, _)| i)
+                    else {
+                        continue;
+                    };
+                    let variant = adt.variant(variant_idx);
+                    let fields = self.build_field_candidates(&variant_pat.fields, &variant.fields)?;
+                    if self.match_field_candidates(&fields, &variant_pat.fields, 0) {
+                        return Some(AdtMatch::new_enum(adt, variant_idx, fields));
+                    }
+                    for (name, m) in fields.candidates.matches.iter() {
+                        if let Some(idx) = m.get() {
+                            fields.candidates.unmatch(*name, idx);
                         }
                     }
                 }
-                candidates
-                    .iter()
-                    .all(|candidates| !candidates.candidates.is_empty())
-                    .then(|| AdtMatch::new_enum(adt, VariantCandidates::new(candidates, adt.variants())))
-            }, */
+                None
+            },
             (
                 pat::AdtKind::Struct(_) | pat::AdtKind::Enum(_),
                 ty::AdtKind::Struct | ty::AdtKind::Enum | ty::AdtKind::Union,
@@ -58,22 +81,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         }
     }
 
-    // fn match_variant(
-    //     &self,
-    //     variant_pat: &pat::Variant<'pcx>,
-    //     variant: &'tcx ty::VariantDef,
-    //     variant_idx: VariantIdx,
-    // ) -> Option<VariantMatch<'tcx>> {
-    //     self.match_fields(&variant_pat.fields, &variant.fields)
-    //         .map(|fields| VariantMatch {
-    //             variant_idx,
-    //             variant,
-    //             fields,
-    //         })
-    // }
-
-    #[instrument(level = "trace", skip(self), ret)]
-    fn match_fields(
+    fn build_field_candidates(
         &self,
         fields_pat: &FxIndexMap<Symbol, pat::Field<'pcx>>,
         fields: &'tcx IndexSlice<FieldIdx, ty::FieldDef>,
@@ -89,6 +97,28 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         candidates.candidates_not_empty().then_some(candidates)
     }
 
+    fn match_field_candidates(
+        &self,
+        candidates: &FieldCandidates<'tcx>,
+        fields_pat: &FxIndexMap<Symbol, pat::Field<'pcx>>,
+        field_idx: usize,
+    ) -> bool {
+        let field_names: Vec<_> = fields_pat.keys().copied().collect();
+        if field_idx == field_names.len() {
+            return true;
+        }
+        let field_name = field_names[field_idx];
+        for cand in candidates.candidates.candidates[&field_name].iter() {
+            if candidates.candidates.r#match(field_name, cand)
+                && ensure_sufficient_stack(|| self.match_field_candidates(candidates, fields_pat, field_idx + 1))
+            {
+                return true;
+            }
+            candidates.candidates.unmatch(field_name, cand);
+        }
+        false
+    }
+
     #[instrument(level = "trace", skip(self), ret)]
     fn match_field(&self, field_pat: &pat::Field<'pcx>, field: &'tcx ty::FieldDef) -> bool {
         let pat_ty = field_pat.ty;
@@ -97,16 +127,19 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     }
 }
 
-#[derive(Debug)]
-#[debug("{adt:?}")]
+#[derive(Debug, Clone)]
 pub struct AdtMatch<'tcx> {
     pub adt: ty::AdtDef<'tcx>,
     kind: AdtMatchKind<'tcx>,
 }
 
+#[derive(Debug, Clone)]
 enum AdtMatchKind<'tcx> {
     Struct(FieldCandidates<'tcx>),
-    // Enum(VariantCandidates<'tcx>),
+    Enum {
+        variant_idx: rustc_abi::VariantIdx,
+        fields: FieldCandidates<'tcx>,
+    },
 }
 
 impl<'tcx> AdtMatch<'tcx> {
@@ -116,31 +149,34 @@ impl<'tcx> AdtMatch<'tcx> {
             kind: AdtMatchKind::Struct(fields),
         }
     }
-    // pub fn new_enum(adt: ty::AdtDef<'tcx>, variants: VariantCandidates<'tcx>) -> Self {
-    //     Self {
-    //         adt,
-    //         kind: AdtMatchKind::Enum(variants),
-    //     }
-    // }
+    pub fn new_enum(
+        adt: ty::AdtDef<'tcx>,
+        variant_idx: rustc_abi::VariantIdx,
+        fields: FieldCandidates<'tcx>,
+    ) -> Self {
+        Self {
+            adt,
+            kind: AdtMatchKind::Enum { variant_idx, fields },
+        }
+    }
+    pub fn field_candidates(&self) -> &FieldCandidates<'tcx> {
+        match &self.kind {
+            AdtMatchKind::Struct(fields) | AdtMatchKind::Enum { fields, .. } => fields,
+        }
+    }
     pub fn expect_struct(&self) -> &FieldCandidates<'tcx> {
         match &self.kind {
             AdtMatchKind::Struct(variant_match) => variant_match,
-            // AdtMatchKind::Enum(_) => panic!("expected struct, got enum"),
+            AdtMatchKind::Enum { .. } => panic!("expected struct, got enum"),
         }
     }
-    // pub fn expect_enum(&self) -> &VariantCandidates<'tcx> {
-    //     match &self.kind {
-    //         AdtMatchKind::Enum(variants) => variants,
-    //         AdtMatchKind::Struct(_) => panic!("expected enum, got struct"),
-    //     }
-    // }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[debug("{candidates:?}")]
 pub struct Candidates<I: Idx> {
     pub candidates: FxIndexMap<Symbol, MixedBitSet<I>>,
-    matches: FxIndexMap<Symbol, CountedMatch<I>>,
+    pub matches: FxIndexMap<Symbol, CountedMatch<I>>,
     lookup: IndexVec<I, CountedMatch<Symbol>>,
 }
 
@@ -165,9 +201,6 @@ impl<I: Idx> Candidates<I> {
         false
     }
     pub fn unmatch(&self, name: Symbol, idx: I) {
-        debug_assert!(self.matches.contains_key(&name));
-        debug_assert!(self.matches[&name].get().is_some());
-        debug_assert!(self.matches[&name].get().is_some_and(|matched| matched == idx));
         if self.matches[&name].get().is_some_and(|matched| matched == idx) {
             self.matches[&name].unmatch();
         }
@@ -177,7 +210,7 @@ impl<I: Idx> Candidates<I> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[debug("{candidates:?}")]
 pub struct FieldCandidates<'tcx> {
     pub fields: &'tcx IndexSlice<FieldIdx, ty::FieldDef>,
