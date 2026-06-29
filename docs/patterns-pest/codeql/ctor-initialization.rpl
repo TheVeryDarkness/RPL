@@ -8,9 +8,9 @@ patt {
     #[diag = "ctor_initialization_print"]
     ctor_println = fn $f(..) {
         'call:
-        let $ret: _ = std::io::_print(_);
+        _ = std::io::_print(_);
     } where {
-        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
+        runs_outside_main($f)
     }
 
     #[diag = "ctor_initialization_stdout"]
@@ -18,7 +18,7 @@ patt {
         'call:
         let $handle: Stdout = std::io::stdout();
     } where {
-        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
+        runs_outside_main($f)
     }
 
     #[diag = "ctor_initialization_stderr"]
@@ -26,7 +26,7 @@ patt {
         'call:
         let $handle: Stderr = std::io::stderr();
     } where {
-        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
+        runs_outside_main($f)
     }
 }
 
