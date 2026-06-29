@@ -118,7 +118,23 @@ impl<'tcx> MetaBindings<'tcx> {
     }
 
     pub(crate) fn merge_ty_vars(&mut self, vars: &IndexVec<TyVarIdx, Ty<'tcx>>) -> bool {
-        merge_index_vec(&mut self.ty_vars, vars, |a, b| a == b)
+        for (idx, value) in vars.iter_enumerated() {
+            if Self::should_skip_ty_binding(*value) {
+                continue;
+            }
+            match &self.ty_vars[idx] {
+                None => self.ty_vars[idx] = Some(value.clone()),
+                Some(existing) if existing == value => {},
+                Some(_) => return false,
+            }
+        }
+        true
+    }
+
+    /// ADT definition matching may bind type metas to generic parameters; concrete
+    /// bindings come from monomorphized function slots instead.
+    fn should_skip_ty_binding(ty: Ty<'tcx>) -> bool {
+        matches!(ty.kind(), rustc_middle::ty::TyKind::Param(_) | rustc_middle::ty::TyKind::Never)
     }
 
     fn merge_const_vars(&mut self, vars: &IndexVec<ConstVarIdx, Const<'tcx>>) -> bool {

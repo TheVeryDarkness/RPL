@@ -38,6 +38,16 @@ impl<'tcx> Matched<'tcx> for MultiMatched<'_, 'tcx> {
         self.normalized.span(body, decl, name, source_map)
     }
 
+    fn try_span(
+        &self,
+        body: &Body<'tcx>,
+        decl: &FnDecl<'tcx>,
+        name: &str,
+        source_map: &SourceMap,
+    ) -> Option<Span> {
+        self.normalized.try_span(body, decl, name, source_map)
+    }
+
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         if let Some(ty) = self.bindings.ty_vars.get(idx).and_then(|t| *t) {
             return ty;

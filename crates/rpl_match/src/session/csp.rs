@@ -1,5 +1,4 @@
 use rpl_context::pat;
-use rustc_span::Symbol;
 
 use crate::session::bindings::MetaBindings;
 use crate::session::config::SessionConfig;

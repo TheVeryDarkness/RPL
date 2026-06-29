@@ -576,7 +576,11 @@ impl<'i> DynamicErrorBuilder<'i> {
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (formatter.format(label), matched.span(body, decl, span, source_map)))
+            .filter_map(|(label, span)| {
+                matched
+                    .try_span(body, decl, span, source_map)
+                    .map(|label_span| (formatter.format(label), label_span))
+            })
             .collect();
         let notes = self
             .notes

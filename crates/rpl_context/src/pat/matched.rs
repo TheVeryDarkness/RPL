@@ -18,9 +18,19 @@ use crate::pat::NonLocalMetaVars;
 
 pub trait Matched<'tcx>: fmt::Debug {
     fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span;
+    fn try_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Option<Span> {
+        Some(self.span(body, decl, name, source_map))
+    }
     fn multi_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, names: &[&str], source_map: &SourceMap) -> MultiSpan {
-        let spans = names.iter().map(|n| self.span(body, decl, n, source_map)).collect();
-        MultiSpan::from_spans(spans)
+        let spans: Vec<_> = names
+            .iter()
+            .filter_map(|n| self.try_span(body, decl, n, source_map))
+            .collect();
+        if spans.is_empty() {
+            MultiSpan::from_span(body.span)
+        } else {
+            MultiSpan::from_spans(spans)
+        }
     }
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;
     fn const_meta_var(&self, idx: ConstVarIdx) -> Const<'tcx>;

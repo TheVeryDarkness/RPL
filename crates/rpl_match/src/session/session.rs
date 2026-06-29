@@ -1,5 +1,4 @@
 use rpl_context::pat::{self, PatternItem};
-use rustc_span::Symbol;
 
 use crate::session::collect::MatchCollectCtxt;
 use crate::session::config::SessionConfig;

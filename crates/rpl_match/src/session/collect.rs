@@ -83,7 +83,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         let (mir_cfg, mir_ddg) = self.graphs(body);
         let self_ty = self.self_ty(item.def_id);
 
-        CheckMirCtxt::new(
+        let mir_matches = CheckMirCtxt::new(
             self.tcx,
             self.pcx,
             body,
@@ -95,10 +95,11 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
             &mir_cfg,
             &mir_ddg,
         )
-        .check()
-        .into_iter()
-        .filter(|matched| self.check_constraints(fn_pat, item.def_id, body, matched))
-        .map(|matched| {
+        .check();
+        mir_matches
+            .into_iter()
+            .filter(|matched| self.check_constraints(fn_pat, item.def_id, body, matched))
+            .map(|matched| {
             let labels = &fn_pat.expect_body().labels;
             let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
             let snapshot = BindingSnapshot::from_normalized(&normalized);
@@ -108,8 +109,8 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
                 matched,
                 snapshot,
             }
-        })
-        .collect()
+            })
+            .collect()
     }
 
     fn collect_sig_candidates(

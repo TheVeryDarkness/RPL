@@ -160,14 +160,18 @@ impl<'tcx> NormalizedMatched<'tcx> {
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
+    fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
+        self.try_span(body, decl, name, source_map).unwrap_or_else(|| {
+            panic!("label `{name}` not found in pattern labels: {labels:?}", labels = self.extra);
+        })
+    }
+
+    fn try_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Option<Span> {
         let labels = &self.extra;
-        let i = labels
+        labels
             .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
-            .unwrap_or_else(|_| {
-                panic!("label `{name}` not found in pattern labels: {labels:?}");
-            });
-        labels[i].1.span(body, decl, source_map)
+            .ok()
+            .map(|i| labels[i].1.span(body, decl, source_map))
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]
