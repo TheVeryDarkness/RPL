@@ -290,7 +290,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                     )
                     .check()
                     .into_iter()
-                    .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
+                    .filter(move |matched| self.check_constraints(name, fn_pat, def_id, body, matched))
                     .map(move |matched| {
                         let labels = &fn_pat.expect_body().labels;
                         (matched, labels, attr_map.clone())
@@ -406,7 +406,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
                 )
                 .check()
                 .into_iter()
-                .filter(move |matched| self.check_constraints(name, fn_pat, body, matched))
+                .filter(move |matched| self.check_constraints(name, fn_pat, def_id, body, matched))
                 .map(move |matched| {
                     let labels = &fn_pat.expect_body().labels;
                     (matched, labels, attr_map.clone())
@@ -493,6 +493,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         &self,
         name: Symbol,
         fn_pat: &pat::FnPattern<'pcx>,
+        def_id: LocalDefId,
         body: &mir::Body<'tcx>,
         matched: &Matched<'tcx>,
     ) -> bool {
@@ -504,6 +505,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         let evaluator = PredicateEvaluator::new(
             self.tcx,
             typing_env,
+            def_id.into(),
             body,
             &fn_pat.expect_body().labels,
             matched,
@@ -572,12 +574,14 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         let error = pattern
                             .get_diag(name, source_map, None, body, decl, &matched)
                             .unwrap_or_else(identity);
+                        trace!(?name, "before emit_node_span_lint");
                         self.tcx.emit_node_span_lint(
                             error.lint(),
                             self.tcx.local_def_id_to_hir_id(def_id),
                             error.primary_span().clone(),
                             error,
                         );
+                        trace!(?name, "after emit_node_span_lint");
                     }
                 }
             });
@@ -608,12 +612,14 @@ impl<'tcx> CheckFnCtxt<'_, 'tcx> {
                         let error = pattern
                             .get_diag(name, source_map, fn_name, body, decl, &matched)
                             .unwrap_or_else(identity);
+                        trace!(?name, ?fn_name, "before emit_node_span_lint");
                         self.tcx.emit_node_span_lint(
                             error.lint(),
                             self.tcx.local_def_id_to_hir_id(def_id),
                             error.primary_span().clone(),
                             error,
                         );
+                        trace!(?name, ?fn_name, "after emit_node_span_lint");
                     }
                 }
             });

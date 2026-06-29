@@ -5,25 +5,28 @@ patt {
     use std::io::Stdout;
     use std::io::Stderr;
 
-    #[deduplicate]
     #[diag = "ctor_initialization_print"]
-    ctor_println = fn _(..) {
+    ctor_println = fn $f(..) {
         'call:
         let $ret: _ = std::io::_print(_);
+    } where {
+        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
     }
 
-    #[deduplicate]
     #[diag = "ctor_initialization_stdout"]
-    ctor_stdout = fn _(..) {
+    ctor_stdout = fn $f(..) {
         'call:
         let $handle: Stdout = std::io::stdout();
+    } where {
+        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
     }
 
-    #[deduplicate]
     #[diag = "ctor_initialization_stderr"]
-    ctor_stderr = fn _(..) {
+    ctor_stderr = fn $f(..) {
         'call:
         let $handle: Stderr = std::io::stderr();
+    } where {
+        (has_attr($f, ctor::ctor) || has_attr($f, ctor::dtor))
     }
 }
 
@@ -33,7 +36,7 @@ diag {
         label(call) = "std library function called here",
         note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
         help = "use a non-std alternative such as `libc_print::libc_println!`",
-        name = "ctor_initialization",
+        name = "ctor_initialization_print",
         level = "deny",
     }
 
@@ -42,7 +45,7 @@ diag {
         label(call) = "std library function called here",
         note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
         help = "use a non-std alternative such as `libc::STDOUT_FILENO`",
-        name = "ctor_initialization",
+        name = "ctor_initialization_stdout",
         level = "deny",
     }
 
@@ -51,7 +54,7 @@ diag {
         label(call) = "std library function called here",
         note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
         help = "use a non-std alternative such as `libc::STDERR_FILENO`",
-        name = "ctor_initialization",
+        name = "ctor_initialization_stderr",
         level = "deny",
     }
 }

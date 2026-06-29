@@ -1,4 +1,3 @@
-//@ignore-on-host: not supported yet
 // https://codeql.github.com/codeql-query-help/rust/rust-access-invalid-pointer/
 // Dereferencing an invalid or dangling pointer may cause undefined behavior.
 //@compile-flags: -Z inline-mir=false

@@ -8,6 +8,7 @@ use rustc_span::Symbol;
 // Attention:
 // When you add a new module here,
 // Try to keep all predicate signatures consistent in it.
+mod item_attr;
 mod locals;
 mod multiple_consts;
 mod multiple_tys;
@@ -28,6 +29,8 @@ use thiserror::Error;
 pub use translate::*;
 pub use trivial::*;
 pub use ty_const::*;
+
+use crate::predicates::item_attr::{ItemAttrPredsFnPtr, has_attr};
 
 #[derive(Clone, Debug, Display, Error)]
 pub enum PredicateError<'i> {
@@ -94,6 +97,7 @@ pub enum PredicateKind {
     MultipleConsts(MultipleConstsPredsFnPtr),
     SingleLocal(SingleLocalPredsFnPtr),
     MultipleLocals(MultipleLocalsPredsFnPtr),
+    ItemAttr(ItemAttrPredsFnPtr),
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -128,6 +132,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "usize_lt" => Self::MultipleConsts(usize_lt),
             "product_of" => Self::MultipleLocals(product_of),
             "is_null" => Self::SingleLocal(is_null),
+            "has_attr" => Self::ItemAttr(has_attr),
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

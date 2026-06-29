@@ -376,6 +376,7 @@ impl<'pcx> Pattern<'pcx> {
         }
     }
 
+    #[instrument(level = "debug", skip(self, source_map, body, decl))]
     pub fn get_diag<'tcx>(
         &self,
         pat_name: Symbol,

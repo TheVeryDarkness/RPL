@@ -10,15 +10,16 @@ use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, PlaceRef};
 use rustc_middle::ty::Ty;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use super::non_local_meta_vars::{ConstVarIdx, PlaceVarIdx, TyVarIdx};
 use crate::pat::NonLocalMetaVars;
 
 pub trait Matched<'tcx>: fmt::Debug {
-    fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span;
-    fn multi_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &[&str]) -> MultiSpan {
-        let spans = name.iter().map(|n| self.span(body, decl, n)).collect();
+    fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span;
+    fn multi_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, names: &[&str], source_map: &SourceMap) -> MultiSpan {
+        let spans = names.iter().map(|n| self.span(body, decl, n, source_map)).collect();
         MultiSpan::from_spans(spans)
     }
     fn type_meta_var(&self, idx: TyVarIdx) -> Ty<'tcx>;

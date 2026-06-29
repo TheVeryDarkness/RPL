@@ -44,6 +44,10 @@ pub fn patterns() -> Vec<(&'static str, &'static str)> {
         "clippy/unsound-collection-transmute.rpl",
         "clippy/wrong-transmute.rpl",
         "clippy/zst-offset.rpl",
+        // CodeQL patterns
+        "codeql/access-after-lifetime-ended.rpl",
+        "codeql/access-invalid-pointer.rpl",
+        "codeql/ctor-initialization.rpl",
         // CVE patterns
         "cve/CVE-2018-20992.rpl",
         "cve/CVE-2018-21000.rpl",

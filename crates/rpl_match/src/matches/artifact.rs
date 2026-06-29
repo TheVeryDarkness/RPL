@@ -4,6 +4,7 @@ use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Local, PlaceRef};
 use rustc_middle::ty::Ty;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use super::{Const, Matched, StatementMatch, pat};
@@ -21,9 +22,9 @@ pub enum NormalizedSpanned {
 }
 
 impl NormalizedSpanned {
-    pub fn span(self, body: &Body<'_>, decl: &FnDecl<'_>) -> Span {
+    pub fn span(self, body: &Body<'_>, decl: &FnDecl<'_>, source_map: &SourceMap) -> Span {
         match self {
-            Self::Location(location) => location.span_no_inline(body),
+            Self::Location(location) => location.span_no_inline(body, source_map),
             Self::Local(local) => body.local_decls[local].source_info.span,
             // Special case for the function name, which is not a label.
             Self::Body => body.span,
@@ -159,14 +160,14 @@ impl<'tcx> NormalizedMatched<'tcx> {
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+    fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
         let labels = &self.extra;
         let i = labels
             .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
             .unwrap_or_else(|_| {
                 panic!("label `{name}` not found in pattern labels: {labels:?}");
             });
-        labels[i].1.span(body, decl)
+        labels[i].1.span(body, decl, source_map)
     }
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]

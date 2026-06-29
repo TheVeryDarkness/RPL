@@ -4,6 +4,7 @@ use rpl_constraints::predicates::{
 use rpl_constraints::{Const, Constraints};
 use rpl_context::pat::{self, ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
 use rpl_meta::symbol_table::MetaVariable;
+use rustc_hir::def_id::DefId;
 use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::{self, Ty, TyCtxt};
 use rustc_span::Symbol;
@@ -14,6 +15,7 @@ use crate::matches::{Matched, StatementMatch};
 #[allow(unused)]
 #[derive(Clone, Debug)]
 enum PredicateArgInstance<'tcx> {
+    Item(DefId),             // mapped from [PredicateArg::Item]
     Location(mir::Location), // mapped from [PredicateArg::Label]
     Local(mir::Local),       // mapped from [PredicateArg::Local]
     Ty(Ty<'tcx>),            // mapped from [PredicateArg::MetaVar]
@@ -26,6 +28,7 @@ pub struct PredicateEvaluator<'e, 'm, 'tcx> {
     // 'e means eval, 'm means meta
     tcx: TyCtxt<'tcx>,
     typing_env: ty::TypingEnv<'tcx>,
+    item: DefId,
     body: &'e mir::Body<'tcx>,
     label_map: &'e LabelMap,
     matched: &'e Matched<'tcx>,
@@ -37,6 +40,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
     pub fn new(
         tcx: TyCtxt<'tcx>,
         typing_env: ty::TypingEnv<'tcx>,
+        item: DefId,
         body: &'e mir::Body<'tcx>,
         label_map: &'e LabelMap,
         matched: &'e Matched<'tcx>,
@@ -46,6 +50,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         Self {
             tcx,
             typing_env,
+            item,
             body,
             label_map,
             matched,
@@ -175,6 +180,21 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     _ => panic!("PredicateArgInstance::Local expected, got {:?}", arg_instance[0]),
                 }
             },
+            PredicateKind::ItemAttr(p) => {
+                assert!(
+                    arg_instance.len() == 2,
+                    "PredicateKind::ItemAttr should have exactly two argument"
+                );
+                match (&arg_instance[0], &arg_instance[1]) {
+                    (PredicateArgInstance::Item(item), PredicateArgInstance::Path(symbol)) => {
+                        p(self.tcx, *item, symbol)
+                    },
+                    _ => panic!(
+                        "PredicateArgInstance::Item and PredicateArgInstance::Symbol expected, got {:?} and {:?}",
+                        &arg_instance[0], &arg_instance[1]
+                    ),
+                }
+            },
         };
         if term.is_neg { !result } else { result }
     }
@@ -223,6 +243,10 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     let local = pat::Local::from_usize(idx);
                     let local = self.matched[local];
                     Ok(PredicateArgInstance::Local(local))
+                } else if let Some(idx) = self.symbol_table.inner.get_fn_name()
+                    && idx == name.as_str()
+                {
+                    Ok(PredicateArgInstance::Item(self.item))
                 } else {
                     Err(format!(
                         "meta_var `{}` not found in {:?}",

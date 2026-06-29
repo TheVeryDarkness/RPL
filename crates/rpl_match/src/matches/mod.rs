@@ -14,6 +14,7 @@ use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::PlaceContext;
 use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::Ty;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use crate::CountedMatch;
@@ -61,9 +62,15 @@ impl Matched<'_> {
         }
     }
 
-    fn span_spanned<'tcx>(&self, spanned: Spanned, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>) -> Span {
+    fn span_spanned<'tcx>(
+        &self,
+        spanned: Spanned,
+        body: &mir::Body<'tcx>,
+        decl: &FnDecl<'tcx>,
+        source_map: &SourceMap,
+    ) -> Span {
         match spanned {
-            Spanned::Location(location) => self[location].span_no_inline(body),
+            Spanned::Location(location) => self[location].span_no_inline(body, source_map),
             Spanned::Local(local) => body.local_decls[self[local]].source_info.span,
             // Special case for the function name, which is not a label.
             Spanned::Body => body.span,
@@ -76,12 +83,12 @@ impl Matched<'_> {
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
-    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
         let MatchedWithLabelMap(labels, matched, attr) = self;
         let name = Symbol::intern(name);
         labels
             .get(&name)
-            .map(|spanned| matched.span_spanned(*spanned, body, decl))
+            .map(|spanned| matched.span_spanned(*spanned, body, decl, source_map))
             .or_else(|| attr.get(&name).map(|attr| attr.span))
             .unwrap_or_else(|| {
                 panic!("label `{name}` not found in:\n    pattern labels: {labels:?}\n    attributes: {attr:?}");
@@ -338,16 +345,27 @@ impl StatementMatch {
         self.source_info(body).span
     }
 
-    pub fn span_no_inline(self, body: &mir::Body<'_>) -> Span {
+    pub fn span_no_inline(self, body: &mir::Body<'_>, source_map: &SourceMap) -> Span {
         let source_info = self.source_info(body);
         let mut scope = source_info.scope;
+
         while let Some(parent_scope) = body.source_scopes[scope].inlined_parent_scope {
             scope = parent_scope;
         }
-        if let Some((_instance, span)) = body.source_scopes[scope].inlined {
-            return span;
+        let mut span = if let Some((_, span)) = body.source_scopes[scope].inlined {
+            span
+        } else {
+            source_info.span
+        };
+
+        if span.in_external_macro(source_map) {
+            span = span.source_callsite();
+            if let Some(inner) = span.find_ancestor_inside(body.span) {
+                span = inner;
+            }
         }
-        source_info.span
+
+        span
     }
 
     pub fn is_arg(self, body: &mir::Body<'_>) -> bool {

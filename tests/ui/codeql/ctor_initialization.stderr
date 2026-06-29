@@ -1,0 +1,12 @@
+error: calling `std::io::stdout` in a `#[ctor]`/`#[dtor]` context is unsafe
+  --> tests/ui/codeql/ctor_initialization.rs:19:22
+   |
+LL |     let mut handle = std::io::stdout();
+   |                      ^^^^^^^^^^^^^^^^^ std library function called here
+   |
+   = help: use a non-std alternative such as `libc::STDOUT_FILENO`
+   = note: `std` library functions are not guaranteed to be stable before `main` starts or after it ends
+   = note: `#[deny(rpl::ctor_initialization)]` on by default
+
+error: aborting due to 1 previous error
+
