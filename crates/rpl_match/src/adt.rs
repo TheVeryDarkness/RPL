@@ -46,11 +46,9 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     #[instrument(level = "trace", skip(self))]
     pub fn match_adt(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
         match (&self.adt_pat.kind, adt.adt_kind()) {
-            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => {
-                let fields = self.build_field_candidates(&variant_pat.fields, &adt.non_enum_variant().fields)?;
-                self.match_field_candidates(&fields, &variant_pat.fields, 0)
-                    .then(|| AdtMatch::new_struct(adt, fields))
-            },
+            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => self
+                .build_field_candidates(&variant_pat.fields, &adt.non_enum_variant().fields)
+                .map(|fields| AdtMatch::new_struct(adt, fields)),
             (pat::AdtKind::Enum(variants_pat), ty::AdtKind::Enum) => {
                 for (variant_name, variant_pat) in variants_pat.iter() {
                     let Some(variant_idx) = adt
@@ -79,6 +77,14 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
                 ty::AdtKind::Struct | ty::AdtKind::Enum | ty::AdtKind::Union,
             ) => None,
         }
+    }
+
+    pub fn commit_field_assignments(
+        &self,
+        adt_match: &AdtMatch<'tcx>,
+        fields_pat: &FxIndexMap<Symbol, pat::Field<'pcx>>,
+    ) -> bool {
+        self.match_field_candidates(adt_match.field_candidates(), fields_pat, 0)
     }
 
     fn build_field_candidates(

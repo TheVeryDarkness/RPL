@@ -1,11 +1,51 @@
 use rpl_context::pat::{self, PatternItem};
+use rustc_hir::def_id::LocalDefId;
 
 use crate::session::collect::MatchCollectCtxt;
 use crate::session::config::SessionConfig;
 use crate::session::csp::CspSolver;
 use crate::session::slot::{
-    collect_slot_descs, CrateItemIndex, FnSlotCandidate, SessionResult, SlotCandidate,
+    collect_slot_descs, AdtSlotDesc, CrateItemIndex, FnMatchContext, FnSlotCandidate, FnSlotDesc,
+    MatchSlot, SessionResult, SlotAssignment, SlotCandidate,
 };
+
+/// How slots inside one [`pat::RustItems`] block relate to each other.
+///
+/// This is distinct from OR across separate `patt { ... }` entries (e.g. the five
+/// `uninit-vec` variants), which the driver matches independently and may all fire on
+/// the same MIR site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RustItemsMatchingMode {
+    /// Single `fn _` slot: each function in the crate is tried independently.
+    IndependentWildcardFn,
+    /// One ADT slot plus one named fn: the ADT is MIR context only; each fn is tried
+    /// independently (e.g. CVE-35892 offset patterns).
+    StructContextSingleFn,
+    /// Multiple fn slots with no ADT: OR alternatives that may overlap on the same site.
+    AlternativeFns,
+    /// ADT and multiple fn slots (or other cross-slot metavar sharing): all slots must
+    /// match together via CSP (e.g. `multi_fn_shared_ty` `$Pair` + `$f1` + `$f2`).
+    ConcurrentSlots,
+}
+
+fn classify_rust_items_matching_mode(
+    fn_slots: &[FnSlotDesc<'_>],
+    adt_slots: &[AdtSlotDesc<'_>],
+) -> RustItemsMatchingMode {
+    if adt_slots.is_empty() {
+        if fn_slots.len() == 1 && fn_slots[0].optional {
+            RustItemsMatchingMode::IndependentWildcardFn
+        } else if fn_slots.len() > 1 {
+            RustItemsMatchingMode::AlternativeFns
+        } else {
+            RustItemsMatchingMode::ConcurrentSlots
+        }
+    } else if fn_slots.len() == 1 && !fn_slots[0].optional {
+        RustItemsMatchingMode::StructContextSingleFn
+    } else {
+        RustItemsMatchingMode::ConcurrentSlots
+    }
+}
 
 /// Orchestrates candidate collection and CSP solving for one pattern item.
 pub struct MatchSession<'a, 'pcx, 'tcx> {
@@ -57,33 +97,31 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             })
             .collect();
 
-        if adt_slots.is_empty()
-            && fn_slots.len() == 1
-            && fn_slots[0].optional
-            && fn_candidates.len() == 1
-        {
-            return self.enrich_and_postprocess(
-                index,
-                rust_items,
-                fn_candidates[0].iter().map(|c| SessionResult {
-                    assignments: vec![super::slot::SlotAssignment {
-                        slot: fn_slots[0].slot,
-                        candidate: SlotCandidate::Fn(c.clone()),
-                    }],
-                    bindings: {
-                        let mut b = super::bindings::MetaBindings::new(rust_items.meta.as_ref());
-                        b.merge_snapshot(&c.snapshot);
-                        b
-                    },
-                    primary_fn: Some(super::slot::FnMatchContext {
-                        def_id: c.def_id,
-                        fn_name: None,
-                        header: None,
-                        has_self: false,
-                        self_ty: None,
+        match classify_rust_items_matching_mode(&fn_slots, &adt_slots) {
+            RustItemsMatchingMode::IndependentWildcardFn
+            | RustItemsMatchingMode::StructContextSingleFn => {
+                return self.enrich_and_postprocess(
+                    index,
+                    rust_items,
+                    fn_candidates[0]
+                        .iter()
+                        .map(|c| self.session_result_from_fn(rust_items, fn_slots[0].slot, c)),
+                );
+            },
+            RustItemsMatchingMode::AlternativeFns => {
+                // OR within one RustItems block: each fn slot is tried independently and
+                // results are not mutually exclusive.
+                return self.enrich_and_postprocess(
+                    index,
+                    rust_items,
+                    fn_slots.iter().enumerate().flat_map(|(slot_idx, desc)| {
+                        fn_candidates[slot_idx]
+                            .iter()
+                            .map(|c| self.session_result_from_fn(rust_items, desc.slot, c))
                     }),
-                }),
-            );
+                );
+            },
+            RustItemsMatchingMode::ConcurrentSlots => {},
         }
 
         let solver = CspSolver::new(
@@ -95,8 +133,69 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             &adt_candidates,
         );
         let mut results = solver.solve();
+        results = Self::deduplicate_fn_slot_permutations(results);
         self.enrich_results(index, &mut results);
         Self::deduplicate_results(rust_items.attr.should_deduplicate(), results)
+    }
+
+    fn session_result_from_fn(
+        &self,
+        rust_items: &'pcx pat::RustItems<'pcx>,
+        slot: MatchSlot,
+        candidate: &FnSlotCandidate<'tcx>,
+    ) -> SessionResult<'tcx> {
+        SessionResult {
+            assignments: vec![SlotAssignment {
+                slot,
+                candidate: SlotCandidate::Fn(candidate.clone()),
+            }],
+            bindings: {
+                let mut bindings = super::bindings::MetaBindings::new(rust_items.meta.as_ref());
+                bindings.merge_snapshot(&candidate.snapshot);
+                bindings
+            },
+            primary_fn: Some(FnMatchContext {
+                def_id: candidate.def_id,
+                fn_name: None,
+                header: None,
+                has_self: false,
+                self_ty: None,
+            }),
+        }
+    }
+
+    fn deduplicate_fn_slot_permutations(results: Vec<SessionResult<'tcx>>) -> Vec<SessionResult<'tcx>> {
+        let (single_fn, multi_fn): (Vec<_>, Vec<_>) = results.into_iter().partition(|result| {
+            Self::fn_assignment_signature(result).len() <= 1
+        });
+
+        let mut kept_multi = Vec::new();
+        for result in multi_fn {
+            let signature = Self::fn_assignment_signature(&result);
+            if kept_multi
+                .iter()
+                .all(|existing| Self::fn_assignment_signature(existing) != signature)
+            {
+                kept_multi.push(result);
+            }
+        }
+
+        let mut kept = single_fn;
+        kept.extend(kept_multi);
+        kept
+    }
+
+    fn fn_assignment_signature(result: &SessionResult<'tcx>) -> Vec<LocalDefId> {
+        let mut defs: Vec<_> = result
+            .assignments
+            .iter()
+            .filter_map(|a| match &a.candidate {
+                SlotCandidate::Fn(c) => Some(c.def_id),
+                SlotCandidate::Adt(_) => None,
+            })
+            .collect();
+        defs.sort_by_key(|def_id| def_id.local_def_index);
+        defs
     }
 
     fn deduplicate_results(deduplicate: bool, results: Vec<SessionResult<'tcx>>) -> Vec<SessionResult<'tcx>> {
@@ -215,6 +314,7 @@ impl<'tcx> SessionResult<'tcx> {
     pub fn equivalent(&self, other: &Self) -> bool {
         self.bindings.equivalent_to(&other.bindings)
             && self.assignments.len() == other.assignments.len()
+            && self.primary_fn_slot() == other.primary_fn_slot()
             && match (self.primary_fn_candidate(), other.primary_fn_candidate()) {
                 (Some(a), Some(b)) => a.def_id == b.def_id && a.normalized == b.normalized,
                 (None, None) => true,

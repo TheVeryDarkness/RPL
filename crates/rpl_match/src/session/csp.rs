@@ -60,6 +60,10 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
 
         let desc = &self.adt_slots[idx];
         let slot_idx = self.adt_slot_index(desc.slot);
+        if self.adt_candidates[slot_idx].is_empty() {
+            self.solve_adt_slots(idx + 1, bindings, assignments, used_defs, results);
+            return;
+        }
         for candidate in &self.adt_candidates[slot_idx] {
             let mut trial = bindings.clone();
             if !trial.merge_adt_match(

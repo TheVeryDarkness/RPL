@@ -25,7 +25,7 @@ use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
 use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::session::{MatchCollectCtxt, MatchSession, SessionConfig};
-use rpl_match::{CrateItemIndex, MultiMatched, OwnedLintMatch};
+use rpl_match::{CrateItemIndex, MatchSlot, MultiMatched, OwnedLintMatch};
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -175,18 +175,20 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 
     fn dedupe_pending(pending: Vec<PendingLint<'pcx, 'tcx>>) -> Vec<PendingLint<'pcx, 'tcx>> {
-        let mut seen: Vec<(Symbol, LocalDefId, NormalizedMatched<'tcx>)> = Vec::new();
+        let mut seen: Vec<(Symbol, LocalDefId, MatchSlot, NormalizedMatched<'tcx>)> = Vec::new();
         pending
             .into_iter()
             .filter(|lint| {
-                !seen.iter().any(|(pat, def, normalized)| {
+                !seen.iter().any(|(pat, def, slot, normalized)| {
                     *pat == lint.pat_name
                         && *def == lint.owned.def_id
+                        && *slot == lint.owned.primary_slot
                         && normalized == &lint.owned.normalized
                 }) && {
                     seen.push((
                         lint.pat_name,
                         lint.owned.def_id,
+                        lint.owned.primary_slot,
                         lint.owned.normalized.clone(),
                     ));
                     true

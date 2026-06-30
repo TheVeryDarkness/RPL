@@ -9,7 +9,7 @@ use rustc_span::Span;
 
 use crate::matches::artifact::NormalizedMatched;
 use crate::session::bindings::MetaBindings;
-use crate::session::slot::{SessionResult, SlotCandidate};
+use crate::session::slot::{SessionResult, SlotCandidate, MatchSlot};
 
 /// Adapter for diagnostics spanning multiple session assignments.
 pub struct MultiMatched<'a, 'tcx> {
@@ -73,6 +73,7 @@ impl<'tcx> Matched<'tcx> for MultiMatched<'_, 'tcx> {
 /// Owned lint payload that can be sorted before emission.
 pub struct OwnedLintMatch<'tcx> {
     pub def_id: LocalDefId,
+    pub primary_slot: MatchSlot,
     pub normalized: NormalizedMatched<'tcx>,
     pub bindings: MetaBindings<'tcx>,
 }
@@ -99,6 +100,7 @@ impl<'tcx> SessionResult<'tcx> {
                     def_id: c.def_id,
                     owned: OwnedLintMatch {
                         def_id: c.def_id,
+                        primary_slot: a.slot,
                         normalized: c.normalized.clone(),
                         bindings: self.bindings.clone(),
                     },

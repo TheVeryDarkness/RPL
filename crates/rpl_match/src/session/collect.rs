@@ -152,6 +152,11 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         let Some(adt_match) = match_ctxt.match_adt(adt_def) else {
             return Vec::new();
         };
+        if let pat::AdtKind::Struct(variant_pat) = &desc.adt_pat.kind {
+            if !match_ctxt.commit_field_assignments(&adt_match, &variant_pat.fields) {
+                return Vec::new();
+            }
+        }
         let ty_bindings = match_ctxt.resolved_ty_bindings();
         vec![AdtSlotCandidate {
             def_id: item.def_id,

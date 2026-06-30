@@ -94,6 +94,13 @@ impl<'tcx> SessionResult<'tcx> {
         })
     }
 
+    pub fn primary_fn_slot(&self) -> Option<MatchSlot> {
+        self.assignments.iter().find_map(|a| match &a.candidate {
+            SlotCandidate::Fn(_) => Some(a.slot),
+            SlotCandidate::Adt(_) => None,
+        })
+    }
+
     /// Key for [`PatternOperation`](rpl_context::pat::PatternOperation) negative filtering:
     /// compare matches within the same function using full [`NormalizedMatched`] equality.
     pub fn operation_match_key(&self) -> Option<(LocalDefId, &NormalizedMatched<'tcx>)> {
@@ -123,7 +130,7 @@ pub struct AdtSlotDesc<'pcx> {
 pub fn collect_slot_descs<'pcx>(
     rust_items: &'pcx pat::RustItems<'pcx>,
 ) -> (Vec<FnSlotDesc<'pcx>>, Vec<AdtSlotDesc<'pcx>>) {
-    let fn_slots = rust_items
+    let mut fn_slots: Vec<FnSlotDesc<'pcx>> = rust_items
         .fns
         .all_fns
         .iter()
@@ -134,6 +141,18 @@ pub fn collect_slot_descs<'pcx>(
             optional: fn_pat.name.as_str() == "_",
         })
         .collect();
+
+    let mut next_idx = fn_slots.len();
+    for impl_pat in rust_items.impls.values() {
+        for fn_pat in impl_pat.fns.values() {
+            fn_slots.push(FnSlotDesc {
+                slot: MatchSlot::Fn(next_idx),
+                fn_pat,
+                optional: fn_pat.name.as_str() == "_",
+            });
+            next_idx += 1;
+        }
+    }
 
     let adt_slots = rust_items
         .adts
