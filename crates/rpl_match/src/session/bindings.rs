@@ -130,7 +130,10 @@ impl<'tcx> MetaBindings<'tcx> {
     /// ADT definition matching may bind type metas to generic parameters; concrete
     /// bindings come from monomorphized function slots instead.
     fn should_skip_ty_binding(ty: Ty<'tcx>) -> bool {
-        matches!(ty.kind(), rustc_middle::ty::TyKind::Param(_) | rustc_middle::ty::TyKind::Never)
+        matches!(
+            ty.kind(),
+            rustc_middle::ty::TyKind::Param(_) | rustc_middle::ty::TyKind::Never
+        )
     }
 
     fn merge_const_vars(&mut self, vars: &IndexVec<ConstVarIdx, Const<'tcx>>) -> bool {
@@ -157,7 +160,7 @@ pub(crate) fn merge_index_vec<I: rustc_index::Idx, T: Clone + PartialEq>(
     for (idx, value) in source.iter_enumerated() {
         match &target[idx] {
             None => target[idx] = Some(value.clone()),
-            Some(existing) if eq(existing, value) => {}
+            Some(existing) if eq(existing, value) => {},
             Some(_) => return false,
         }
     }
@@ -169,9 +172,8 @@ mod tests {
     use rustc_index::IndexVec;
     use rustc_span::Symbol;
 
+    use super::{MetaBindings, merge_index_vec};
     use crate::AdtFieldMap;
-
-    use super::{merge_index_vec, MetaBindings};
 
     #[test]
     fn merge_index_vec_consistent() {

@@ -106,9 +106,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     "PredicateKind::Fn should have exactly one argument"
                 );
                 match &arg_instance[0] {
-                    PredicateArgInstance::Item(item) => {
-                        item.as_local().is_some_and(|local| p(self.tcx, local))
-                    },
+                    PredicateArgInstance::Item(item) => item.as_local().is_some_and(|local| p(self.tcx, local)),
                     _ => panic!("PredicateArgInstance::Item expected, got {:?}", arg_instance[0]),
                 }
             },

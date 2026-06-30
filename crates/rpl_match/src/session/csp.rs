@@ -157,27 +157,30 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
             return;
         }
 
-        let primary_fn = assignments.iter().find_map(|a| match &a.candidate {
-            SlotCandidate::Fn(c) if !c.matched.basic_blocks.is_empty() => Some(FnMatchContext {
-                def_id: c.def_id,
-                fn_name: None,
-                header: None,
-                has_self: false,
-                self_ty: None,
-            }),
-            SlotCandidate::Fn(_) | SlotCandidate::Adt(_) => None,
-        }).or_else(|| {
-            assignments.iter().find_map(|a| match &a.candidate {
-                SlotCandidate::Fn(c) => Some(FnMatchContext {
+        let primary_fn = assignments
+            .iter()
+            .find_map(|a| match &a.candidate {
+                SlotCandidate::Fn(c) if !c.matched.basic_blocks.is_empty() => Some(FnMatchContext {
                     def_id: c.def_id,
                     fn_name: None,
                     header: None,
                     has_self: false,
                     self_ty: None,
                 }),
-                SlotCandidate::Adt(_) => None,
+                SlotCandidate::Fn(_) | SlotCandidate::Adt(_) => None,
             })
-        });
+            .or_else(|| {
+                assignments.iter().find_map(|a| match &a.candidate {
+                    SlotCandidate::Fn(c) => Some(FnMatchContext {
+                        def_id: c.def_id,
+                        fn_name: None,
+                        header: None,
+                        has_self: false,
+                        self_ty: None,
+                    }),
+                    SlotCandidate::Adt(_) => None,
+                })
+            });
 
         results.push(SessionResult {
             assignments: assignments.clone(),
@@ -188,11 +191,7 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
 
     fn adt_slot_index(&self, slot: MatchSlot) -> usize {
         match slot {
-            MatchSlot::Adt(name) => self
-                .adt_slots
-                .iter()
-                .position(|s| s.adt_pat_name == name)
-                .unwrap(),
+            MatchSlot::Adt(name) => self.adt_slots.iter().position(|s| s.adt_pat_name == name).unwrap(),
             _ => panic!("expected ADT slot"),
         }
     }

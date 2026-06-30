@@ -100,15 +100,15 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
             .into_iter()
             .filter(|matched| self.check_constraints(fn_pat, item.def_id, body, matched))
             .map(|matched| {
-            let labels = &fn_pat.expect_body().labels;
-            let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
-            let snapshot = BindingSnapshot::from_normalized(&normalized);
-            FnSlotCandidate {
-                def_id: item.def_id,
-                normalized,
-                matched,
-                snapshot,
-            }
+                let labels = &fn_pat.expect_body().labels;
+                let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
+                let snapshot = BindingSnapshot::from_normalized(&normalized);
+                FnSlotCandidate {
+                    def_id: item.def_id,
+                    normalized,
+                    matched,
+                    snapshot,
+                }
             })
             .collect()
     }

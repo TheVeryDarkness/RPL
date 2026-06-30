@@ -1,15 +1,15 @@
-use rpl_context::pat::{self, Matched};
 use rpl_constraints::Const;
+use rpl_context::pat::{self, Matched};
 use rustc_hir::FnDecl;
 use rustc_hir::def_id::LocalDefId;
 use rustc_middle::mir::{Body, PlaceRef};
 use rustc_middle::ty::Ty;
-use rustc_span::source_map::SourceMap;
 use rustc_span::Span;
+use rustc_span::source_map::SourceMap;
 
 use crate::matches::artifact::NormalizedMatched;
 use crate::session::bindings::MetaBindings;
-use crate::session::slot::{SessionResult, SlotCandidate, MatchSlot};
+use crate::session::slot::{MatchSlot, SessionResult, SlotCandidate};
 
 /// Adapter for diagnostics spanning multiple session assignments.
 pub struct MultiMatched<'a, 'tcx> {
@@ -38,13 +38,7 @@ impl<'tcx> Matched<'tcx> for MultiMatched<'_, 'tcx> {
         self.normalized.span(body, decl, name, source_map)
     }
 
-    fn try_span(
-        &self,
-        body: &Body<'tcx>,
-        decl: &FnDecl<'tcx>,
-        name: &str,
-        source_map: &SourceMap,
-    ) -> Option<Span> {
+    fn try_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Option<Span> {
         self.normalized.try_span(body, decl, name, source_map)
     }
 

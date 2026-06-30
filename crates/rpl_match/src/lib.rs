@@ -49,7 +49,7 @@ pub use counted::CountedMatch;
 pub use fns::MatchFnCtxt;
 pub use place::MatchPlaceCtxt;
 pub use session::{
-    BindingSnapshot, CrateItemIndex, FnSlotCandidate, MatchCollectCtxt, MatchSession, MatchSlot,
-    MetaBindings, MultiMatched, OwnedLintMatch, SessionConfig, SessionLintTarget, SessionResult,
+    BindingSnapshot, CrateItemIndex, FnSlotCandidate, MatchCollectCtxt, MatchSession, MatchSlot, MetaBindings,
+    MultiMatched, OwnedLintMatch, SessionConfig, SessionLintTarget, SessionResult,
 };
 pub use ty::{MatchTyCtxt, TryCmpAs};

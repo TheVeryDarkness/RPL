@@ -208,7 +208,12 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         let Some(decl) = fn_decl(self.tcx, def_id) else {
             return;
         };
-        let fn_name = self.index.fns.iter().find(|f| f.def_id == def_id).and_then(|f| f.fn_name);
+        let fn_name = self
+            .index
+            .fns
+            .iter()
+            .find(|f| f.def_id == def_id)
+            .and_then(|f| f.fn_name);
         let error = pattern
             .get_diag(pat_name, self.tcx.sess.source_map(), fn_name, body, decl, matched)
             .unwrap_or_else(identity);

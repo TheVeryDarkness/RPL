@@ -105,8 +105,7 @@ impl<'tcx> SessionResult<'tcx> {
     /// Key for [`PatternOperation`](rpl_context::pat::PatternOperation) negative filtering:
     /// compare matches within the same function using full [`NormalizedMatched`] equality.
     pub fn operation_match_key(&self) -> Option<(LocalDefId, &NormalizedMatched<'tcx>)> {
-        self.primary_fn_candidate()
-            .map(|c| (c.def_id, &c.normalized))
+        self.primary_fn_candidate().map(|c| (c.def_id, &c.normalized))
     }
 }
 
@@ -227,12 +226,8 @@ impl CrateItemIndex {
                     return rustc_hir::intravisit::walk_fn(self, kind, decl, _body_id, def_id);
                 }
                 let (fn_name, header) = match kind {
-                    rustc_hir::intravisit::FnKind::ItemFn(name, _, fn_header) => {
-                        (Some(name.name), Some(fn_header))
-                    },
-                    rustc_hir::intravisit::FnKind::Method(name, fn_sig) => {
-                        (Some(name.name), Some(fn_sig.header))
-                    },
+                    rustc_hir::intravisit::FnKind::ItemFn(name, _, fn_header) => (Some(name.name), Some(fn_header)),
+                    rustc_hir::intravisit::FnKind::Method(name, fn_sig) => (Some(name.name), Some(fn_sig.header)),
                     rustc_hir::intravisit::FnKind::Closure => (None, None),
                 };
                 self.index.fns.push(CrateFnItem {

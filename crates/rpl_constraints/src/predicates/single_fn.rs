@@ -17,8 +17,7 @@ pub fn requires_monomorphization<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) ->
 /// e.g. a `#[ctor]`/`#[dtor]` function after `ctor` crate macro expansion.
 #[instrument(level = "debug", skip(tcx), ret)]
 pub fn runs_outside_main<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> bool {
-    is_invoked_from_ctor_crate_hook(tcx, def_id)
-        || mir_has_ctor_exit_hook_call(tcx, def_id)
+    is_invoked_from_ctor_crate_hook(tcx, def_id) || mir_has_ctor_exit_hook_call(tcx, def_id)
 }
 
 /// After `ctor` macro expansion, registration hooks call the user function:
@@ -86,7 +85,10 @@ fn is_ctor_exit_hook<'tcx>(tcx: TyCtxt<'tcx>, callee: DefId) -> bool {
     for path in ["ctor::__support::at_binary_exit", "ctor::__support::at_library_exit"] {
         let symbols: Vec<Symbol> = path.split("::").map(Symbol::intern).collect();
         let resolved = def_path_res(tcx, &symbols, PatItemKind::Fn);
-        if resolved.iter().any(|res| matches!(res, Res::Def(DefKind::Fn, id) if *id == callee)) {
+        if resolved
+            .iter()
+            .any(|res| matches!(res, Res::Def(DefKind::Fn, id) if *id == callee))
+        {
             return true;
         }
     }

@@ -5,8 +5,8 @@ use crate::session::collect::MatchCollectCtxt;
 use crate::session::config::SessionConfig;
 use crate::session::csp::CspSolver;
 use crate::session::slot::{
-    collect_slot_descs, AdtSlotDesc, CrateItemIndex, FnMatchContext, FnSlotCandidate, FnSlotDesc,
-    MatchSlot, SessionResult, SlotAssignment, SlotCandidate,
+    AdtSlotDesc, CrateItemIndex, FnMatchContext, FnSlotCandidate, FnSlotDesc, MatchSlot, SessionResult, SlotAssignment,
+    SlotCandidate, collect_slot_descs,
 };
 
 /// How slots inside one [`pat::RustItems`] block relate to each other.
@@ -136,8 +136,7 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
                     rust_items,
                     adt_candidates[0].iter().flat_map(|adt| {
                         fn_candidates[fn_slot_idx].iter().filter_map(|c| {
-                            let mut bindings =
-                                super::bindings::MetaBindings::new(rust_items.meta.as_ref());
+                            let mut bindings = super::bindings::MetaBindings::new(rust_items.meta.as_ref());
                             if !bindings.merge_adt_ty_bindings(&adt.ty_bindings)
                                 || !bindings.merge_snapshot(&c.snapshot)
                             {
@@ -223,9 +222,9 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
     }
 
     fn deduplicate_fn_slot_permutations(results: Vec<SessionResult<'tcx>>) -> Vec<SessionResult<'tcx>> {
-        let (single_fn, multi_fn): (Vec<_>, Vec<_>) = results.into_iter().partition(|result| {
-            Self::fn_assignment_signature(result).len() <= 1
-        });
+        let (single_fn, multi_fn): (Vec<_>, Vec<_>) = results
+            .into_iter()
+            .partition(|result| Self::fn_assignment_signature(result).len() <= 1);
 
         let mut kept_multi = Vec::new();
         for result in multi_fn {
@@ -262,7 +261,10 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
         }
         let mut kept = Vec::new();
         for result in results {
-            if kept.iter().all(|existing: &SessionResult<'tcx>| !existing.equivalent(&result)) {
+            if kept
+                .iter()
+                .all(|existing: &SessionResult<'tcx>| !existing.equivalent(&result))
+            {
                 kept.push(result);
             }
         }
@@ -340,9 +342,7 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
                 };
                 !negative.iter().any(|neg| {
                     neg.operation_match_key()
-                        .is_some_and(|(neg_def, neg_norm)| {
-                            pos_def == neg_def && pos_norm == neg_norm
-                        })
+                        .is_some_and(|(neg_def, neg_norm)| pos_def == neg_def && pos_norm == neg_norm)
                 })
             })
             .collect()

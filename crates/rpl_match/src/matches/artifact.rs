@@ -169,7 +169,10 @@ impl<'tcx> NormalizedMatched<'tcx> {
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
     fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
         self.try_span(body, decl, name, source_map).unwrap_or_else(|| {
-            panic!("label `{name}` not found in pattern labels: {labels:?}", labels = self.extra);
+            panic!(
+                "label `{name}` not found in pattern labels: {labels:?}",
+                labels = self.extra
+            );
         })
     }
 

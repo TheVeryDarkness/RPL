@@ -37,10 +37,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         IndexVec::from_fn_n(
             |i| {
                 let set = self.ty.ty_vars[i].borrow();
-                set.iter()
-                    .copied()
-                    .next()
-                    .unwrap_or_else(|| self.ty.tcx.types.never)
+                set.iter().copied().next().unwrap_or_else(|| self.ty.tcx.types.never)
             },
             self.ty.ty_vars.len(),
         )
@@ -54,10 +51,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     #[instrument(level = "trace", skip(self))]
     pub fn match_adt_for_fn_mir(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
         let adt_match = self.match_adt_structure(adt)?;
-        adt_match
-            .field_candidates()
-            .candidates
-            .commit_unique_field_candidates();
+        adt_match.field_candidates().candidates.commit_unique_field_candidates();
         Some(adt_match)
     }
 
@@ -145,9 +139,10 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     ) -> Option<FieldCandidates<'tcx>> {
         let mut candidates = FieldCandidates::new(fields_pat, fields);
         for (field_name, field_pat) in fields_pat.iter() {
-            if let Some((field_idx, _)) = fields.iter_enumerated().find(|(_, field)| {
-                field.name == *field_name && self.match_field(field_pat, field)
-            }) {
+            if let Some((field_idx, _)) = fields
+                .iter_enumerated()
+                .find(|(_, field)| field.name == *field_name && self.match_field(field_pat, field))
+            {
                 candidates.candidates.candidates[field_name].insert(field_idx);
                 continue;
             }
@@ -212,11 +207,7 @@ impl<'tcx> AdtMatch<'tcx> {
             kind: AdtMatchKind::Struct(fields),
         }
     }
-    pub fn new_enum(
-        adt: ty::AdtDef<'tcx>,
-        variant_idx: rustc_abi::VariantIdx,
-        fields: FieldCandidates<'tcx>,
-    ) -> Self {
+    pub fn new_enum(adt: ty::AdtDef<'tcx>, variant_idx: rustc_abi::VariantIdx, fields: FieldCandidates<'tcx>) -> Self {
         Self {
             adt,
             kind: AdtMatchKind::Enum { variant_idx, fields },
@@ -336,8 +327,9 @@ mod tests {
     #[test]
     fn commit_unique_field_candidates_leaves_ambiguous_unbound() {
         rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
-            let fields_pat: FxIndexMap<Symbol, ()> =
-                [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())].into_iter().collect();
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
             let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
             let mut candidates = Candidates::new(&fields_pat, &field_defs);
             let len = FieldIdx::from_u32(1);
@@ -350,28 +342,23 @@ mod tests {
 
             candidates.commit_unique_field_candidates();
             assert!(candidates.matches[&Symbol::intern("$len")].get().is_none());
-            assert_eq!(
-                candidates.matches[&Symbol::intern("$mem")].get(),
-                Some(mem)
-            );
+            assert_eq!(candidates.matches[&Symbol::intern("$mem")].get(), Some(mem));
         });
     }
 
     #[test]
     fn candidates_match_and_unmatch_field_metavar() {
         rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
-            let fields_pat: FxIndexMap<Symbol, ()> =
-                [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())].into_iter().collect();
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
             let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
             let candidates = Candidates::new(&fields_pat, &field_defs);
             let len = FieldIdx::from_u32(1);
             let capacity = FieldIdx::from_u32(0);
 
             assert!(candidates.r#match(Symbol::intern("$len"), len));
-            assert_eq!(
-                candidates.matches[&Symbol::intern("$len")].get(),
-                Some(len)
-            );
+            assert_eq!(candidates.matches[&Symbol::intern("$len")].get(), Some(len));
             // conflicting binding for the same field metavar fails
             assert!(!candidates.r#match(Symbol::intern("$len"), capacity));
             // same binding is idempotent (refcounted)
@@ -379,10 +366,7 @@ mod tests {
 
             candidates.unmatch(Symbol::intern("$len"), len);
             // one unmatch decrements refcount; binding remains until count hits zero
-            assert_eq!(
-                candidates.matches[&Symbol::intern("$len")].get(),
-                Some(len)
-            );
+            assert_eq!(candidates.matches[&Symbol::intern("$len")].get(), Some(len));
             candidates.unmatch(Symbol::intern("$len"), len);
             assert!(candidates.matches[&Symbol::intern("$len")].get().is_none());
             // after unmatch, a different field index can bind
