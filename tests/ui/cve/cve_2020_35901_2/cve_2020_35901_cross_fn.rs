@@ -99,7 +99,7 @@ where
         // FIXME: this should be an error
         let this = self;
         let mut stream = unsafe { new_pin(this) }.project().stream;
-        // ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
+        //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
         loop {
             return Poll::Ready(match ready!(stream.as_mut().poll_next(cx)) {
                 Some(Ok(ref bytes)) if bytes.is_empty() => continue,

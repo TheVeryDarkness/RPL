@@ -1,4 +1,16 @@
 error: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
+  --> tests/ui/cve/cve_2020_35901_2/cve_2020_35902.rs:92:17
+   |
+LL |     pub fn next_item(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<U::Item, U::Error>>>
+   |                      --------- mutable reference passed into a public function here
+...
+LL |                 Pin::new_unchecked(&mut self.io).poll_read_buf(cx, &mut self.read_buf)
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Pin::new_unchecked` called here
+   |
+   = note: type `T` doesn't implement `Unpin`
+   = note: `#[deny(rpl::unsound_pin_project)]` on by default
+
+error: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
   --> tests/ui/cve/cve_2020_35901_2/cve_2020_35902.rs:119:17
    |
 LL |     pub fn flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
@@ -8,7 +20,6 @@ LL |                 Pin::new_unchecked(&mut self.io).poll_write(cx, &self.write
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Pin::new_unchecked` called here
    |
    = note: type `T` doesn't implement `Unpin`
-   = note: `#[deny(rpl::unsound_pin_project)]` on by default
 
 error: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
   --> tests/ui/cve/cve_2020_35901_2/cve_2020_35902.rs:136:25
@@ -43,5 +54,5 @@ LL |             ready!(Pin::new_unchecked(&mut self.io).poll_shutdown(cx))?;
    |
    = note: type `T` doesn't implement `Unpin`
 
-error: aborting due to 4 previous errors
+error: aborting due to 5 previous errors
 

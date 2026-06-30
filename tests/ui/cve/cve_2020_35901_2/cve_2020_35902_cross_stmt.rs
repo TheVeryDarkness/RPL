@@ -90,7 +90,7 @@ impl<T, U> Framed<T, U> {
             let cnt = match unsafe {
                 // FIXME: this should be an error
                 Pin::new_unchecked(&mut self.io).poll_read_buf(cx, &mut self.read_buf)
-                // ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
+                //~^ ERROR: it is unsound to call `Pin::new_unchecked` on a mutable reference that can be freely moved
             } {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
