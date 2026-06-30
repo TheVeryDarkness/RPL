@@ -93,19 +93,29 @@ pub struct SessionLintTarget<'a, 'tcx> {
 
 impl<'tcx> SessionResult<'tcx> {
     pub fn lint_targets<'a>(&'a self) -> Vec<SessionLintTarget<'a, 'tcx>> {
+        let has_mir_body_fn = self.assignments.iter().any(|a| match &a.candidate {
+            SlotCandidate::Fn(c) => !c.matched.basic_blocks.is_empty(),
+            SlotCandidate::Adt(_) => false,
+        });
+
         self.assignments
             .iter()
             .filter_map(|a| match &a.candidate {
-                SlotCandidate::Fn(c) => Some(SessionLintTarget {
-                    def_id: c.def_id,
-                    owned: OwnedLintMatch {
+                SlotCandidate::Fn(c) => {
+                    if has_mir_body_fn && c.matched.basic_blocks.is_empty() {
+                        return None;
+                    }
+                    Some(SessionLintTarget {
                         def_id: c.def_id,
-                        primary_slot: a.slot,
-                        normalized: c.normalized.clone(),
-                        bindings: self.bindings.clone(),
-                    },
-                    _result: std::marker::PhantomData,
-                }),
+                        owned: OwnedLintMatch {
+                            def_id: c.def_id,
+                            primary_slot: a.slot,
+                            normalized: c.normalized.clone(),
+                            bindings: self.bindings.clone(),
+                        },
+                        _result: std::marker::PhantomData,
+                    })
+                },
                 SlotCandidate::Adt(_) => None,
             })
             .collect()

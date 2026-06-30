@@ -18,33 +18,44 @@ use crate::session::slot::{
 enum RustItemsMatchingMode {
     /// Single `fn _` slot: each function in the crate is tried independently.
     IndependentWildcardFn,
-    /// One ADT slot plus one named fn: the ADT is MIR context only; each fn is tried
-    /// independently (e.g. CVE-35892 offset patterns).
-    StructContextSingleFn,
-    /// Multiple fn slots with no ADT: OR alternatives that may overlap on the same site.
+    /// Multiple MIR-body fn slots with no ADT: OR alternatives that may overlap on the same site.
     AlternativeFns,
-    /// ADT and multiple fn slots (or other cross-slot metavar sharing): all slots must
-    /// match together via CSP (e.g. `multi_fn_shared_ty` `$Pair` + `$f1` + `$f2`).
+    /// ADT slot(s) and/or cross-slot metavar sharing: all slots via CSP
+    /// (e.g. `multi_fn_shared_ty` `$Pair` + `$f1` + `$f2`, struct + fn patterns).
     ConcurrentSlots,
+}
+
+fn mir_body_fn_slots<'a>(fn_slots: &'a [FnSlotDesc<'a>]) -> Vec<&'a FnSlotDesc<'a>> {
+    fn_slots
+        .iter()
+        .filter(|desc| !desc.fn_pat.is_signature_only())
+        .collect()
 }
 
 fn classify_rust_items_matching_mode(
     fn_slots: &[FnSlotDesc<'_>],
     adt_slots: &[AdtSlotDesc<'_>],
 ) -> RustItemsMatchingMode {
+    let body_slots = mir_body_fn_slots(fn_slots);
+
     if adt_slots.is_empty() {
-        if fn_slots.len() == 1 && fn_slots[0].optional {
+        if body_slots.len() == 1 && body_slots[0].optional {
             RustItemsMatchingMode::IndependentWildcardFn
-        } else if fn_slots.len() > 1 {
+        } else if body_slots.len() > 1 {
             RustItemsMatchingMode::AlternativeFns
         } else {
             RustItemsMatchingMode::ConcurrentSlots
         }
-    } else if fn_slots.len() == 1 && !fn_slots[0].optional {
-        RustItemsMatchingMode::StructContextSingleFn
     } else {
         RustItemsMatchingMode::ConcurrentSlots
     }
+}
+
+fn fn_slot_index(fn_slots: &[FnSlotDesc<'_>], slot: MatchSlot) -> usize {
+    fn_slots
+        .iter()
+        .position(|desc| desc.slot == slot)
+        .unwrap_or_else(|| panic!("unknown fn slot {slot:?}"))
 }
 
 /// Orchestrates candidate collection and CSP solving for one pattern item.
@@ -85,7 +96,7 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             })
             .collect();
 
-        let adt_candidates: Vec<_> = adt_slots
+        let adt_candidates: Vec<Vec<super::slot::AdtSlotCandidate<'tcx>>> = adt_slots
             .iter()
             .map(|desc| {
                 index
@@ -97,24 +108,26 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             })
             .collect();
 
+        let body_slots = mir_body_fn_slots(&fn_slots);
+
         match classify_rust_items_matching_mode(&fn_slots, &adt_slots) {
-            RustItemsMatchingMode::IndependentWildcardFn
-            | RustItemsMatchingMode::StructContextSingleFn => {
+            RustItemsMatchingMode::IndependentWildcardFn => {
+                let desc = body_slots[0];
+                let slot_idx = fn_slot_index(&fn_slots, desc.slot);
                 return self.enrich_and_postprocess(
                     index,
                     rust_items,
-                    fn_candidates[0]
+                    fn_candidates[slot_idx]
                         .iter()
-                        .map(|c| self.session_result_from_fn(rust_items, fn_slots[0].slot, c)),
+                        .map(|c| self.session_result_from_fn(rust_items, desc.slot, c)),
                 );
             },
             RustItemsMatchingMode::AlternativeFns => {
-                // OR within one RustItems block: each fn slot is tried independently and
-                // results are not mutually exclusive.
                 return self.enrich_and_postprocess(
                     index,
                     rust_items,
-                    fn_slots.iter().enumerate().flat_map(|(slot_idx, desc)| {
+                    body_slots.iter().flat_map(|desc| {
+                        let slot_idx = fn_slot_index(&fn_slots, desc.slot);
                         fn_candidates[slot_idx]
                             .iter()
                             .map(|c| self.session_result_from_fn(rust_items, desc.slot, c))

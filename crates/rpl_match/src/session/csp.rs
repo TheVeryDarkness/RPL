@@ -162,14 +162,25 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
         }
 
         let primary_fn = assignments.iter().find_map(|a| match &a.candidate {
-            SlotCandidate::Fn(c) => Some(FnMatchContext {
+            SlotCandidate::Fn(c) if !c.matched.basic_blocks.is_empty() => Some(FnMatchContext {
                 def_id: c.def_id,
                 fn_name: None,
                 header: None,
                 has_self: false,
                 self_ty: None,
             }),
-            SlotCandidate::Adt(_) => None,
+            SlotCandidate::Fn(_) | SlotCandidate::Adt(_) => None,
+        }).or_else(|| {
+            assignments.iter().find_map(|a| match &a.candidate {
+                SlotCandidate::Fn(c) => Some(FnMatchContext {
+                    def_id: c.def_id,
+                    fn_name: None,
+                    header: None,
+                    has_self: false,
+                    self_ty: None,
+                }),
+                SlotCandidate::Adt(_) => None,
+            })
         });
 
         results.push(SessionResult {
