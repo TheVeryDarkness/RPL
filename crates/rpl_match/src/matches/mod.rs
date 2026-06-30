@@ -590,6 +590,13 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_const_var_free();
             return;
         }
+        if self.matching[ty_var].candidates.is_empty() {
+            if self.match_ty_var(ty_var, self.cx.ty.tcx().types.never) {
+                ensure_sufficient_stack(|| self.match_ty_var_candidates(ty_var.plus(1), loc_pats));
+                self.unmatch_ty_var(ty_var);
+            }
+            return;
+        }
         for &cand in &self.matching[ty_var].candidates {
             let _span = debug_span!("match_ty_var_candidates", ?ty_var, ?cand).entered();
             if self.match_ty_var(ty_var, cand) {
@@ -605,6 +612,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_place_var_free();
             self.match_place_var_candidates(pat::PlaceVarIdx::ZERO, loc_pats);
             self.assert_place_var_free();
+            return;
+        }
+        if self.matching[const_var].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_const_var_candidates(const_var.plus(1), loc_pats));
             return;
         }
         for &cand in &self.matching[const_var].candidates {
@@ -624,6 +635,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_local_free();
             return;
         }
+        if self.matching[place_var].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_place_var_candidates(place_var.plus(1), loc_pats));
+            return;
+        }
         for &cand in &self.matching[place_var].candidates {
             let _span = debug_span!("match_place_var_candidates", ?place_var, ?cand).entered();
             if self.match_place_var(place_var, cand) {
@@ -639,6 +654,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_stmt_free();
             self.match_stmt_candidates(loc_pats);
             self.assert_stmt_free();
+            return;
+        }
+        if self.matching[local].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_local_candidates(local.plus(1), loc_pats));
             return;
         }
         for cand in self.matching[local].candidates.iter() {

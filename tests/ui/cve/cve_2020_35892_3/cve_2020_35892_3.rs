@@ -58,14 +58,14 @@ impl<T> Slab<T> {
             //~| ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
             last_elem_ptr = self.mem.offset(self.len as isize);
-            //~^ HELP: this is because `self.len` exceeds the container's length by one
+            //~^ ERROR: pointer out of bound
+            //~| HELP: this is because `self.len` exceeds the container's length by one
             //~| HELP: did you mean this
             //~| ptr_offset_with_cast
             //~| HELP: if you’re always increasing the pointer address, you can avoid the numeric cast by using the `add` method instead.
 
             elem = ptr::read(elem_ptr);
             last_elem = ptr::read(last_elem_ptr);
-            //~^ ERROR: pointer out of bound
 
             ptr::write(elem_ptr, last_elem);
         }

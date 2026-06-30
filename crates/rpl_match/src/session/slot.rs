@@ -1,5 +1,6 @@
 use rpl_context::pat::{self, FnPattern};
 use rustc_hir::FnHeader;
+use rustc_hir::def::DefKind;
 use rustc_hir::def_id::LocalDefId;
 use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Symbol;
@@ -245,6 +246,24 @@ impl CrateItemIndex {
         }
 
         hir.walk_toplevel_module(&mut FnCollector { tcx, index: &mut index });
+
+        let mut seen: rustc_data_structures::fx::FxHashSet<LocalDefId> =
+            index.fns.iter().map(|item| item.def_id).collect();
+        for def_id in tcx.hir_crate_items(()).nested_bodies() {
+            if !seen.insert(def_id) {
+                continue;
+            }
+            if !matches!(tcx.def_kind(def_id), DefKind::Closure) || !tcx.is_mir_available(def_id) {
+                continue;
+            }
+            index.fns.push(CrateFnItem {
+                def_id,
+                fn_name: None,
+                header: None,
+                has_self: false,
+            });
+        }
+
         index
     }
 

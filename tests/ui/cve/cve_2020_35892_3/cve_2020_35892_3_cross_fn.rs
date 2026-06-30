@@ -69,7 +69,6 @@ impl<T> Slab<T> {
 
             elem = ptr::read(elem_ptr);
             last_elem = ptr::read(last_elem_ptr);
-            //FN: ~^ ERROR: pointer out of bound
 
             ptr::write(elem_ptr, last_elem);
         }

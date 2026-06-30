@@ -18,10 +18,13 @@ use crate::session::slot::{
 enum RustItemsMatchingMode {
     /// Single `fn _` slot: each function in the crate is tried independently.
     IndependentWildcardFn,
+    /// One ADT slot plus one MIR-body fn: struct and fn bindings must agree, each fn tried
+    /// independently (e.g. struct + `fn $pattern`).
+    StructContextSingleFn,
     /// Multiple MIR-body fn slots with no ADT: OR alternatives that may overlap on the same site.
     AlternativeFns,
-    /// ADT slot(s) and/or cross-slot metavar sharing: all slots via CSP
-    /// (e.g. `multi_fn_shared_ty` `$Pair` + `$f1` + `$f2`, struct + fn patterns).
+    /// Multiple ADT/fn slots or cross-slot metavar sharing: all slots via CSP
+    /// (e.g. `multi_fn_shared_ty` `$Pair` + `$f1` + `$f2`).
     ConcurrentSlots,
 }
 
@@ -46,6 +49,8 @@ fn classify_rust_items_matching_mode(
         } else {
             RustItemsMatchingMode::ConcurrentSlots
         }
+    } else if body_slots.len() == 1 && !body_slots[0].optional {
+        RustItemsMatchingMode::StructContextSingleFn
     } else {
         RustItemsMatchingMode::ConcurrentSlots
     }
@@ -120,6 +125,49 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
                     fn_candidates[slot_idx]
                         .iter()
                         .map(|c| self.session_result_from_fn(rust_items, desc.slot, c)),
+                );
+            },
+            RustItemsMatchingMode::StructContextSingleFn => {
+                let fn_desc = body_slots[0];
+                let fn_slot_idx = fn_slot_index(&fn_slots, fn_desc.slot);
+                let adt_desc = &adt_slots[0];
+                return self.enrich_and_postprocess(
+                    index,
+                    rust_items,
+                    adt_candidates[0].iter().flat_map(|adt| {
+                        fn_candidates[fn_slot_idx].iter().filter_map(|c| {
+                            let mut bindings =
+                                super::bindings::MetaBindings::new(rust_items.meta.as_ref());
+                            if !bindings.merge_adt_match(
+                                adt_desc.adt_pat_name,
+                                &adt.adt_match,
+                                &adt.ty_bindings,
+                            ) || !bindings.merge_snapshot(&c.snapshot)
+                            {
+                                return None;
+                            }
+                            Some(SessionResult {
+                                assignments: vec![
+                                    SlotAssignment {
+                                        slot: adt_desc.slot,
+                                        candidate: SlotCandidate::Adt(adt.clone()),
+                                    },
+                                    SlotAssignment {
+                                        slot: fn_desc.slot,
+                                        candidate: SlotCandidate::Fn(c.clone()),
+                                    },
+                                ],
+                                bindings,
+                                primary_fn: Some(FnMatchContext {
+                                    def_id: c.def_id,
+                                    fn_name: None,
+                                    header: None,
+                                    has_self: false,
+                                    self_ty: None,
+                                }),
+                            })
+                        })
+                    }),
                 );
             },
             RustItemsMatchingMode::AlternativeFns => {

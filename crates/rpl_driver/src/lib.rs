@@ -222,21 +222,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
 }
 
 fn fn_decl<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Option<&'tcx FnDecl<'tcx>> {
-    match tcx.hir_node_by_def_id(def_id) {
-        hir::Node::Item(item) => match item.kind {
-            hir::ItemKind::Fn { sig, .. } => Some(sig.decl),
-            _ => None,
-        },
-        hir::Node::ImplItem(item) => match item.kind {
-            hir::ImplItemKind::Fn(sig, _) => Some(sig.decl),
-            _ => None,
-        },
-        hir::Node::TraitItem(item) => match item.kind {
-            hir::TraitItemKind::Fn(sig, _) => Some(sig.decl),
-            _ => None,
-        },
-        _ => None,
-    }
+    tcx.hir().fn_decl_by_hir_id(tcx.local_def_id_to_hir_id(def_id))
 }
 
 impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {

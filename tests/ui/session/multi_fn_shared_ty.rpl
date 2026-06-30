@@ -7,10 +7,10 @@ patt {
             $second: $U,
         }
 
-        fn $f1(_: ()) {
+        fn $f1(_: $Pair) {
         }
 
-        fn $f2(_: ()) {
+        fn $f2(_: $Pair) {
         }
     }
 }

@@ -88,6 +88,12 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     ) -> Option<FieldCandidates<'tcx>> {
         let mut candidates = FieldCandidates::new(fields_pat, fields);
         for (field_name, field_pat) in fields_pat.iter() {
+            if let Some((field_idx, _)) = fields.iter_enumerated().find(|(_, field)| {
+                field.name == *field_name && self.match_field(field_pat, field)
+            }) {
+                candidates.candidates.candidates[field_name].insert(field_idx);
+                continue;
+            }
             for (field_idx, field) in fields.iter_enumerated() {
                 if self.match_field(field_pat, field) {
                     candidates.candidates.candidates[field_name].insert(field_idx);
