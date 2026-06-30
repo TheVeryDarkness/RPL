@@ -84,10 +84,21 @@ impl<'tcx> SessionResult<'tcx> {
     }
 
     pub fn normalized_for_lint(&self) -> Option<&NormalizedMatched<'tcx>> {
+        self.primary_fn_candidate().map(|c| &c.normalized)
+    }
+
+    pub fn primary_fn_candidate(&self) -> Option<&FnSlotCandidate<'tcx>> {
         self.assignments.iter().find_map(|a| match &a.candidate {
-            SlotCandidate::Fn(c) => Some(&c.normalized),
+            SlotCandidate::Fn(c) => Some(c),
             SlotCandidate::Adt(_) => None,
         })
+    }
+
+    /// Key for [`PatternOperation`](rpl_context::pat::PatternOperation) negative filtering:
+    /// compare matches within the same function using full [`NormalizedMatched`] equality.
+    pub fn operation_match_key(&self) -> Option<(LocalDefId, &NormalizedMatched<'tcx>)> {
+        self.primary_fn_candidate()
+            .map(|c| (c.def_id, &c.normalized))
     }
 }
 

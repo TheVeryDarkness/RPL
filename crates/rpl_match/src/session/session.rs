@@ -177,7 +177,17 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
 
         positive
             .into_iter()
-            .filter(|pos| !negative.iter().any(|neg| neg.equivalent(pos)))
+            .filter(|pos| {
+                let Some((pos_def, pos_norm)) = pos.operation_match_key() else {
+                    return true;
+                };
+                !negative.iter().any(|neg| {
+                    neg.operation_match_key()
+                        .is_some_and(|(neg_def, neg_norm)| {
+                            pos_def == neg_def && pos_norm == neg_norm
+                        })
+                })
+            })
             .collect()
     }
 }
@@ -205,5 +215,10 @@ impl<'tcx> SessionResult<'tcx> {
     pub fn equivalent(&self, other: &Self) -> bool {
         self.bindings.equivalent_to(&other.bindings)
             && self.assignments.len() == other.assignments.len()
+            && match (self.primary_fn_candidate(), other.primary_fn_candidate()) {
+                (Some(a), Some(b)) => a.def_id == b.def_id && a.normalized == b.normalized,
+                (None, None) => true,
+                _ => false,
+            }
     }
 }
