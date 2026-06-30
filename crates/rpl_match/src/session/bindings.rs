@@ -1,21 +1,20 @@
 use rpl_constraints::Const;
 use rpl_context::pat::{ConstVarIdx, NonLocalMetaVars, PlaceVarIdx, TyVarIdx};
-use rustc_abi::FieldIdx;
-use rustc_data_structures::fx::FxHashMap;
 use rustc_index::IndexVec;
 use rustc_middle::mir::PlaceRef;
 use rustc_middle::ty::Ty;
 use rustc_span::Symbol;
 
-use crate::AdtMatch;
+use crate::AdtFieldMap;
 use crate::matches::artifact::NormalizedMatched;
 
 /// Snapshot of metavar bindings projected onto a shared [`NonLocalMetaVars`] index space.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BindingSnapshot<'tcx> {
     pub ty_vars: IndexVec<TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<PlaceVarIdx, PlaceRef<'tcx>>,
+    pub adt_fields: AdtFieldMap,
 }
 
 impl<'tcx> BindingSnapshot<'tcx> {
@@ -24,6 +23,7 @@ impl<'tcx> BindingSnapshot<'tcx> {
             ty_vars: matched.ty_vars.clone(),
             const_vars: matched.const_vars.clone(),
             place_vars: matched.place_vars.clone(),
+            adt_fields: matched.adt_fields.clone(),
         }
     }
 
@@ -53,6 +53,7 @@ impl<'tcx> BindingSnapshot<'tcx> {
                 },
                 meta.place_vars.len(),
             ),
+            adt_fields: AdtFieldMap::default(),
         }
     }
 }
@@ -70,7 +71,7 @@ pub struct MetaBindings<'tcx> {
     pub ty_vars: IndexVec<TyVarIdx, Option<Ty<'tcx>>>,
     pub const_vars: IndexVec<ConstVarIdx, Option<Const<'tcx>>>,
     pub place_vars: IndexVec<PlaceVarIdx, Option<PlaceRef<'tcx>>>,
-    pub adt_fields: FxHashMap<(Symbol, Symbol), FieldIdx>,
+    pub adt_fields: AdtFieldMap,
 }
 
 impl<'tcx> MetaBindings<'tcx> {
@@ -79,7 +80,7 @@ impl<'tcx> MetaBindings<'tcx> {
             ty_vars: IndexVec::from_elem_n(None, meta.ty_vars.len()),
             const_vars: IndexVec::from_elem_n(None, meta.const_vars.len()),
             place_vars: IndexVec::from_elem_n(None, meta.place_vars.len()),
-            adt_fields: FxHashMap::default(),
+            adt_fields: AdtFieldMap::default(),
         }
     }
 
@@ -87,31 +88,26 @@ impl<'tcx> MetaBindings<'tcx> {
         self.merge_ty_vars(&snapshot.ty_vars)
             && self.merge_const_vars(&snapshot.const_vars)
             && self.merge_place_vars(&snapshot.place_vars)
+            && self.merge_adt_fields(&snapshot.adt_fields)
     }
 
     pub fn merge_normalized(&mut self, matched: &NormalizedMatched<'tcx>) -> bool {
         self.merge_snapshot(&BindingSnapshot::from_normalized(matched))
     }
 
-    pub fn merge_adt_match(
-        &mut self,
-        adt_pat_name: Symbol,
-        adt_match: &AdtMatch<'tcx>,
-        ty_bindings: &IndexVec<TyVarIdx, Ty<'tcx>>,
-    ) -> bool {
-        if !self.merge_ty_vars(ty_bindings) {
-            return false;
-        }
-        let fields = adt_match.field_candidates();
-        for (field_name, matched_idx) in fields.candidates.matches.iter() {
-            if let Some(idx) = matched_idx.get() {
-                match self.adt_fields.get(&(adt_pat_name, *field_name)) {
-                    None => {
-                        self.adt_fields.insert((adt_pat_name, *field_name), idx);
-                    },
-                    Some(existing) if *existing == idx => {},
-                    Some(_) => return false,
-                }
+    /// Merge type metavar bindings from ADT slot matching (shape/ty only).
+    pub fn merge_adt_ty_bindings(&mut self, ty_bindings: &IndexVec<TyVarIdx, Ty<'tcx>>) -> bool {
+        self.merge_ty_vars(ty_bindings)
+    }
+
+    pub fn merge_adt_fields(&mut self, fields: &AdtFieldMap) -> bool {
+        for (key, idx) in fields {
+            match self.adt_fields.get(key) {
+                None => {
+                    self.adt_fields.insert(*key, *idx);
+                },
+                Some(existing) if *existing == *idx => {},
+                Some(_) => return false,
             }
         }
         true
@@ -171,8 +167,11 @@ pub(crate) fn merge_index_vec<I: rustc_index::Idx, T: Clone + PartialEq>(
 #[cfg(test)]
 mod tests {
     use rustc_index::IndexVec;
+    use rustc_span::Symbol;
 
-    use super::merge_index_vec;
+    use crate::AdtFieldMap;
+
+    use super::{merge_index_vec, MetaBindings};
 
     #[test]
     fn merge_index_vec_consistent() {
@@ -191,5 +190,30 @@ mod tests {
         let b: IndexVec<u32, u32> = IndexVec::from_raw(vec![2]);
         assert!(merge_index_vec(&mut target, &a, |x, y| x == y));
         assert!(!merge_index_vec(&mut target, &b, |x, y| x == y));
+    }
+
+    #[test]
+    fn merge_adt_fields_consistent_and_conflict() {
+        rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+            use rustc_abi::FieldIdx;
+
+            let mut bindings = MetaBindings {
+                ty_vars: IndexVec::new(),
+                const_vars: IndexVec::new(),
+                place_vars: IndexVec::new(),
+                adt_fields: AdtFieldMap::default(),
+            };
+            let adt = Symbol::intern("$SlabT");
+            let len = Symbol::intern("$len");
+            let mem = Symbol::intern("$mem");
+            let mut fn_fields = AdtFieldMap::default();
+            fn_fields.insert((adt, len), FieldIdx::from_u32(1));
+            fn_fields.insert((adt, mem), FieldIdx::from_u32(2));
+            assert!(bindings.merge_adt_fields(&fn_fields));
+
+            let mut conflicting = AdtFieldMap::default();
+            conflicting.insert((adt, len), FieldIdx::from_u32(0));
+            assert!(!bindings.merge_adt_fields(&conflicting));
+        });
     }
 }

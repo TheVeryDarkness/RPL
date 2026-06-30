@@ -140,8 +140,7 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchTyCtxt<'pcx, 'tcx> {
             .borrow_mut()
             .entry(pat)
             .or_default()
-            .entry(adt_match.adt.did())
-            .or_insert(adt_match);
+            .insert(adt_match.adt.did(), adt_match);
         true
     }
 

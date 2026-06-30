@@ -7,7 +7,7 @@ use rustc_middle::ty::Ty;
 use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
-use super::{Const, Matched, StatementMatch, pat};
+use super::{AdtFieldMap, Const, Matched, StatementMatch, pat};
 
 /// A normalized version of [`Spanned`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -35,11 +35,12 @@ impl NormalizedSpanned {
 }
 
 /// A normalized version of [`Matched`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
+    pub adt_fields: AdtFieldMap,
     /// Labels and attributes. Sorted by label.
     extra: Vec<(Symbol, NormalizedSpanned)>,
 }
@@ -51,6 +52,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
+        let adt_fields = matched.adt_fields.clone();
         let mut labels: Vec<_> = label_map
             .iter()
             .map(|(label, spanned)| match spanned {
@@ -71,6 +73,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }
@@ -93,6 +96,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| matched_from.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
+        let adt_fields = matched_from.adt_fields.clone();
         let mut labels: Vec<_> = label_map_from
             .iter()
             .map(|(label, spanned)| {
@@ -111,6 +115,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }
@@ -130,6 +135,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| self.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
+        let adt_fields = self.adt_fields.clone();
         let mut labels: Vec<_> = self
             .extra
             .iter()
@@ -141,6 +147,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }

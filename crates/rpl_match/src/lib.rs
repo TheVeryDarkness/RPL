@@ -44,7 +44,7 @@ pub mod session;
 mod statement;
 mod ty;
 
-pub use adt::{AdtMatch, Candidates, MatchAdtCtxt};
+pub use adt::{AdtFieldMap, AdtMatch, Candidates, MatchAdtCtxt, collect_adt_field_bindings};
 pub use counted::CountedMatch;
 pub use fns::MatchFnCtxt;
 pub use place::MatchPlaceCtxt;

@@ -862,7 +862,20 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
     ) -> bool {
         let mut matched = false;
         self.ty()
-            .for_variant_and_match(adt_pat, adt, |_variant_pat, variant_match, _variant| {
+            .for_variant_and_match(adt_pat, adt, |_variant_pat, variant_match, variant| {
+                if let Some(prev) = variant_match.matches.get(&field_pat).and_then(|m| m.get())
+                    && prev != field
+                {
+                    let tcx = self.tcx();
+                    let prev_ty = tcx.type_of(variant.fields[prev].did).instantiate_identity();
+                    let field_ty = tcx.type_of(variant.fields[field].did).instantiate_identity();
+                    // Same-type ambiguous fields (e.g. Slab `$len` vs `capacity`/`len`) may be
+                    // mis-assigned by eager type matching; let `FieldPat` override. Different-type
+                    // candidates (e.g. Framed `$field` vs `io`/`codec`) keep the eager binding.
+                    if prev_ty == field_ty {
+                        variant_match.unmatch(field_pat, prev);
+                    }
+                }
                 matched |= variant_match.r#match(field_pat, field);
             });
         matched

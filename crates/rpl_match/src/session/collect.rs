@@ -128,6 +128,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
             ty_vars: Default::default(),
             const_vars: Default::default(),
             place_vars: Default::default(),
+            adt_fields: Default::default(),
         };
         if !self.check_constraints(fn_pat, item.def_id, body, &matched) {
             return Vec::new();

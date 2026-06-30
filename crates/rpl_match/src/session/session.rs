@@ -138,11 +138,8 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
                         fn_candidates[fn_slot_idx].iter().filter_map(|c| {
                             let mut bindings =
                                 super::bindings::MetaBindings::new(rust_items.meta.as_ref());
-                            if !bindings.merge_adt_match(
-                                adt_desc.adt_pat_name,
-                                &adt.adt_match,
-                                &adt.ty_bindings,
-                            ) || !bindings.merge_snapshot(&c.snapshot)
+                            if !bindings.merge_adt_ty_bindings(&adt.ty_bindings)
+                                || !bindings.merge_snapshot(&c.snapshot)
                             {
                                 return None;
                             }

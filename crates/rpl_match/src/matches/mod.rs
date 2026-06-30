@@ -18,6 +18,7 @@ use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use crate::CountedMatch;
+use crate::adt::{AdtFieldMap, collect_adt_field_bindings};
 use crate::mir::{CheckMirCtxt, pat};
 use crate::statement::MatchStatement as _;
 use crate::ty::MatchTy as _;
@@ -32,6 +33,7 @@ pub struct Matched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
+    pub adt_fields: AdtFieldMap,
 }
 
 impl Matched<'_> {
@@ -675,7 +677,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             if self.match_graph() {
                 self.matching.log_matched(self.cx);
                 let mut matched = self.matched.take();
-                matched.push(self.matching.to_matched());
+                matched.push(self.matching.to_matched(self.cx));
                 self.matched.set(matched);
             }
             return;
@@ -1266,7 +1268,7 @@ impl<'tcx> Matching<'tcx> {
         }
     }
 
-    fn to_matched(&self) -> Matched<'tcx> {
+    fn to_matched(&self, cx: &CheckMirCtxt<'_, '_, 'tcx>) -> Matched<'tcx> {
         let basic_blocks = self
             .basic_blocks
             .iter_enumerated()
@@ -1308,6 +1310,7 @@ impl<'tcx> Matching<'tcx> {
                     .unwrap_or_else(|| panic!("bug: place variable {place_var:?} not matched"))
             })
             .collect();
+        let adt_fields = collect_adt_field_bindings(&cx.ty);
 
         Matched {
             basic_blocks,
@@ -1315,6 +1318,7 @@ impl<'tcx> Matching<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
         }
     }
 }

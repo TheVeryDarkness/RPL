@@ -66,11 +66,7 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
         }
         for candidate in &self.adt_candidates[slot_idx] {
             let mut trial = bindings.clone();
-            if !trial.merge_adt_match(
-                desc.adt_pat_name,
-                &candidate.adt_match,
-                &candidate.ty_bindings,
-            ) {
+            if !trial.merge_adt_ty_bindings(&candidate.ty_bindings) {
                 continue;
             }
             assignments.push(SlotAssignment {
