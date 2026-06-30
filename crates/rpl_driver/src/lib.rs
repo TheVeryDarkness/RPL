@@ -23,8 +23,9 @@ use std::convert::identity;
 use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
+use rpl_match::matches::artifact::NormalizedMatched;
 use rpl_match::session::{MatchCollectCtxt, MatchSession, SessionConfig};
-use rpl_match::{CrateItemIndex, MetaBindings, MultiMatched, OwnedLintMatch};
+use rpl_match::{CrateItemIndex, MultiMatched, OwnedLintMatch};
 use rpl_meta::context::MetaContext;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -174,16 +175,20 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 
     fn dedupe_pending(pending: Vec<PendingLint<'pcx, 'tcx>>) -> Vec<PendingLint<'pcx, 'tcx>> {
-        let mut seen: Vec<(Symbol, LocalDefId, MetaBindings<'tcx>)> = Vec::new();
+        let mut seen: Vec<(Symbol, LocalDefId, NormalizedMatched<'tcx>)> = Vec::new();
         pending
             .into_iter()
             .filter(|lint| {
-                !seen.iter().any(|(pat, def, bindings)| {
+                !seen.iter().any(|(pat, def, normalized)| {
                     *pat == lint.pat_name
                         && *def == lint.owned.def_id
-                        && bindings.equivalent_to(&lint.owned.bindings)
+                        && normalized == &lint.owned.normalized
                 }) && {
-                    seen.push((lint.pat_name, lint.owned.def_id, lint.owned.bindings.clone()));
+                    seen.push((
+                        lint.pat_name,
+                        lint.owned.def_id,
+                        lint.owned.normalized.clone(),
+                    ));
                     true
                 }
             })
