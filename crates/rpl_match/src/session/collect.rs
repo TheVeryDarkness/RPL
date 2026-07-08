@@ -16,12 +16,14 @@ use crate::predicate_evaluator::PredicateEvaluator;
 use crate::session::bindings::BindingSnapshot;
 use crate::session::slot::{AdtSlotCandidate, AdtSlotDesc, CrateAdtItem, CrateFnItem, FnSlotCandidate};
 
+type FnCandidateCache<'tcx> = RefCell<FxHashMap<(DefId, usize, usize), Vec<FnSlotCandidate<'tcx>>>>;
+
 pub struct MatchCollectCtxt<'a, 'pcx, 'tcx> {
     pub tcx: TyCtxt<'tcx>,
     pub pcx: PatCtxt<'pcx>,
     pub pat_name: Symbol,
     pub body_caches: &'a RefCell<FxHashMap<DefId, BodyInfoCache>>,
-    fn_candidate_cache: &'a RefCell<FxHashMap<(DefId, usize, usize), Vec<FnSlotCandidate<'tcx>>>>,
+    fn_candidate_cache: &'a FnCandidateCache<'tcx>,
 }
 
 impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
@@ -30,7 +32,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         pcx: PatCtxt<'pcx>,
         pat_name: Symbol,
         body_caches: &'a RefCell<FxHashMap<DefId, BodyInfoCache>>,
-        fn_candidate_cache: &'a RefCell<FxHashMap<(DefId, usize, usize), Vec<FnSlotCandidate<'tcx>>>>,
+        fn_candidate_cache: &'a FnCandidateCache<'tcx>,
     ) -> Self {
         Self {
             tcx,
@@ -133,7 +135,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         if !self.check_constraints(fn_pat, item.def_id, body, &matched) {
             return Vec::new();
         }
-        let normalized = NormalizedMatched::new(&matched, &labels, &attr_map);
+        let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
         vec![FnSlotCandidate {
             def_id: item.def_id,
             snapshot: BindingSnapshot::from_normalized(&normalized),

@@ -37,6 +37,10 @@ pub struct PredicateEvaluator<'e, 'm, 'tcx> {
 }
 
 impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "This is a constructor, and must take all arguments"
+    )]
     pub fn new(
         tcx: TyCtxt<'tcx>,
         typing_env: ty::TypingEnv<'tcx>,

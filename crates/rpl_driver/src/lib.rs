@@ -1,5 +1,6 @@
 #![feature(rustc_private)]
 #![warn(unused_qualifications)]
+extern crate either;
 extern crate rustc_data_structures;
 extern crate rustc_errors;
 extern crate rustc_fluent_macro;
@@ -10,9 +11,7 @@ extern crate rustc_macros;
 extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
-#[macro_use]
 extern crate tracing;
-extern crate either;
 
 rustc_fluent_macro::fluent_messages! { "../messages.en.ftl" }
 
@@ -226,7 +225,7 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
     }
 }
 
-fn fn_decl<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Option<&'tcx FnDecl<'tcx>> {
+fn fn_decl(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Option<&FnDecl<'_>> {
     tcx.hir().fn_decl_by_hir_id(tcx.local_def_id_to_hir_id(def_id))
 }
 
@@ -256,7 +255,7 @@ impl<'tcx> Visitor<'tcx> for CheckFnCtxt<'_, 'tcx> {
     fn visit_fn(
         &mut self,
         kind: intravisit::FnKind<'tcx>,
-        _decl: &'tcx hir::FnDecl<'tcx>,
+        _decl: &'tcx FnDecl<'tcx>,
         body_id: hir::BodyId,
         _span: Span,
         def_id: LocalDefId,

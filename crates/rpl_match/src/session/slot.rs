@@ -188,7 +188,7 @@ pub struct CrateAdtItem {
 }
 
 impl CrateItemIndex {
-    pub fn build<'tcx>(tcx: TyCtxt<'tcx>) -> Self {
+    pub fn build(tcx: TyCtxt<'_>) -> Self {
         let mut index = Self::default();
         let hir = tcx.hir();
 

@@ -143,8 +143,8 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
     fn push_result(
         &self,
         bindings: &MetaBindings<'tcx>,
-        assignments: &Vec<SlotAssignment<'tcx>>,
-        _used_defs: &Vec<LocalDefId>,
+        assignments: &[SlotAssignment<'tcx>],
+        _used_defs: &[LocalDefId],
         results: &mut Vec<SessionResult<'tcx>>,
     ) {
         let has_fn = assignments.iter().any(|a| matches!(a.candidate, SlotCandidate::Fn(_)));
@@ -183,7 +183,7 @@ impl<'a, 'pcx, 'tcx> CspSolver<'a, 'tcx> {
             });
 
         results.push(SessionResult {
-            assignments: assignments.clone(),
+            assignments: assignments.to_vec(),
             bindings: bindings.clone(),
             primary_fn,
         });

@@ -17,7 +17,7 @@ pub struct MultiMatched<'a, 'tcx> {
     pub normalized: &'a NormalizedMatched<'tcx>,
 }
 
-impl<'a, 'tcx> std::fmt::Debug for MultiMatched<'a, 'tcx> {
+impl std::fmt::Debug for MultiMatched<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MultiMatched").finish_non_exhaustive()
     }

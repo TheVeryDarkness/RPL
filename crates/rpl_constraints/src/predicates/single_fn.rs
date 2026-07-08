@@ -23,7 +23,7 @@ pub fn runs_outside_main<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> bool {
 /// After `ctor` macro expansion, registration hooks call the user function:
 /// - `#[ctor]`: `{name}::__CTOR_FUNCTION::__CTOR_FUNCTION_INNER` calls `{name}()`
 /// - `#[dtor]`: `{name}::__dtor` calls `{name}()`
-fn is_invoked_from_ctor_crate_hook<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> bool {
+fn is_invoked_from_ctor_crate_hook(tcx: TyCtxt<'_>, def_id: LocalDefId) -> bool {
     let target = def_id.to_def_id();
     tcx.hir_crate_items(())
         .nested_bodies()
@@ -39,7 +39,7 @@ fn is_invoked_from_ctor_crate_hook<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) 
         })
 }
 
-fn mir_has_ctor_exit_hook_call<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> bool {
+fn mir_has_ctor_exit_hook_call(tcx: TyCtxt<'_>, def_id: LocalDefId) -> bool {
     if !tcx.is_mir_available(def_id) {
         return false;
     }
@@ -58,7 +58,7 @@ fn mir_has_ctor_exit_hook_call<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> b
     })
 }
 
-fn mir_has_zero_arg_call_to<'tcx>(tcx: TyCtxt<'tcx>, caller: LocalDefId, callee: DefId) -> bool {
+fn mir_has_zero_arg_call_to(tcx: TyCtxt<'_>, caller: LocalDefId, callee: DefId) -> bool {
     let body = tcx.optimized_mir(caller);
     body.basic_blocks.iter().any(|bb_data| {
         let Some(term) = bb_data.terminator.as_ref() else {
@@ -71,7 +71,7 @@ fn mir_has_zero_arg_call_to<'tcx>(tcx: TyCtxt<'tcx>, caller: LocalDefId, callee:
     })
 }
 
-fn callee_def_id<'tcx>(func: &Operand<'tcx>) -> Option<DefId> {
+fn callee_def_id(func: &Operand<'_>) -> Option<DefId> {
     let Operand::Constant(box mir::ConstOperand { const_, .. }) = func else {
         return None;
     };
@@ -81,7 +81,7 @@ fn callee_def_id<'tcx>(func: &Operand<'tcx>) -> Option<DefId> {
     Some(*def_id)
 }
 
-fn is_ctor_exit_hook<'tcx>(tcx: TyCtxt<'tcx>, callee: DefId) -> bool {
+fn is_ctor_exit_hook(tcx: TyCtxt<'_>, callee: DefId) -> bool {
     for path in ["ctor::__support::at_binary_exit", "ctor::__support::at_library_exit"] {
         let symbols: Vec<Symbol> = path.split("::").map(Symbol::intern).collect();
         let resolved = def_path_res(tcx, &symbols, PatItemKind::Fn);

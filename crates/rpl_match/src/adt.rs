@@ -155,6 +155,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         candidates.candidates_not_empty().then_some(candidates)
     }
 
+    #[expect(clippy::only_used_in_recursion, reason = "for future usage")]
     fn match_field_candidates(
         &self,
         candidates: &FieldCandidates<'tcx>,
@@ -195,6 +196,7 @@ pub struct AdtMatch<'tcx> {
 enum AdtMatchKind<'tcx> {
     Struct(FieldCandidates<'tcx>),
     Enum {
+        #[expect(dead_code, reason = "for future usage")]
         variant_idx: rustc_abi::VariantIdx,
         fields: FieldCandidates<'tcx>,
     },
@@ -376,7 +378,7 @@ mod tests {
 }
 
 /// Collect all committed ADT field bindings from a fn MIR match context.
-pub fn collect_adt_field_bindings<'pcx, 'tcx>(ty: &MatchTyCtxt<'pcx, 'tcx>) -> AdtFieldMap {
+pub fn collect_adt_field_bindings(ty: &MatchTyCtxt<'_, '_>) -> AdtFieldMap {
     let mut map = AdtFieldMap::default();
     for (adt_pat, matches) in ty.adt_matches.borrow().iter() {
         for adt_match in matches.values() {

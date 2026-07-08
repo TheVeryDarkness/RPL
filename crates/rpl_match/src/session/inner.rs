@@ -349,7 +349,7 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
     }
 }
 
-impl<'tcx> SessionResult<'tcx> {
+impl SessionResult<'_> {
     fn map_bindings(self, map: &pat::MatchedMap) -> Self {
         let assignments = self
             .assignments

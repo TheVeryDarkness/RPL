@@ -119,7 +119,7 @@ impl<'tcx> MetaBindings<'tcx> {
                 continue;
             }
             match &self.ty_vars[idx] {
-                None => self.ty_vars[idx] = Some(value.clone()),
+                None => self.ty_vars[idx] = Some(*value),
                 Some(existing) if existing == value => {},
                 Some(_) => return false,
             }
