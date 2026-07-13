@@ -32,14 +32,7 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             return Vec::new();
         }
 
-        let mut results = SessionMatching::run(
-            &self.collect,
-            self.config,
-            index,
-            rust_items,
-            &fn_slots,
-            &adt_slots,
-        );
+        let mut results = SessionMatching::run(&self.collect, self.config, index, rust_items, &fn_slots, &adt_slots);
         results = Self::deduplicate_fn_slot_permutations(results);
         self.enrich_results(index, &mut results);
         Self::deduplicate_results(rust_items.attr.should_deduplicate(), results)
