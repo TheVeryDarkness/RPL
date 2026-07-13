@@ -3,7 +3,7 @@ use rustc_hir::def_id::LocalDefId;
 
 use crate::session::collect::MatchCollectCtxt;
 use crate::session::config::SessionConfig;
-use crate::session::matching::{SessionMatching, SlotPolicy};
+use crate::session::matching::SessionMatching;
 use crate::session::slot::{CrateItemIndex, SessionResult, SlotCandidate, collect_slot_descs};
 
 /// Orchestrates candidate collection and multi-slot matching for one pattern item.
@@ -32,7 +32,6 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             return Vec::new();
         }
 
-        let policy = SlotPolicy::from_slots(&fn_slots, &adt_slots);
         let mut results = SessionMatching::run(
             &self.collect,
             self.config,
@@ -40,12 +39,8 @@ impl<'a, 'pcx, 'tcx> MatchSession<'a, 'pcx, 'tcx> {
             rust_items,
             &fn_slots,
             &adt_slots,
-            policy,
         );
-
-        if policy.needs_fn_permutation_dedupe() {
-            results = Self::deduplicate_fn_slot_permutations(results);
-        }
+        results = Self::deduplicate_fn_slot_permutations(results);
         self.enrich_results(index, &mut results);
         Self::deduplicate_results(rust_items.attr.should_deduplicate(), results)
     }
