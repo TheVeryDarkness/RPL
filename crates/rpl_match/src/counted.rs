@@ -36,6 +36,10 @@ impl<T: Copy + PartialEq> CountedMatch<T> {
         debug_assert!(self.0.get().is_some());
         self.0.update(|m| m.and_then(Counted::dec));
     }
+    /// Drop the binding regardless of reference count (e.g. after candidate probing).
+    pub fn clear(&self) {
+        self.0.set(None);
+    }
     pub fn try_take(&self) -> Option<T> {
         self.0.get().map(Counted::into_inner)
     }

@@ -136,11 +136,14 @@ impl<'pcx, 'tcx> MatchTy<'pcx, 'tcx> for MatchTyCtxt<'pcx, 'tcx> {
         false
     }
     fn match_adt_matches(&self, pat: Symbol, adt_match: AdtMatch<'tcx>) -> bool {
+        // Keep the first AdtMatch for this DefId so FieldPat bindings accumulated during
+        // statement matching are not wiped when the ADT type is re-matched.
         self.adt_matches
             .borrow_mut()
             .entry(pat)
             .or_default()
-            .insert(adt_match.adt.did(), adt_match);
+            .entry(adt_match.adt.did())
+            .or_insert(adt_match);
         true
     }
 
@@ -315,7 +318,10 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
 
     #[instrument(level = "trace", skip(self), ret)]
     fn match_adt(&self, adt_pat: &pat::Adt<'pcx>, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
-        MatchAdtCtxt::new(self.tcx(), self.pcx(), self.pat(), adt_pat).match_adt(adt)
+        // Structure + unique commits; ambiguous fields stay for FieldPat.
+        // Use caller TypingEnv so predicates like is_not_unpin do not fail-open.
+        MatchAdtCtxt::with_typing_env(self.tcx(), self.pcx(), self.pat(), adt_pat, self.typing_env())
+            .match_adt_for_fn_mir(adt)
     }
 
     #[instrument(level = "trace", skip(self), ret)]

@@ -18,7 +18,10 @@ use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use crate::CountedMatch;
-use crate::adt::{AdtFieldMap, collect_adt_field_bindings};
+use crate::adt::{
+    AdtFieldMap, all_adt_fields_resolved, collect_adt_field_bindings, reset_adt_field_bindings_after_probe,
+    seed_ty_vars_from_adt_field_candidates,
+};
 use crate::mir::{CheckMirCtxt, pat};
 use crate::statement::MatchStatement as _;
 use crate::ty::MatchTy as _;
@@ -520,6 +523,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                 matches.candidates.insert(only_candidate);
             }
         }
+        // Re-seed ty-vars from ADT field bitsets before taking them into Matching,
+        // so FieldPat probe locking cannot drop alternate field types.
+        seed_ty_vars_from_adt_field_candidates(&self.cx.ty);
         for (candidates, matches) in core::iter::zip(&self.cx.ty.ty_vars, &mut self.matching.ty_vars) {
             matches.candidates = std::mem::take(&mut *candidates.borrow_mut());
         }
@@ -529,6 +535,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         for (candidates, matches) in core::iter::zip(&self.cx.places, &mut self.matching.place_vars) {
             matches.candidates = std::mem::take(&mut *candidates.borrow_mut());
         }
+        // Candidate probing may have bound FieldPat matches as a side effect; clear them
+        // so actual matching starts from structure + unique commits only.
+        reset_adt_field_bindings_after_probe(&self.cx.ty);
     }
     #[instrument(level = "info", skip(self), fields(?pat_name = self.cx.pat_name, ?fn_name = self.cx.fn_pat.name))]
     fn do_match(&mut self) {
@@ -674,7 +683,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_stmt_candidates(&self, loc_pats: &[pat::Location]) {
         let Some((&loc_pat, loc_pats)) = loc_pats.split_first() else {
-            if self.match_graph() {
+            if self.match_graph() && all_adt_fields_resolved(&self.cx.ty) {
                 self.matching.log_matched(self.cx);
                 let mut matched = self.matched.take();
                 matched.push(self.matching.to_matched(self.cx));

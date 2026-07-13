@@ -20,6 +20,15 @@ pub enum MatchSlot {
     ImplFn { impl_name: Symbol, fn_name: Symbol },
 }
 
+impl MatchSlot {
+    pub fn fn_index(self) -> Option<usize> {
+        match self {
+            MatchSlot::Fn(idx) => Some(idx),
+            _ => None,
+        }
+    }
+}
+
 /// A single function-slot match candidate.
 #[derive(Debug, Clone)]
 pub struct FnSlotCandidate<'tcx> {

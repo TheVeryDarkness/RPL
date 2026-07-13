@@ -129,7 +129,7 @@ impl<'tcx> MetaBindings<'tcx> {
 
     /// ADT definition matching may bind type metas to generic parameters; concrete
     /// bindings come from monomorphized function slots instead.
-    fn should_skip_ty_binding(ty: Ty<'tcx>) -> bool {
+    pub(crate) fn should_skip_ty_binding(ty: Ty<'tcx>) -> bool {
         matches!(
             ty.kind(),
             rustc_middle::ty::TyKind::Param(_) | rustc_middle::ty::TyKind::Never
