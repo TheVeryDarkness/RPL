@@ -10,7 +10,7 @@ pub use bindings::{BindingSnapshot, MetaBindings};
 pub use collect::MatchCollectCtxt;
 pub use config::{DEFAULT_MAX_SESSION_RESULTS, SessionConfig};
 pub use inner::MatchSession;
-pub use matching::SessionMatching;
+pub use matching::{Combine, SessionMatching, SlotPolicy};
 pub use multi_matched::{MultiMatched, OwnedLintMatch, SessionLintTarget};
 pub use slot::{
     AdtSlotCandidate, AdtSlotDesc, CrateAdtItem, CrateFnItem, CrateItemIndex, FnMatchContext, FnSlotCandidate,

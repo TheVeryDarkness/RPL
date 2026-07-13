@@ -1,7 +1,8 @@
 //! Unified multi-slot matching with function-owned locals/locations.
 //!
-//! Replaces CSP for ConcurrentSlots: shared metavars live in one context; MIR locals/locations
-//! are keyed by [`MatchSlot`] and carry [`LocalDefId`].
+//! All [`RustItems`](rpl_context::pat::RustItems) matching goes through [`SessionMatching`]:
+//! shared metavars live in one context; MIR locals/locations are keyed by [`MatchSlot`] and
+//! carry [`LocalDefId`]. [`SlotPolicy`] selects And (fill all slots) vs Or (one result per hit).
 
 use std::cell::Cell;
 
@@ -31,6 +32,72 @@ pub type OwnedLocationPat = (MatchSlot, pat::Location);
 pub type OwnedMirLocal = (LocalDefId, mir::Local);
 /// MIR location tagged with the function it belongs to.
 pub type OwnedMirLocation = (LocalDefId, mir::Location);
+
+/// How multiple successful matches become [`SessionResult`]s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Combine {
+    /// One result fills all non-optional slots (ConcurrentSlots / StructContextSingleFn).
+    And,
+    /// Each successful unit pushes its own result (IndependentWildcardFn / AlternativeFns).
+    Or,
+}
+
+/// Policy derived from slot shape (replaces `RustItemsMatchingMode` branching in the engine).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlotPolicy {
+    pub combine: Combine,
+    /// When [`Combine::And`]: the same `DefId` cannot be assigned to two fn slots.
+    pub exclusive_fn_defs: bool,
+}
+
+impl SlotPolicy {
+    /// Same classification rules as the former `classify_rust_items_matching_mode`.
+    pub fn from_slots(fn_slots: &[FnSlotDesc<'_>], adt_slots: &[AdtSlotDesc<'_>]) -> Self {
+        let body_slots: Vec<_> = fn_slots
+            .iter()
+            .filter(|desc| !desc.fn_pat.is_signature_only())
+            .collect();
+
+        if adt_slots.is_empty() {
+            if body_slots.len() == 1 && body_slots[0].optional {
+                // IndependentWildcardFn
+                Self {
+                    combine: Combine::Or,
+                    exclusive_fn_defs: false,
+                }
+            } else if body_slots.len() > 1 {
+                // AlternativeFns
+                Self {
+                    combine: Combine::Or,
+                    exclusive_fn_defs: false,
+                }
+            } else {
+                // ConcurrentSlots (e.g. only signature-only fns, or empty body list edge)
+                Self {
+                    combine: Combine::And,
+                    exclusive_fn_defs: true,
+                }
+            }
+        } else if body_slots.len() == 1 && !body_slots[0].optional {
+            // StructContextSingleFn
+            Self {
+                combine: Combine::And,
+                exclusive_fn_defs: true,
+            }
+        } else {
+            // ConcurrentSlots (e.g. multi_fn_shared_ty)
+            Self {
+                combine: Combine::And,
+                exclusive_fn_defs: true,
+            }
+        }
+    }
+
+    /// Whether post-process should collapse fn-slot permutations of the same DefId set.
+    pub fn needs_fn_permutation_dedupe(self) -> bool {
+        matches!(self.combine, Combine::And)
+    }
+}
 
 #[derive(Debug, Default)]
 struct DefMatches {
@@ -99,10 +166,11 @@ struct AdtProbe<'tcx> {
 
 type FnMirCache<'tcx> = FxHashMap<(MatchSlot, LocalDefId), Vec<FnSlotCandidate<'tcx>>>;
 
-/// Unified session matching context for ConcurrentSlots.
+/// Unified session matching context for all [`RustItems`](rpl_context::pat::RustItems) modes.
 pub struct SessionMatching<'a, 'pcx, 'tcx> {
     collect: &'a MatchCollectCtxt<'a, 'pcx, 'tcx>,
     config: SessionConfig,
+    policy: SlotPolicy,
     rust_items: &'pcx pat::RustItems<'pcx>,
     fn_slots: &'a [FnSlotDesc<'pcx>],
     adt_slots: &'a [AdtSlotDesc<'pcx>],
@@ -116,7 +184,6 @@ pub struct SessionMatching<'a, 'pcx, 'tcx> {
     fn_defs: FxHashMap<MatchSlot, DefMatches>,
     adt_defs: FxHashMap<MatchSlot, DefMatches>,
     adt_probes: FxHashMap<(MatchSlot, LocalDefId), AdtProbe<'tcx>>,
-    /// Crate fn items discovered during probe (for lazy MIR collect).
     fn_items: FxHashMap<(MatchSlot, LocalDefId), CrateFnItem>,
 
     locals: FxHashMap<OwnedLocalPat, OwnedLocalMatches>,
@@ -136,11 +203,13 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
         rust_items: &'pcx pat::RustItems<'pcx>,
         fn_slots: &'a [FnSlotDesc<'pcx>],
         adt_slots: &'a [AdtSlotDesc<'pcx>],
+        policy: SlotPolicy,
     ) -> Vec<SessionResult<'tcx>> {
         let meta = rust_items.meta.as_ref();
         let mut matching = Self {
             collect,
             config,
+            policy,
             rust_items,
             fn_slots,
             adt_slots,
@@ -171,7 +240,6 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
         matching.results
     }
 
-    /// Fill DefId / ty candidates without materializing the full cross-slot MIR product.
     fn probe(&mut self, index: &CrateItemIndex) {
         for desc in self.adt_slots {
             for item in &index.adts {
@@ -210,10 +278,56 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
     }
 
     fn match_candidates(&mut self) {
-        let mut bindings = MetaBindings::new(self.rust_items.meta.as_ref());
-        let mut used_defs = Vec::new();
-        let mut assignments = Vec::new();
-        self.match_ty_vars(TyVarIdx::from_u32(0), &mut bindings, &mut used_defs, &mut assignments);
+        match self.policy.combine {
+            Combine::And => {
+                let mut bindings = MetaBindings::new(self.rust_items.meta.as_ref());
+                let mut used_defs = Vec::new();
+                let mut assignments = Vec::new();
+                self.match_ty_vars(TyVarIdx::from_u32(0), &mut bindings, &mut used_defs, &mut assignments);
+            },
+            Combine::Or => {
+                // Or modes have no ADT slots under current classification.
+                debug_assert!(self.adt_slots.is_empty());
+                let body_slots: Vec<_> = self
+                    .fn_slots
+                    .iter()
+                    .copied()
+                    .filter(|desc| !desc.fn_pat.is_signature_only())
+                    .collect();
+                let slots: Vec<FnSlotDesc<'pcx>> = if body_slots.is_empty() {
+                    self.fn_slots.to_vec()
+                } else {
+                    body_slots
+                };
+                for desc in slots {
+                    self.match_fn_slot_or(desc);
+                }
+            },
+        }
+    }
+
+    /// Or: each DefId (and each MIR match) for this slot becomes its own [`SessionResult`].
+    fn match_fn_slot_or(&mut self, desc: FnSlotDesc<'pcx>) {
+        let def_cands = self.fn_defs[&desc.slot].candidates.clone();
+        for def_id in def_cands {
+            if self.config.max_results > 0 && self.results.len() >= self.config.max_results {
+                return;
+            }
+            let mir_cands = self.fn_mir_for(desc.slot, desc.fn_pat, def_id);
+            for cand in mir_cands {
+                let mut bindings = MetaBindings::new(self.rust_items.meta.as_ref());
+                if !bindings.merge_snapshot(&cand.snapshot) {
+                    continue;
+                }
+                self.ingest_fn_matched(desc.slot, &cand);
+                let assignments = vec![SlotAssignment {
+                    slot: desc.slot,
+                    candidate: SlotCandidate::Fn(cand.clone()),
+                }];
+                self.push_result(&bindings, &assignments);
+                self.unenest_fn_matched(desc.slot, &cand);
+            }
+        }
     }
 
     fn match_ty_vars(
@@ -313,19 +427,20 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
         let def_cands = self.fn_defs[&desc.slot].candidates.clone();
 
         if desc.optional {
+            // And + optional: may skip this slot entirely.
             self.fn_skipped[&desc.slot].set(true);
             self.match_fn_slots(slot_i + 1, bindings, used_defs, assignments);
             self.fn_skipped[&desc.slot].set(false);
 
             for def_id in def_cands {
-                if used_defs.contains(&def_id) {
+                if self.policy.exclusive_fn_defs && used_defs.contains(&def_id) {
                     continue;
                 }
                 self.try_fn_candidate(desc, def_id, slot_i, bindings, used_defs, assignments);
             }
         } else {
             for def_id in def_cands {
-                if used_defs.contains(&def_id) {
+                if self.policy.exclusive_fn_defs && used_defs.contains(&def_id) {
                     continue;
                 }
                 self.try_fn_candidate(desc, def_id, slot_i, bindings, used_defs, assignments);
@@ -355,7 +470,6 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
                 continue;
             }
 
-            // Search-time filter: owned MIR locals must belong to the assigned DefId.
             if !self.locals_consistent_with_def(desc.slot, def_id) {
                 self.fn_defs.get_mut(&desc.slot).unwrap().matched.unmatch();
                 self.unenest_fn_matched(desc.slot, &cand);
@@ -461,9 +575,11 @@ impl<'a, 'pcx, 'tcx> SessionMatching<'a, 'pcx, 'tcx> {
         if !has_fn && !has_adt {
             return;
         }
-        let requires_fn = self.fn_slots.iter().any(|s| !s.optional);
-        if requires_fn && !has_fn {
-            return;
+        if matches!(self.policy.combine, Combine::And) {
+            let requires_fn = self.fn_slots.iter().any(|s| !s.optional);
+            if requires_fn && !has_fn {
+                return;
+            }
         }
 
         let primary_fn = assignments
@@ -528,5 +644,20 @@ mod tests {
         m.unmatch();
         m.unmatch();
         assert!(m.get().is_none());
+    }
+
+    #[test]
+    fn slot_policy_wildcard_is_or() {
+        // from_slots needs real FnSlotDesc; smoke-test Combine defaults via constructed policy.
+        let p = SlotPolicy {
+            combine: Combine::Or,
+            exclusive_fn_defs: false,
+        };
+        assert!(!p.needs_fn_permutation_dedupe());
+        let and = SlotPolicy {
+            combine: Combine::And,
+            exclusive_fn_defs: true,
+        };
+        assert!(and.needs_fn_permutation_dedupe());
     }
 }
