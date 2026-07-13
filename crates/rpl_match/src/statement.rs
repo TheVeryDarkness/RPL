@@ -461,7 +461,7 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             (pat::Rvalue::Use(operand_pat), mir::Rvalue::Use(operand)) => {
                 self.unmatch_operand(operand_pat, operand);
             },
-            (&pat::Rvalue::Repeat(ref operand_pat, _), &mir::Rvalue::Repeat(ref operand, _)) => {
+            (pat::Rvalue::Repeat(operand_pat, _), mir::Rvalue::Repeat(operand, _)) => {
                 self.unmatch_operand(operand_pat, operand);
             },
             (&pat::Rvalue::Ref(_, _, place_pat), &mir::Rvalue::Ref(_, _, place))
@@ -471,13 +471,13 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             | (&pat::Rvalue::CopyForDeref(place_pat), &mir::Rvalue::CopyForDeref(place)) => {
                 self.unmatch_place(place_pat, place);
             },
-            (&pat::Rvalue::Cast(_, ref operand_pat, _), &mir::Rvalue::Cast(_, ref operand, _)) => {
+            (pat::Rvalue::Cast(_, operand_pat, _), mir::Rvalue::Cast(_, operand, _)) => {
                 self.unmatch_operand(operand_pat, operand);
             },
             (pat::Rvalue::UnaryOp(_, operand_pat), mir::Rvalue::UnaryOp(_, operand)) => {
                 self.unmatch_operand(operand_pat, operand);
             },
-            (&pat::Rvalue::ShallowInitBox(ref operand_pat, _), &mir::Rvalue::ShallowInitBox(ref operand, _)) => {
+            (pat::Rvalue::ShallowInitBox(operand_pat, _), mir::Rvalue::ShallowInitBox(operand, _)) => {
                 self.unmatch_operand(operand_pat, operand);
             },
             (pat::Rvalue::BinaryOp(_, box [lhs_pat, rhs_pat]), mir::Rvalue::BinaryOp(_, box (lhs, rhs))) => {
