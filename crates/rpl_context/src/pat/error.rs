@@ -23,7 +23,7 @@ use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 use thiserror::Error;
 
-use super::Matched;
+use super::{Matched, Spanned};
 use crate::pat::{ConstVarIdx, TyVarIdx};
 
 /// A dynamic error that can be used to report user-defined errors
@@ -336,6 +336,8 @@ pub(crate) struct DynamicErrorBuilder<'i> {
 pub enum ParseError<'i> {
     #[display("Primary message not found:\n{_0}")]
     PrimaryNotFound(SpanWrapper<'i>),
+    #[display("Primary label `{_0}` not found in pattern:\n{_1}")]
+    PrimaryLabelNotFound(&'i str, SpanWrapper<'i>),
     #[display("Lint name not found:\n{_0}")]
     MissingName(SpanWrapper<'i>),
     #[display("Expected an identifier, but found:\n{_0}")]
@@ -372,14 +374,29 @@ fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> R
     Ok(ident.span.as_str())
 }
 
-fn parse_idents<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> Result<Vec<&'i str>, ParseError<'i>> {
+/// Parse `primary(...)` label names. Each label must exist in the pattern (any [`Spanned`] kind).
+fn parse_primary_idents<'i>(
+    path: &'i std::path::Path,
+    attrs: &pairs::diagAttrs<'i>,
+    label_map: &FxHashMap<Symbol, Spanned>,
+) -> Result<Vec<&'i str>, ParseError<'i>> {
     let mut idents = Vec::new();
     for attr in collect_elems_separated_by_comma!(attrs) {
         let (ident, arguments_or_value) = attr.get_matched();
         if arguments_or_value.is_some() {
             return Err(ParseError::NotAnIdentifier(SpanWrapper::new(attr.span, path)));
         }
-        idents.push(ident.span.as_str());
+        let name = ident.span.as_str();
+        if !label_map.contains_key(&Symbol::intern(name)) {
+            return Err(ParseError::PrimaryLabelNotFound(
+                name,
+                SpanWrapper::new(attr.span, path),
+            ));
+        }
+        idents.push(name);
+    }
+    if idents.is_empty() {
+        return Err(ParseError::Empty(SpanWrapper::new(attrs.span, path)));
     }
     Ok(idents)
 }
@@ -435,6 +452,7 @@ impl<'i> DynamicErrorBuilder<'i> {
         meta_vars: &NonLocalMetaSymTab<'mcx>,
         consts: &FxHashMap<Symbol, &'i str>,
         locals: &FxHashSet<Symbol>,
+        label_map: &FxHashMap<Symbol, Spanned>,
         table: &DiagSymbolTable,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
@@ -457,9 +475,10 @@ impl<'i> DynamicErrorBuilder<'i> {
 
             match key {
                 "primary" => {
-                    let idents = parse_idents(
+                    let idents = parse_primary_idents(
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
+                        label_map,
                     )?;
                     primary = Some((SubMsg::parse(message, meta_vars, consts, locals), idents));
                 },
@@ -520,6 +539,12 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         Ok(builder)
     }
+
+    /// Primary label names in declaration order (used for lint-root selection, last first).
+    pub(crate) fn primary_labels(&self) -> &[&'i str] {
+        &self.primary.1
+    }
+
     #[instrument(level = "debug", skip(self, source_map, body, decl))]
     pub(crate) fn build<'tcx>(
         &self,

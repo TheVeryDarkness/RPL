@@ -175,6 +175,16 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                 }
                 p(self.tcx, self.typing_env, self.body, self.body_cache, args)
             },
+            PredicateKind::MultiplePlaces(p) => {
+                let mut args = Vec::new();
+                for arg in arg_instance.iter() {
+                    match arg {
+                        PredicateArgInstance::Place(place) => args.push(*place),
+                        _ => panic!("PredicateArgInstance::Place expected, got {:?}", arg),
+                    }
+                }
+                p(self.tcx, self.typing_env, self.body, self.body_cache, args)
+            },
             PredicateKind::SingleLocal(p) => {
                 assert!(
                     arg_instance.len() == 1,

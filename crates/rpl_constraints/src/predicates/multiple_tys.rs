@@ -59,7 +59,13 @@ pub fn compatible_layout<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx
     true
 }
 
-/// Check if niche of those types are ordered increasingly
+/// Check if niche of those types are ordered increasingly (source validity ⊆ target).
+///
+/// Aligned with Clippy's `eager_transmute` niche check:
+/// - `(Some, Some)`: target valid_range contains source valid_range
+/// - `(_, None)`: target has no niche → treated as ordered/safe
+/// - `(None, Some)`: source has full validity, target has a niche → not ordered
+/// - layout failure → ordered/safe (do not lint)
 #[instrument(level = "debug", skip(tcx, typing_env), ret)]
 pub fn niche_ordered<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, tys: Vec<Ty<'tcx>>) -> bool {
     #[instrument(level = "trace", ret)]
@@ -70,20 +76,25 @@ pub fn niche_ordered<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, t
                 let to = to.valid_range;
                 to.contains(from.start) && to.contains(from.end)
             },
-            (Some(_), None) => true,
-            _ => false,
+            // Target has no niche (full validity) → source is always "contained"
+            (_, None) => true,
+            // Source has no niche, target has one → not ordered
+            (None, Some(_)) => false,
         }
     }
 
     if let Some((first_ty, remained_tys)) = tys.split_first() {
         let Ok(prev) = tcx.layout_of(typing_env.as_query_input(*first_ty)) else {
-            return false;
+            // Unknown layout: treat as ordered so we do not spuriously lint
+            warn!(?first_ty, "unknown layout");
+            return true;
         };
         let mut prev_niche = prev.largest_niche;
 
         for ty in remained_tys {
             let Ok(layout) = tcx.layout_of(typing_env.as_query_input(*ty)) else {
-                return false;
+                warn!(?ty, "unknown layout");
+                return true;
             };
             let niche = layout.largest_niche;
             if !range_fully_contained(prev_niche, niche) {

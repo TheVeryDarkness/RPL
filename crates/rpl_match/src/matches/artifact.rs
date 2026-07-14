@@ -164,6 +164,15 @@ impl<'tcx> NormalizedMatched<'tcx> {
                 .zip(&other.extra)
                 .all(|((label1, _), (label2, _))| label1 == label2)
     }
+
+    /// Look up a normalized label by name.
+    pub fn spanned(&self, name: &str) -> Option<NormalizedSpanned> {
+        let labels = &self.extra;
+        labels
+            .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
+            .ok()
+            .map(|i| labels[i].1)
+    }
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
@@ -177,12 +186,9 @@ impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
     }
 
     fn try_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Option<Span> {
-        let labels = &self.extra;
-        labels
-            .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
-            .ok()
-            .map(|i| labels[i].1.span(body, decl, source_map))
+        self.spanned(name).map(|s| s.span(body, decl, source_map))
     }
+
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]
     }

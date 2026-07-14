@@ -12,6 +12,7 @@ mod item_attr;
 mod locals;
 mod multiple_consts;
 mod multiple_tys;
+mod places;
 mod single_const;
 mod single_fn;
 mod single_ty;
@@ -22,6 +23,7 @@ mod ty_const;
 pub use locals::*;
 pub use multiple_consts::*;
 pub use multiple_tys::*;
+pub use places::*;
 pub use single_const::*;
 pub use single_fn::*;
 pub use single_ty::*;
@@ -78,12 +80,15 @@ pub const ALL_PREDICATES: &[&str] = &[
     "maybe_misaligned",
     // single_const_preds
     "is_null_ptr",
+    "is_nonzero",
     // multiple_consts_preds
     "usize_lt",
     // single_local_preds
     "is_null",
     // multiple_locals_preds
     "product_of",
+    // multiple_places_preds
+    "mentions_place",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +103,7 @@ pub enum PredicateKind {
     MultipleConsts(MultipleConstsPredsFnPtr),
     SingleLocal(SingleLocalPredsFnPtr),
     MultipleLocals(MultipleLocalsPredsFnPtr),
+    MultiplePlaces(MultiplePlacesPredsFnPtr),
     ItemAttr(ItemAttrPredsFnPtr),
 }
 
@@ -131,9 +137,11 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "runs_outside_main" => Self::Fn(runs_outside_main),
             "maybe_misaligned" => Self::TyConst(maybe_misaligned),
             "is_null_ptr" => Self::SingleConst(is_null_ptr),
+            "is_nonzero" => Self::SingleConst(is_nonzero),
             "usize_lt" => Self::MultipleConsts(usize_lt),
             "product_of" => Self::MultipleLocals(product_of),
             "is_null" => Self::SingleLocal(is_null),
+            "mentions_place" => Self::MultiplePlaces(mentions_place),
             "has_attr" => Self::ItemAttr(has_attr),
             _ => {
                 return Err(PredicateError::InvalidPredicate {

@@ -22,7 +22,7 @@ use std::convert::identity;
 use rpl_constraints::predicates::BodyInfoCache;
 use rpl_context::PatCtxt;
 use rpl_context::pat::DynamicError;
-use rpl_match::matches::artifact::NormalizedMatched;
+use rpl_match::matches::artifact::{NormalizedMatched, NormalizedSpanned};
 use rpl_match::session::{MatchCollectCtxt, MatchSession, SessionConfig};
 use rpl_match::{CrateItemIndex, MatchSlot, MultiMatched, OwnedLintMatch};
 use rpl_meta::context::MetaContext;
@@ -216,12 +216,27 @@ impl<'tcx, 'pcx> CheckFnCtxt<'pcx, 'tcx> {
         let error = pattern
             .get_diag(pat_name, self.tcx.sess.source_map(), fn_name, body, decl, matched)
             .unwrap_or_else(identity);
-        self.tcx.emit_node_span_lint(
-            error.lint(),
-            self.tcx.local_def_id_to_hir_id(def_id),
-            error.primary_span().clone(),
-            error,
-        );
+        let fn_hir_id = self.tcx.local_def_id_to_hir_id(def_id);
+        let primary_labels = pattern.primary_labels(pat_name).unwrap_or(&[]);
+        // Prefer primary labels from last to first for nested `#[allow]` (e.g. `primary(reserve,
+        // set_len)`). Skip Body/Output/Span here so a trailing location primary can still win.
+        let hir_id = primary_labels
+            .iter()
+            .rev()
+            .find_map(|name| match matched.normalized.spanned(name)? {
+                NormalizedSpanned::Location(stmt_match) => {
+                    let scope = stmt_match.source_info(body).scope;
+                    scope.lint_root(&body.source_scopes)
+                },
+                NormalizedSpanned::Local(local) => {
+                    let scope = body.local_decls[local].source_info.scope;
+                    scope.lint_root(&body.source_scopes)
+                },
+                NormalizedSpanned::Body | NormalizedSpanned::Output | NormalizedSpanned::Span(_) => None,
+            })
+            .unwrap_or(fn_hir_id);
+        self.tcx
+            .emit_node_span_lint(error.lint(), hir_id, error.primary_span().clone(), error);
     }
 }
 
