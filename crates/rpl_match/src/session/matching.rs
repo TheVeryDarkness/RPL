@@ -84,13 +84,17 @@ struct TyVarMatches<'tcx> {
 
 #[derive(Debug, Default)]
 struct ConstVarMatches<'tcx> {
+    #[expect(dead_code, reason = "const var does not share between functions")]
     candidates: FxIndexSet<Const<'tcx>>,
+    #[expect(dead_code, reason = "const var does not share between functions")]
     matched: CountedMatch<Const<'tcx>>,
 }
 
 #[derive(Debug, Default)]
 struct PlaceVarMatches<'tcx> {
+    #[expect(dead_code, reason = "place var does not share between functions")]
     candidates: FxIndexSet<PlaceRef<'tcx>>,
+    #[expect(dead_code, reason = "place var does not share between functions")]
     matched: CountedMatch<PlaceRef<'tcx>>,
 }
 
