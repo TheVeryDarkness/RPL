@@ -846,8 +846,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                 self.cx.body.basic_blocks[mir_bb].terminator().kind,
                 mir::TerminatorKind::Return
             );
-            let target_is_return =
-                matches!(self.cx.mir_pat[*target].terminator(), pat::TerminatorKind::Return);
+            let target_is_return = matches!(self.cx.mir_pat[*target].terminator(), pat::TerminatorKind::Return);
             if target_is_return {
                 return mir_is_return;
             }
