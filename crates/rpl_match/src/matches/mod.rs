@@ -830,11 +830,29 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     // `bla.len()` to the end of `bb0`.
     #[instrument(level = "debug", skip(self), ret)]
     fn match_block_ends_with(&self, bb_pat: pat::BasicBlock, bb: mir::BasicBlock) -> bool {
-        // FIXME: handle empty blocks
+        // Empty `Goto` arms: distinguish `return` (Goto to return block) from fallthrough.
+        // Pattern `return` is compiled as `Goto(return_bb)` where `return_bb` has `Return`.
+        // Empty fallthrough is `Goto(join)` after a switch arm.
+        //
+        // Important: `match_block` passes the MIR block where the empty `Goto` terminator was
+        // matched as a statement candidate (often some unrelated `goto`). The switch arm's real
+        // MIR target is stored in `matching.start` by `match_block_starts_with`. Use that when
+        // deciding return vs fallthrough.
         if self.cx.mir_pat[bb_pat].statements.is_empty()
-            && matches!(self.cx.mir_pat[bb_pat].terminator(), pat::TerminatorKind::Goto(_))
+            && let pat::TerminatorKind::Goto(target) = self.cx.mir_pat[bb_pat].terminator()
         {
-            return true;
+            let mir_bb = self.matching[bb_pat].start.get().unwrap_or(bb);
+            let mir_is_return = matches!(
+                self.cx.body.basic_blocks[mir_bb].terminator().kind,
+                mir::TerminatorKind::Return
+            );
+            let target_is_return =
+                matches!(self.cx.mir_pat[*target].terminator(), pat::TerminatorKind::Return);
+            if target_is_return {
+                return mir_is_return;
+            }
+            // Fallthrough: reject pure `Return` so `_ => {}` ≠ `_ => { return }`.
+            return !mir_is_return;
         }
         let matching = &self.matching[bb_pat];
         matching.end.get().is_some_and(|block| block == bb)

@@ -1,4 +1,5 @@
 //@compile-flags: -Z inline-mir=false
+//@check-pass
 use std::cell::UnsafeCell;
 use std::mem;
 use std::sync::atomic::AtomicU64;
@@ -52,8 +53,6 @@ macro_rules! impl_arithmetic {
             pub fn fetch_add(&self, val: $t) -> $t {
                 if can_transmute::<$t, $atomic>() {
                     let a = unsafe { &*(self.value.get() as *const $atomic) };
-                    //~^unsound_cast_between_u64_and_atomic_u64
-                    // False positive, the cast is sound because of the `can_transmute` check
                     a.fetch_add(val, Ordering::AcqRel)
                 } else {
                     // #[cfg(crossbeam_loom)]
