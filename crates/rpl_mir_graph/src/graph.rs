@@ -583,13 +583,13 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
     ) -> impl Iterator<Item = (BasicBlock, usize)> + '_ {
         let from_loc = Location::new(from_bb, from_stmt);
         self.interblock_edges.iter_enumerated().flat_map(move |(bb, edges)| {
-            edges
-                .deps
-                .iter()
-                .enumerate()
-                .filter_map(move |(stmt, entry)| {
-                    entry.entry.get(&from_loc).copied().and_then(|l| (l == local).then_some((bb, stmt)))
-                })
+            edges.deps.iter().enumerate().filter_map(move |(stmt, entry)| {
+                entry
+                    .entry
+                    .get(&from_loc)
+                    .copied()
+                    .and_then(|l| (l == local).then_some((bb, stmt)))
+            })
         })
     }
 }

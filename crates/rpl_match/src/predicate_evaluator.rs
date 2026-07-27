@@ -222,7 +222,8 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         if term.is_neg { !result } else { result }
     }
 
-    /// `flows_to($x, 'src, 'sink)` — `$x` is a pattern local or place; labels are statement anchors.
+    /// `flows_to($x, 'src, 'sink)` — `$x` is a pattern local or place; labels are statement
+    /// anchors.
     #[instrument(level = "debug", skip(self, args), ret)]
     fn eval_flows_to(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
         assert!(
