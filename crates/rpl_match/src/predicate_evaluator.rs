@@ -5,10 +5,11 @@ use rpl_constraints::{Const, Constraints};
 use rpl_context::pat::{self, ConstVarIdx, LabelMap, PlaceVarIdx, Spanned, TyVarIdx};
 use rpl_meta::symbol_table::MetaVariable;
 use rustc_hir::def_id::DefId;
-use rustc_middle::mir::{self, PlaceRef};
-use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_middle::mir::{self, Operand, PlaceRef, TerminatorKind};
+use rustc_middle::ty::{self, Ty, TyCtxt, TypeVisitableExt};
 use rustc_span::Symbol;
 
+use crate::graph::MirDataDepGraph;
 use crate::matches::{Matched, StatementMatch};
 
 /// PredicateArgInstance is the matched instance of a [PredicateArg]
@@ -34,6 +35,7 @@ pub struct PredicateEvaluator<'e, 'm, 'tcx> {
     matched: &'e Matched<'tcx>,
     body_cache: &'e BodyInfoCache,
     symbol_table: &'e pat::FnSymbolTable<'m>,
+    mir_ddg: Option<&'e MirDataDepGraph>,
 }
 
 impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
@@ -50,6 +52,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         matched: &'e Matched<'tcx>,
         body_cache: &'e BodyInfoCache,
         symbol_table: &'e pat::FnSymbolTable<'m>,
+        mir_ddg: Option<&'e MirDataDepGraph>,
     ) -> Self {
         Self {
             tcx,
@@ -60,6 +63,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
             matched,
             body_cache,
             symbol_table,
+            mir_ddg,
         }
     }
 
@@ -212,8 +216,46 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
                     ),
                 }
             },
+            PredicateKind::FlowsTo => self.eval_flows_to(&arg_instance),
+            PredicateKind::MayPanic => self.eval_may_panic(&arg_instance),
         };
         if term.is_neg { !result } else { result }
+    }
+
+    /// `flows_to($x, 'src, 'sink)` — `$x` is a pattern local or place; labels are statement anchors.
+    #[instrument(level = "debug", skip(self, args), ret)]
+    fn eval_flows_to(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
+        assert!(
+            args.len() == 3,
+            "flows_to expects ($local_or_place, 'src, 'sink), got {} args",
+            args.len()
+        );
+        let Some(ddg) = self.mir_ddg else {
+            debug!("flows_to: no MIR DDG available");
+            return false;
+        };
+        let local = match &args[0] {
+            PredicateArgInstance::Local(local) => *local,
+            PredicateArgInstance::Place(place) => place.local,
+            other => panic!("flows_to first arg must be Local or Place, got {other:?}"),
+        };
+        let (PredicateArgInstance::Location(src), PredicateArgInstance::Location(sink)) = (&args[1], &args[2]) else {
+            panic!(
+                "flows_to expects Location labels for src/sink, got {:?} and {:?}",
+                args[1], args[2]
+            );
+        };
+        ddg.flows_to(src.block, src.statement_index, sink.block, sink.statement_index, local)
+    }
+
+    /// `may_panic('sink)` — sink is Assert, Fn*/closure call, or trait/generic method call.
+    #[instrument(level = "debug", skip(self, args), ret)]
+    fn eval_may_panic(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
+        assert!(args.len() == 1, "may_panic expects ('sink), got {} args", args.len());
+        let PredicateArgInstance::Location(loc) = &args[0] else {
+            panic!("may_panic expects a Location label, got {:?}", args[0]);
+        };
+        location_may_panic(self.tcx, self.body, *loc)
     }
 
     fn instantiate_arg(&self, arg: &'m PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
@@ -274,5 +316,78 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
             PredicateArg::Path(path) => Ok(PredicateArgInstance::Path(path.clone())),
             PredicateArg::SelfValue => panic!("SelfValue should not be used in predicate evaluation."),
         }
+    }
+}
+
+/// Conservative approximation of Rudra's "unresolvable generic" / user-callback panic sites.
+fn location_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, loc: mir::Location) -> bool {
+    let bb_data = &body[loc.block];
+    // Assert and Call are terminators (statement_index == statements.len()).
+    if loc.statement_index < bb_data.statements.len() {
+        return false;
+    }
+    let Some(term) = bb_data.terminator.as_ref() else {
+        return false;
+    };
+    match &term.kind {
+        TerminatorKind::Assert { .. } => true,
+        TerminatorKind::Call { func, .. } => operand_may_panic(tcx, body, func),
+        TerminatorKind::TailCall { func, .. } => operand_may_panic(tcx, body, func),
+        _ => false,
+    }
+}
+
+fn operand_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, func: &Operand<'tcx>) -> bool {
+    let ty = func.ty(body, tcx);
+    match *ty.kind() {
+        ty::FnDef(def_id, args) => {
+            // Trait methods: only when call-site args still mention caller params
+            // (Rudra unresolvable-generic). Concrete std iterators (Zip/Chunks/…) are not.
+            if tcx.trait_of_item(def_id).is_some() {
+                return args.iter().any(arg_has_param);
+            }
+            // Known non-unwinding / non-user std helpers (e.g. `mem::forget`).
+            if is_known_non_panicking_callee(tcx, def_id) {
+                return false;
+            }
+            // Local generic functions (user-provided) that still need monomorphization.
+            if def_id.is_local() && tcx.generics_of(def_id).requires_monomorphization(tcx) {
+                return true;
+            }
+            // Call site still mentions type/const params from the caller (unresolvable-ish).
+            args.iter().any(arg_has_param) && def_id.is_local()
+        },
+        ty::FnPtr(..) => true,
+        ty::Closure(..) | ty::CoroutineClosure(..) | ty::Coroutine(..) => true,
+        ty::Dynamic(..) => true,
+        ty::Param(_) | ty::Alias(..) => true,
+        _ => ty.is_fn(),
+    }
+}
+
+fn is_known_non_panicking_callee(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
+    let path = tcx.def_path_str(def_id);
+    matches!(
+        path.as_str(),
+        "core::mem::forget"
+            | "std::mem::forget"
+            | "core::mem::ManuallyDrop::new"
+            | "std::mem::ManuallyDrop::new"
+            | "core::ptr::read"
+            | "std::ptr::read"
+            | "core::ptr::write"
+            | "std::ptr::write"
+            | "core::ptr::copy"
+            | "std::ptr::copy"
+            | "core::ptr::copy_nonoverlapping"
+            | "std::ptr::copy_nonoverlapping"
+    )
+}
+
+fn arg_has_param<'tcx>(arg: ty::GenericArg<'tcx>) -> bool {
+    match arg.unpack() {
+        ty::GenericArgKind::Type(ty) => ty.has_param(),
+        ty::GenericArgKind::Const(ct) => ct.has_param(),
+        ty::GenericArgKind::Lifetime(_) => false,
     }
 }

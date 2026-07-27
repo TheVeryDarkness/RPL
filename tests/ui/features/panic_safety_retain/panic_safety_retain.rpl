@@ -1,0 +1,34 @@
+pattern panic-safety-retain
+
+patt {
+    use std::vec::Vec;
+
+    #[deduplicate]
+    set_len_then_callback[
+        $T: type,
+        $I: type,
+    ] = {
+        fn $cb(_: &mut $I) -> core::option::Option<$T>;
+
+        unsafe? fn retain_like_tp(..) -> _ {
+            let $vec: &mut Vec<$T> = _;
+            'poison:
+            _ = Vec::set_len(copy $vec, const 0usize);
+            'sink:
+            _ = $cb(_);
+        } where {
+            may_panic('sink),
+        }
+    }
+}
+
+diag {
+    set_len_then_callback = {
+        primary(sink)   = "length poisoned before a potentially panicking call",
+        label(poison)   = "`set_len` called here",
+        label(sink)     = "potentially panicking call here",
+        help            = "do not call user code while container length/invariants are temporarily broken; use a drop guard or restore length first",
+        name            = "set_len_then_callback",
+        level           = "deny",
+    }
+}

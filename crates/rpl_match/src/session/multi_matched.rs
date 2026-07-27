@@ -96,6 +96,7 @@ impl<'tcx> SessionResult<'tcx> {
             .iter()
             .filter_map(|a| match &a.candidate {
                 SlotCandidate::Fn(c) => {
+                    // Skip signature-only companions when another slot carried a MIR body match.
                     if has_mir_body_fn && c.matched.basic_blocks.is_empty() {
                         return None;
                     }

@@ -1,0 +1,26 @@
+pattern flows-to-panic
+
+patt {
+    #[deduplicate]
+    ownership_dup_then_use[
+        $T: type,
+    ] = unsafe? fn _(..) -> _ {
+        let $p: *const $T = _;
+        'bypass:
+        let $v: $T = core::ptr::read::<_>(copy $p);
+        'sink:
+        _ = core::mem::forget::<$T>(move $v);
+    } where {
+        flows_to($v, 'bypass, 'sink),
+    }
+}
+
+diag {
+    ownership_dup_then_use = {
+        primary(sink)  = "ownership duplicated by `ptr::read` then consumed (flows_to check)",
+        label(bypass)  = "ownership duplicated here",
+        label(sink)    = "consumed here",
+        name           = "ownership_dup_then_use",
+        level          = "deny",
+    }
+}

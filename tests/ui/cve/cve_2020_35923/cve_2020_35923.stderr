@@ -1,5 +1,16 @@
+error: mutating `NotNan` then checking `is_nan` is not panic-safe if unwind is caught
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:107:18
+   |
+LL |         self.0 += other;
+   |         --------------- inner value mutated here
+LL |         assert!(!self.0.is_nan(), "Addition resulted in NaN");
+   |                  ^^^^^^^^^^^^^^^ potentially panicking check here
+   |
+   = help: compute the new value first, then assign through a by-value constructor/`NotNan::new`
+   = note: `#[deny(rpl::notnan_panic_safety)]` on by default
+
 error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
-  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:251:15
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:254:15
    |
 LL |         match self.partial_cmp(&other) {
    |               ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8,7 +19,7 @@ LL |         match self.partial_cmp(&other) {
    = note: `#[deny(rpl::unreachable_unchecked_depend_on_option)]` on by default
 
 error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
-  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:251:15
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:254:15
    |
 LL |         match self.partial_cmp(&other) {
    |               ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -17,7 +28,7 @@ LL |         match self.partial_cmp(&other) {
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
-  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:251:15
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:254:15
    |
 LL |         match self.partial_cmp(&other) {
    |               ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -26,7 +37,7 @@ LL |         match self.partial_cmp(&other) {
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
 error: unwrapping an `Option` using `match` and `unreachable_unchecked` in the `None` arm
-  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:251:15
+  --> tests/ui/cve/cve_2020_35923/cve_2020_35923.rs:254:15
    |
 LL |         match self.partial_cmp(&other) {
    |               ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -34,5 +45,5 @@ LL |         match self.partial_cmp(&other) {
    = help: consider using `Option::unwrap_unchecked` which is more concise
    = note: duplicate diagnostic emitted due to `-Z deduplicate-diagnostics=no`
 
-error: aborting due to 4 previous errors
+error: aborting due to 5 previous errors
 

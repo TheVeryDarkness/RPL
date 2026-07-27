@@ -89,6 +89,9 @@ pub const ALL_PREDICATES: &[&str] = &[
     "product_of",
     // multiple_places_preds
     "mentions_place",
+    // dataflow preds (evaluated specially in PredicateEvaluator)
+    "flows_to",
+    "may_panic",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -105,6 +108,10 @@ pub enum PredicateKind {
     MultipleLocals(MultipleLocalsPredsFnPtr),
     MultiplePlaces(MultiplePlacesPredsFnPtr),
     ItemAttr(ItemAttrPredsFnPtr),
+    /// `flows_to($local_or_place, 'src, 'sink)` — DDG reachability; evaluated in matcher.
+    FlowsTo,
+    /// `may_panic('sink)` — potential panic site; evaluated in matcher.
+    MayPanic,
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -143,6 +150,8 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "is_null" => Self::SingleLocal(is_null),
             "mentions_place" => Self::MultiplePlaces(mentions_place),
             "has_attr" => Self::ItemAttr(has_attr),
+            "flows_to" => Self::FlowsTo,
+            "may_panic" => Self::MayPanic,
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

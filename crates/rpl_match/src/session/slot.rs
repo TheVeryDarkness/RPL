@@ -98,17 +98,35 @@ impl<'tcx> SessionResult<'tcx> {
     }
 
     pub fn primary_fn_candidate(&self) -> Option<&FnSlotCandidate<'tcx>> {
-        self.assignments.iter().find_map(|a| match &a.candidate {
-            SlotCandidate::Fn(c) => Some(c),
-            SlotCandidate::Adt(_) => None,
-        })
+        // Prefer a MIR-body match (non-empty basic_blocks) so signature-only slots like
+        // `fn $callback(...);` are not treated as the lint primary.
+        self.assignments
+            .iter()
+            .find_map(|a| match &a.candidate {
+                SlotCandidate::Fn(c) if !c.matched.basic_blocks.is_empty() => Some(c),
+                SlotCandidate::Fn(_) | SlotCandidate::Adt(_) => None,
+            })
+            .or_else(|| {
+                self.assignments.iter().find_map(|a| match &a.candidate {
+                    SlotCandidate::Fn(c) => Some(c),
+                    SlotCandidate::Adt(_) => None,
+                })
+            })
     }
 
     pub fn primary_fn_slot(&self) -> Option<MatchSlot> {
-        self.assignments.iter().find_map(|a| match &a.candidate {
-            SlotCandidate::Fn(_) => Some(a.slot),
-            SlotCandidate::Adt(_) => None,
-        })
+        self.assignments
+            .iter()
+            .find_map(|a| match &a.candidate {
+                SlotCandidate::Fn(c) if !c.matched.basic_blocks.is_empty() => Some(a.slot),
+                SlotCandidate::Fn(_) | SlotCandidate::Adt(_) => None,
+            })
+            .or_else(|| {
+                self.assignments.iter().find_map(|a| match &a.candidate {
+                    SlotCandidate::Fn(_) => Some(a.slot),
+                    SlotCandidate::Adt(_) => None,
+                })
+            })
     }
 
     /// Key for [`PatternOperation`](rpl_context::pat::PatternOperation) negative filtering:

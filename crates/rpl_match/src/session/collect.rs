@@ -100,7 +100,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         .check();
         mir_matches
             .into_iter()
-            .filter(|matched| self.check_constraints(fn_pat, item.def_id, body, matched))
+            .filter(|matched| self.check_constraints(fn_pat, item.def_id, body, matched, Some(&mir_ddg)))
             .map(|matched| {
                 let labels = &fn_pat.expect_body().labels;
                 let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
@@ -132,7 +132,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
             place_vars: Default::default(),
             adt_fields: Default::default(),
         };
-        if !self.check_constraints(fn_pat, item.def_id, body, &matched) {
+        if !self.check_constraints(fn_pat, item.def_id, body, &matched, None) {
             return Vec::new();
         }
         let normalized = NormalizedMatched::new(&matched, labels, &attr_map);
@@ -185,6 +185,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
         def_id: rustc_hir::def_id::LocalDefId,
         body: &mir::Body<'tcx>,
         matched: &crate::matches::Matched<'tcx>,
+        mir_ddg: Option<&MirDataDepGraph>,
     ) -> bool {
         let typing_env = ty::TypingEnv::post_analysis(self.tcx, body.source.def_id());
         let mut caches = self.body_caches.borrow_mut();
@@ -200,6 +201,7 @@ impl<'a, 'pcx, 'tcx> MatchCollectCtxt<'a, 'pcx, 'tcx> {
             matched,
             cache,
             fn_pat.symbol_table,
+            mir_ddg,
         );
         evaluator.evaluate_constraint(&fn_pat.constraints)
     }

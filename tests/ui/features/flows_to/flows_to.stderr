@@ -1,0 +1,13 @@
+error: ownership duplicated by `ptr::read` then consumed (flows_to check)
+  --> tests/ui/features/flows_to/flows_to.rs:13:5
+   |
+LL |     let v = unsafe { ptr::read(p) };
+   |                      ------------ ownership duplicated here
+LL |     let _x = 0usize;
+LL |     std::mem::forget(v);
+   |     ^^^^^^^^^^^^^^^^^^^ consumed here
+   |
+   = note: `#[deny(rpl::ownership_dup_then_use)]` on by default
+
+error: aborting due to 1 previous error
+
