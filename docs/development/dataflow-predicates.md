@@ -20,7 +20,7 @@ p[...] = unsafe? fn _(..) -> _ {
 | Predicate | Arguments | Meaning |
 |-----------|-----------|---------|
 | `flows_to($x, 'src, 'sink)` | local/place + two labels | DDG path labeled with `$x` from `'src` to `'sink` (intermediate statements allowed). |
-| `may_panic('sink)` | one label | Potential panic site: MIR `Assert`; trait methods whose call-site args still contain type/const params (Rudra unresolvable-generic); local generic fns; `Fn*` / closure / `dyn`. Concrete trait calls (e.g. std `Zip`/`Chunks` `next`) and known non-panicking helpers (`mem::forget`, `ptr::read`, …) are excluded. |
+| `may_panic('sink)` | one label | Potential panic site: MIR `Assert`; Call whose callee is Rudra-unresolvable (`Instance::try_resolve` → `Ok(None)`/`Err` with the item’s analysis `TypingEnv` and call-site args); local-generic fallback (inherent wrappers that still resolve); `Fn*` / closure / `dyn` / `Param` / `Alias`. Denylist (`mem::forget`, `ptr::read`/`write`/`copy*`, …) is never a sink. |
 
 `where` attaches to a single `fn` item, not the outer multi-item `{ ... }` brace.
 
@@ -44,13 +44,16 @@ Prefer `-Z inline-mir=false` in UI tests when matching `Vec::set_len` / `ptr::*`
 | CVE-2020-25795 | `copy_nonoverlapping` then panicking callback | `docs/patterns-pest/cve/CVE-2020-25795.rpl` |
 | CVE-2020-35923 | `NotNan` field write + `is_nan` / `unreachable_unchecked` | `docs/patterns-pest/cve/CVE-2020-35923.rpl` |
 | Retain-like synth | `set_len(0)` then callback | `tests/ui/features/panic_safety_retain/` |
+| id-map (Rudra-aligned) | write/drop bypass + `may_panic` | `docs/patterns-pest/cve/CVE-2021-30455.rpl` (RPL_PATS only) |
 
 ## Pattern tips (Panic Safety)
 
-- **Qself**: `<I as Iterator>::next` / `<T as Float>::is_nan` are not matched by path forms. Declare `fn $cb(...);` / `fn $isnan(...);` and call `_ = $cb(_);`.
+- Prefer **Rudra-style** shapes: concrete lifetime-bypass ops (`set_len`, `copy_nonoverlapping`, `ptr::read`/`write`, `drop_in_place`) then a sink with `may_panic`. Do **not** use dual `fn $poison` / `fn $sink` metavars for “any Call → any Call”.
+- **Qself**: `<I as Iterator>::next` / `<T as Float>::is_nan` / `<T as Clone>::clone` are not matched by path forms. Declare `fn $cb(...);` / `fn $clone(...);` and call `_ = $cb(_);` — only as a matching stand-in for the trait method, not as an artificial poison.
 - **Ignore-ret calls**: prefer `_ = $cb(_);` over `$x = $cb(_);` when binding the return is unnecessary.
 - **Decls before stmts**: all `let` locals must appear before non-decl MIR statements in a pattern block.
 - **`copy_nonoverlapping`**: use the MIR statement form (`copy_nonoverlapping(_, _, _);`); the ident is a keyword and cannot appear in a Path.
+- Example id-map patterns (RPL_PATS only): [`cve/CVE-2021-30455.rpl`](../patterns-pest/cve/CVE-2021-30455.rpl).
 
 ## Limitations
 

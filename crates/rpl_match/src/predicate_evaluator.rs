@@ -249,14 +249,14 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         ddg.flows_to(src.block, src.statement_index, sink.block, sink.statement_index, local)
     }
 
-    /// `may_panic('sink)` — sink is Assert, Fn*/closure call, or trait/generic method call.
+    /// `may_panic('sink)` — Assert, or Call whose callee is Rudra-unresolvable / Fn* / local generic.
     #[instrument(level = "debug", skip(self, args), ret)]
     fn eval_may_panic(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
         assert!(args.len() == 1, "may_panic expects ('sink), got {} args", args.len());
         let PredicateArgInstance::Location(loc) = &args[0] else {
             panic!("may_panic expects a Location label, got {:?}", args[0]);
         };
-        location_may_panic(self.tcx, self.body, *loc)
+        location_may_panic(self.tcx, self.typing_env, self.body, *loc)
     }
 
     fn instantiate_arg(&self, arg: &'m PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
@@ -320,8 +320,13 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
     }
 }
 
-/// Conservative approximation of Rudra's "unresolvable generic" / user-callback panic sites.
-fn location_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, loc: mir::Location) -> bool {
+/// Potential panic / higher-order sink sites (Assert, or Call via Rudra resolve + fallbacks).
+fn location_may_panic<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    typing_env: ty::TypingEnv<'tcx>,
+    body: &mir::Body<'tcx>,
+    loc: mir::Location,
+) -> bool {
     let bb_data = &body[loc.block];
     // Assert and Call are terminators (statement_index == statements.len()).
     if loc.statement_index < bb_data.statements.len() {
@@ -332,30 +337,34 @@ fn location_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, loc: mir:
     };
     match &term.kind {
         TerminatorKind::Assert { .. } => true,
-        TerminatorKind::Call { func, .. } => operand_may_panic(tcx, body, func),
-        TerminatorKind::TailCall { func, .. } => operand_may_panic(tcx, body, func),
+        TerminatorKind::Call { func, .. } => operand_may_panic(tcx, typing_env, body, func),
+        TerminatorKind::TailCall { func, .. } => operand_may_panic(tcx, typing_env, body, func),
         _ => false,
     }
 }
 
-fn operand_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, func: &Operand<'tcx>) -> bool {
+fn operand_may_panic<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    typing_env: ty::TypingEnv<'tcx>,
+    body: &mir::Body<'tcx>,
+    func: &Operand<'tcx>,
+) -> bool {
     let ty = func.ty(body, tcx);
     match *ty.kind() {
         ty::FnDef(def_id, args) => {
-            // Trait methods: only when call-site args still mention caller params
-            // (Rudra unresolvable-generic). Concrete std iterators (Zip/Chunks/…) are not.
-            if tcx.trait_of_item(def_id).is_some() {
-                return args.iter().any(arg_has_param);
-            }
             // Known non-unwinding / non-user std helpers (e.g. `mem::forget`).
             if is_known_non_panicking_callee(tcx, def_id) {
                 return false;
             }
-            // Local generic functions (user-provided) that still need monomorphization.
+            // Rudra: `resolve(def_id, args)` with analysis typing env; `Ok(None)` ⇒ sink.
+            if rudra_instance_unresolvable(tcx, typing_env, def_id, args) {
+                return true;
+            }
+            // Fallback: local generic items (inherent wrappers) often `Ok(Some)` even with
+            // params still present; keep may_panic for retain / insert_from-style patterns.
             if def_id.is_local() && tcx.generics_of(def_id).requires_monomorphization(tcx) {
                 return true;
             }
-            // Call site still mentions type/const params from the caller (unresolvable-ish).
             args.iter().any(arg_has_param) && def_id.is_local()
         },
         ty::FnPtr(..) => true,
@@ -363,6 +372,21 @@ fn operand_may_panic<'tcx>(tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, func: &Ope
         ty::Dynamic(..) => true,
         ty::Param(_) | ty::Alias(..) => true,
         _ => ty.is_fn(),
+    }
+}
+
+/// Rudra-style unresolvable generic: `Instance::try_resolve` cannot pick a concrete instance
+/// when call-site args may still contain `ty::Param` (empty concrete substs).
+fn rudra_instance_unresolvable<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    typing_env: ty::TypingEnv<'tcx>,
+    def_id: DefId,
+    args: ty::GenericArgsRef<'tcx>,
+) -> bool {
+    match ty::Instance::try_resolve(tcx, typing_env, def_id, args) {
+        Ok(None) => true,
+        Ok(Some(_)) => false,
+        Err(_) => true,
     }
 }
 
