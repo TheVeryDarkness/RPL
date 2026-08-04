@@ -160,17 +160,6 @@ LL |     let arr: &mut [u32] = unsafe { std::slice::from_raw_parts_mut(vec.as_mu
    |
    = help: See https://doc.rust-lang.org/std/slice/fn.from_raw_parts_mut.html#safety
 
-error: calling `set_len()` on empty `Vec` creates out-of-bound values
-  --> tests/ui/cve/cve_2021_29941_2/cve_2021_29941_2.rs:86:19
-   |
-LL |     let mut vec = Vec::new();
-   |                   ^^^^^^^^^^
-...
-LL |         vec.set_len(len);
-   |         ^^^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-
 error: it is unsound to trust return value of `std::iter::ExactSizeIterator::len` and pass it to an unsafe function like `std::vec::Vec::set_len`, which may leak uninitialized memory
   --> tests/ui/cve/cve_2021_29941_2/cve_2021_29941_2.rs:95:9
    |
@@ -181,6 +170,17 @@ LL |         vec.set_len(len);
    |         ^^^^^^^^^^^^^^^^ length used here in `Vec::set_len`
    |
    = help: incorrect implementation of `std::iter::ExactSizeIterator::len` must not cause safety issues, and consider using `std::iter::TrustedLen` instead if it's stabilized
+
+error: calling `set_len()` on empty `Vec` creates out-of-bound values
+  --> tests/ui/cve/cve_2021_29941_2/cve_2021_29941_2.rs:86:19
+   |
+LL |     let mut vec = Vec::new();
+   |                   ^^^^^^^^^^
+...
+LL |         vec.set_len(len);
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: aborting due to 15 previous errors
 

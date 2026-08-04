@@ -67,6 +67,8 @@ pub fn patterns() -> Vec<(&'static str, &'static str)> {{
     .unwrap();
     writeln!(out, r"        // Clippy lints").unwrap();
     collect_patterns(&patterns_dir.join("clippy"), "clippy", &mut out);
+    writeln!(out, r"        // CodeQL patterns").unwrap();
+    collect_patterns(&patterns_dir.join("codeql"), "codeql", &mut out);
     writeln!(out, r"        // CVE patterns").unwrap();
     collect_patterns(&patterns_dir.join("cve"), "cve", &mut out);
     writeln!(out, r"        // Common patterns based on Rust's UB").unwrap();

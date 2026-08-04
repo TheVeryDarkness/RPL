@@ -1,0 +1,25 @@
+error: dereferencing a pointer after it has been invalidated
+  --> tests/ui/codeql/access_invalid_pointer.rs:8:9
+   |
+LL |         std::ptr::drop_in_place(ptr);
+   |         ---------------------------- pointer invalidated by `drop_in_place` here
+LL |         (*ptr).len()
+   |         ^^^^^^ dangling pointer dereferenced here
+   |
+   = help: rearrange code so that the pointer is dereferenced before calling `drop_in_place`
+   = note: calling `drop_in_place` executes the destructor and invalidates the pointer
+   = note: `#[deny(rpl::access_invalid_pointer)]` on by default
+
+error: dereferencing a pointer after it has been invalidated
+  --> tests/ui/codeql/access_invalid_pointer.rs:15:9
+   |
+LL |         std::ptr::drop_in_place(ptr);
+   |         ---------------------------- pointer invalidated by `drop_in_place` here
+LL |         (*ptr)[0]
+   |         ^^^^^^ dangling pointer dereferenced here
+   |
+   = help: rearrange code so that the pointer is dereferenced before calling `drop_in_place`
+   = note: calling `drop_in_place` executes the destructor and invalidates the pointer
+
+error: aborting due to 2 previous errors
+

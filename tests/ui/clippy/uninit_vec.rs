@@ -119,8 +119,7 @@ fn main() {
     }
 
     // Test `#[allow(...)]` attributes on inner unsafe block (shouldn't trigger)
-    let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-    //~^ uninit_vec
+    let mut vec: Vec<u8> = Vec::with_capacity(1000);
     #[allow(rpl::uninit_vec)]
     unsafe {
         vec.set_len(200);
@@ -153,11 +152,9 @@ fn main() {
     }
 
     // set_len(0) should not be detected
-    let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-    //~^ uninit_vec
+    let mut vec: Vec<u8> = Vec::with_capacity(1000);
     unsafe {
         vec.set_len(0);
-        //~^ set_len_uninitialized
     }
 
     // ZSTs should not be detected

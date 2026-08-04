@@ -1,8 +1,22 @@
+//! ADT (struct/enum) matching and field metavar → `FieldIdx` bindings.
+//!
+//! # Two paths
+//!
+//! - **Fn MIR path** ([`MatchAdtCtxt::match_adt_for_fn_mir`]): builds type-compatible field
+//!   candidates and commits only unambiguous ones. Ambiguous field metvars (e.g. Slab `$len` when
+//!   both `capacity` and `len` are `usize`) stay unbound until MIR
+//!   [`PlaceElem::FieldPat`](rpl_context::pat::PlaceElem::FieldPat) commits them. Field mappings
+//!   are the authoritative source for Session `adt_fields`.
+//! - **ADT slot path** ([`MatchAdtCtxt::match_adt`]): eagerly resolves all field metvars by type
+//!   uniqueness when no fn body is available. Only `ty_bindings` are merged into Session; field
+//!   maps from ADT slots are not Session sources.
+
 use derive_more::derive::Debug;
 use rpl_context::PatCtxt;
 use rpl_context::pat::{self};
 use rustc_abi::FieldIdx;
-use rustc_data_structures::fx::FxIndexMap;
+use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
+use rustc_data_structures::stack::ensure_sufficient_stack;
 use rustc_index::bit_set::MixedBitSet;
 use rustc_index::{Idx, IndexSlice, IndexVec};
 use rustc_middle::ty::{self, TyCtxt};
@@ -10,6 +24,9 @@ use rustc_span::Symbol;
 
 use crate::ty::MatchTy as _;
 use crate::{CountedMatch, MatchTyCtxt};
+
+/// Resolved ADT field metavar bindings: `(adt_pat, field_metavar) -> FieldIdx`.
+pub type AdtFieldMap = FxHashMap<(Symbol, Symbol), FieldIdx>;
 
 pub struct MatchAdtCtxt<'a, 'pcx, 'tcx> {
     ty: MatchTyCtxt<'pcx, 'tcx>,
@@ -23,34 +40,75 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         pat: &'pcx pat::RustItems<'pcx>,
         adt_pat: &'a pat::Adt<'pcx>,
     ) -> Self {
+        Self::with_typing_env(tcx, pcx, pat, adt_pat, ty::TypingEnv::fully_monomorphized())
+    }
+
+    /// Prefer the caller's [`TypingEnv`] (e.g. post-analysis) so predicates like
+    /// `is_not_unpin` do not fail-open on `PhantomData<$E>` / other param-using types.
+    pub fn with_typing_env(
+        tcx: TyCtxt<'tcx>,
+        pcx: PatCtxt<'pcx>,
+        pat: &'pcx pat::RustItems<'pcx>,
+        adt_pat: &'a pat::Adt<'pcx>,
+        typing_env: ty::TypingEnv<'tcx>,
+    ) -> Self {
         // FIXME: `self_ty` should be passed from the caller.
-        let ty = MatchTyCtxt::new(tcx, pcx, ty::TypingEnv::fully_monomorphized(), None, pat, &adt_pat.meta);
+        let ty = MatchTyCtxt::new(tcx, pcx, typing_env, None, pat, &adt_pat.meta);
         Self { ty, adt_pat }
     }
 
-    #[instrument(level = "trace", skip(self))]
-    pub fn match_adt(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
-        match (&self.adt_pat.kind, adt.adt_kind()) {
-            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => Some(AdtMatch::new_struct(
-                adt,
-                self.match_fields(&variant_pat.fields, &adt.non_enum_variant().fields)?,
-            )),
-            (pat::AdtKind::Enum(_variants_pat), ty::AdtKind::Enum) => todo!(),
-            /* {
+    /// Resolved type metavar bindings after [`Self::match_adt`].
+    pub fn resolved_ty_bindings(&self) -> IndexVec<pat::TyVarIdx, ty::Ty<'tcx>> {
+        IndexVec::from_fn_n(
+            |i| {
+                let set = self.ty.ty_vars[i].borrow();
+                set.iter().copied().next().unwrap_or_else(|| self.ty.tcx.types.never)
+            },
+            self.ty.ty_vars.len(),
+        )
+    }
 
-                let mut candidates = VariantCandidates::new(variants_pat.len(), adt.variants());
+    /// Match struct/enum shape for fn MIR matching, committing only unambiguous field bindings.
+    ///
+    /// Field metvars with a single type-compatible candidate are bound immediately; ambiguous
+    /// metvars (e.g. Slab `$len` vs `capacity`/`len`) stay unresolved until
+    /// [`PlaceElem::FieldPat`](pat::PlaceElem::FieldPat) during statement matching.
+    #[instrument(level = "trace", skip(self))]
+    pub fn match_adt_for_fn_mir(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
+        let adt_match = self.match_adt_structure(adt)?;
+        adt_match.field_candidates().candidates.commit_unique_field_candidates();
+        Some(adt_match)
+    }
+
+    /// Match struct/enum shape and field-type candidates without committing field indices.
+    ///
+    /// Used by fn MIR matching: field metavar → `FieldIdx` bindings are established later via
+    /// [`PlaceElem::FieldPat`](pat::PlaceElem::FieldPat) during statement matching.
+    #[instrument(level = "trace", skip(self))]
+    pub fn match_adt_structure(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
+        match (&self.adt_pat.kind, adt.adt_kind()) {
+            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => {
+                let fields = self.build_field_candidates(&variant_pat.fields, &adt.non_enum_variant().fields)?;
+                Some(AdtMatch::new_struct(adt, fields))
+            },
+            (pat::AdtKind::Enum(variants_pat), ty::AdtKind::Enum) => {
                 for (variant_name, variant_pat) in variants_pat.iter() {
-                    for (variant_idx, variant) in candidates.variants.iter_enumerated() {
-                        if let Some(matched) = self.match_variant(variant_pat, variant, variant_idx) {
-                            candidates[index].candidates.push(matched);
-                        }
-                    }
+                    let Some(variant_idx) = adt
+                        .variants()
+                        .iter_enumerated()
+                        .find(|(_, v)| v.name == *variant_name)
+                        .map(|(i, _)| i)
+                    else {
+                        continue;
+                    };
+                    let variant = adt.variant(variant_idx);
+                    let Some(fields) = self.build_field_candidates(&variant_pat.fields, &variant.fields) else {
+                        continue;
+                    };
+                    return Some(AdtMatch::new_enum(adt, variant_idx, fields));
                 }
-                candidates
-                    .iter()
-                    .all(|candidates| !candidates.candidates.is_empty())
-                    .then(|| AdtMatch::new_enum(adt, VariantCandidates::new(candidates, adt.variants())))
-            }, */
+                None
+            },
             (
                 pat::AdtKind::Struct(_) | pat::AdtKind::Enum(_),
                 ty::AdtKind::Struct | ty::AdtKind::Enum | ty::AdtKind::Union,
@@ -58,27 +116,54 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         }
     }
 
-    // fn match_variant(
-    //     &self,
-    //     variant_pat: &pat::Variant<'pcx>,
-    //     variant: &'tcx ty::VariantDef,
-    //     variant_idx: VariantIdx,
-    // ) -> Option<VariantMatch<'tcx>> {
-    //     self.match_fields(&variant_pat.fields, &variant.fields)
-    //         .map(|fields| VariantMatch {
-    //             variant_idx,
-    //             variant,
-    //             fields,
-    //         })
-    // }
+    /// Match struct/enum and eagerly resolve all field metavar → `FieldIdx` bindings.
+    ///
+    /// Used by ADT slot collection where no fn MIR body is available to drive `FieldPat` matching.
+    #[instrument(level = "trace", skip(self))]
+    pub fn match_adt(&self, adt: ty::AdtDef<'tcx>) -> Option<AdtMatch<'tcx>> {
+        match (&self.adt_pat.kind, adt.adt_kind()) {
+            (pat::AdtKind::Struct(variant_pat), ty::AdtKind::Struct) => {
+                let fields = self.build_field_candidates(&variant_pat.fields, &adt.non_enum_variant().fields)?;
+                self.match_field_candidates(&fields, &variant_pat.fields, 0)
+                    .then(|| AdtMatch::new_struct(adt, fields))
+            },
+            (pat::AdtKind::Enum(variants_pat), ty::AdtKind::Enum) => {
+                for (variant_name, variant_pat) in variants_pat.iter() {
+                    let Some(variant_idx) = adt
+                        .variants()
+                        .iter_enumerated()
+                        .find(|(_, v)| v.name == *variant_name)
+                        .map(|(i, _)| i)
+                    else {
+                        continue;
+                    };
+                    let variant = adt.variant(variant_idx);
+                    let fields = self.build_field_candidates(&variant_pat.fields, &variant.fields)?;
+                    if self.match_field_candidates(&fields, &variant_pat.fields, 0) {
+                        return Some(AdtMatch::new_enum(adt, variant_idx, fields));
+                    }
+                    for (name, m) in fields.candidates.matches.iter() {
+                        if let Some(idx) = m.get() {
+                            fields.candidates.unmatch(*name, idx);
+                        }
+                    }
+                }
+                None
+            },
+            (
+                pat::AdtKind::Struct(_) | pat::AdtKind::Enum(_),
+                ty::AdtKind::Struct | ty::AdtKind::Enum | ty::AdtKind::Union,
+            ) => None,
+        }
+    }
 
-    #[instrument(level = "trace", skip(self), ret)]
-    fn match_fields(
+    fn build_field_candidates(
         &self,
         fields_pat: &FxIndexMap<Symbol, pat::Field<'pcx>>,
         fields: &'tcx IndexSlice<FieldIdx, ty::FieldDef>,
     ) -> Option<FieldCandidates<'tcx>> {
         let mut candidates = FieldCandidates::new(fields_pat, fields);
+        // Match by field type only — field metvars (e.g. `$len`) are not Rust field names.
         for (field_name, field_pat) in fields_pat.iter() {
             for (field_idx, field) in fields.iter_enumerated() {
                 if self.match_field(field_pat, field) {
@@ -89,6 +174,29 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
         candidates.candidates_not_empty().then_some(candidates)
     }
 
+    #[expect(clippy::only_used_in_recursion, reason = "for future usage")]
+    fn match_field_candidates(
+        &self,
+        candidates: &FieldCandidates<'tcx>,
+        fields_pat: &FxIndexMap<Symbol, pat::Field<'pcx>>,
+        field_idx: usize,
+    ) -> bool {
+        let field_names: Vec<_> = fields_pat.keys().copied().collect();
+        if field_idx == field_names.len() {
+            return true;
+        }
+        let field_name = field_names[field_idx];
+        for cand in candidates.candidates.candidates[&field_name].iter() {
+            if candidates.candidates.r#match(field_name, cand)
+                && ensure_sufficient_stack(|| self.match_field_candidates(candidates, fields_pat, field_idx + 1))
+            {
+                return true;
+            }
+            candidates.candidates.unmatch(field_name, cand);
+        }
+        false
+    }
+
     #[instrument(level = "trace", skip(self), ret)]
     fn match_field(&self, field_pat: &pat::Field<'pcx>, field: &'tcx ty::FieldDef) -> bool {
         let pat_ty = field_pat.ty;
@@ -97,16 +205,20 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     }
 }
 
-#[derive(Debug)]
-#[debug("{adt:?}")]
+#[derive(Debug, Clone)]
 pub struct AdtMatch<'tcx> {
     pub adt: ty::AdtDef<'tcx>,
     kind: AdtMatchKind<'tcx>,
 }
 
+#[derive(Debug, Clone)]
 enum AdtMatchKind<'tcx> {
     Struct(FieldCandidates<'tcx>),
-    // Enum(VariantCandidates<'tcx>),
+    Enum {
+        #[expect(dead_code, reason = "for future usage")]
+        variant_idx: rustc_abi::VariantIdx,
+        fields: FieldCandidates<'tcx>,
+    },
 }
 
 impl<'tcx> AdtMatch<'tcx> {
@@ -116,31 +228,52 @@ impl<'tcx> AdtMatch<'tcx> {
             kind: AdtMatchKind::Struct(fields),
         }
     }
-    // pub fn new_enum(adt: ty::AdtDef<'tcx>, variants: VariantCandidates<'tcx>) -> Self {
-    //     Self {
-    //         adt,
-    //         kind: AdtMatchKind::Enum(variants),
-    //     }
-    // }
+    pub fn new_enum(adt: ty::AdtDef<'tcx>, variant_idx: rustc_abi::VariantIdx, fields: FieldCandidates<'tcx>) -> Self {
+        Self {
+            adt,
+            kind: AdtMatchKind::Enum { variant_idx, fields },
+        }
+    }
+    pub fn field_candidates(&self) -> &FieldCandidates<'tcx> {
+        match &self.kind {
+            AdtMatchKind::Struct(fields) | AdtMatchKind::Enum { fields, .. } => fields,
+        }
+    }
     pub fn expect_struct(&self) -> &FieldCandidates<'tcx> {
         match &self.kind {
             AdtMatchKind::Struct(variant_match) => variant_match,
-            // AdtMatchKind::Enum(_) => panic!("expected struct, got enum"),
+            AdtMatchKind::Enum { .. } => panic!("expected struct, got enum"),
         }
     }
-    // pub fn expect_enum(&self) -> &VariantCandidates<'tcx> {
-    //     match &self.kind {
-    //         AdtMatchKind::Enum(variants) => variants,
-    //         AdtMatchKind::Struct(_) => panic!("expected enum, got struct"),
-    //     }
-    // }
+
+    /// Extract committed field metavar bindings for this ADT pattern.
+    pub fn field_bindings(&self, adt_pat: Symbol) -> AdtFieldMap {
+        let mut map = AdtFieldMap::default();
+        for (field_name, matched_idx) in self.field_candidates().candidates.matches.iter() {
+            if let Some(idx) = matched_idx.get() {
+                map.insert((adt_pat, *field_name), idx);
+            }
+        }
+        map
+    }
+
+    /// Whether every field metavar declared in the pattern struct has a committed binding.
+    pub fn all_fields_resolved(&self, fields_pat: &FxIndexMap<Symbol, pat::Field<'_>>) -> bool {
+        fields_pat.keys().all(|field_name| {
+            self.field_candidates()
+                .candidates
+                .matches
+                .get(field_name)
+                .is_some_and(|m| m.get().is_some())
+        })
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[debug("{candidates:?}")]
 pub struct Candidates<I: Idx> {
     pub candidates: FxIndexMap<Symbol, MixedBitSet<I>>,
-    matches: FxIndexMap<Symbol, CountedMatch<I>>,
+    pub matches: FxIndexMap<Symbol, CountedMatch<I>>,
     lookup: IndexVec<I, CountedMatch<Symbol>>,
 }
 
@@ -165,9 +298,6 @@ impl<I: Idx> Candidates<I> {
         false
     }
     pub fn unmatch(&self, name: Symbol, idx: I) {
-        debug_assert!(self.matches.contains_key(&name));
-        debug_assert!(self.matches[&name].get().is_some());
-        debug_assert!(self.matches[&name].get().is_some_and(|matched| matched == idx));
         if self.matches[&name].get().is_some_and(|matched| matched == idx) {
             self.matches[&name].unmatch();
         }
@@ -175,9 +305,37 @@ impl<I: Idx> Candidates<I> {
             self.lookup[idx].unmatch();
         }
     }
+
+    /// Commit bindings for field metvars with exactly one type-compatible candidate.
+    pub fn commit_unique_field_candidates(&self) {
+        for (field_name, bitset) in &self.candidates {
+            if self.matches[field_name].get().is_some() {
+                continue;
+            }
+            let mut iter = bitset.iter();
+            let Some(first) = iter.next() else { continue };
+            if iter.next().is_none() {
+                self.r#match(*field_name, first);
+            }
+        }
+    }
+
+    /// Clear all committed field bindings (ignores refcounts) and re-commit unique candidates.
+    ///
+    /// Needed after [`CheckMirCtxt`] candidate probing, which may temporarily bind FieldPat
+    /// matches as a side effect without unmatching them.
+    pub fn reset_matches_after_probe(&self) {
+        for m in self.matches.values() {
+            m.clear();
+        }
+        for m in &self.lookup {
+            m.clear();
+        }
+        self.commit_unique_field_candidates();
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[debug("{candidates:?}")]
 pub struct FieldCandidates<'tcx> {
     pub fields: &'tcx IndexSlice<FieldIdx, ty::FieldDef>,
@@ -194,5 +352,209 @@ impl<'tcx> FieldCandidates<'tcx> {
             .candidates
             .values()
             .all(|candidates| !candidates.is_empty())
+    }
+}
+
+/// Collect all committed ADT field bindings from a fn MIR match context.
+pub fn collect_adt_field_bindings(ty: &MatchTyCtxt<'_, '_>) -> AdtFieldMap {
+    let mut map = AdtFieldMap::default();
+    for (adt_pat, matches) in ty.adt_matches.borrow().iter() {
+        for adt_match in matches.values() {
+            map.extend(adt_match.field_bindings(*adt_pat));
+        }
+    }
+    map
+}
+
+/// Reset FieldPat bindings left behind by statement candidate probing, then re-commit
+/// unambiguous fields. Call after [`CheckMirCtxt`] `build_candidates`.
+pub fn reset_adt_field_bindings_after_probe(ty: &MatchTyCtxt<'_, '_>) {
+    for matches in ty.adt_matches.borrow().values() {
+        for adt_match in matches.values() {
+            adt_match.field_candidates().candidates.reset_matches_after_probe();
+        }
+    }
+}
+
+/// Ensure ty-var candidates include every type from ADT field candidate bitsets.
+///
+/// Statement probing may lock the first FieldPat (e.g. `codec`) and skip later sites
+/// (`io`), omitting their types from [`MatchTyCtxt::ty_vars`]. Re-seed from the bitset
+/// built by [`MatchAdtCtxt::match_adt_structure`] so ambiguous fields remain tryable.
+///
+/// Only types that still satisfy the field metavar's predicates (under this context's
+/// [`TypingEnv`](ty::TypingEnv)) are inserted — the ADT structure bitset may be looser
+/// when predicates fail-open on param-dependent types like `PhantomData<$E>`.
+pub fn seed_ty_vars_from_adt_field_candidates(ty: &MatchTyCtxt<'_, '_>) {
+    for (adt_pat_sym, per_def) in ty.adt_matches.borrow().iter() {
+        let Some(adt_pat) = ty.pat.get_adt(*adt_pat_sym) else {
+            continue;
+        };
+        let fields_pat = match &adt_pat.kind {
+            pat::AdtKind::Struct(variant) => &variant.fields,
+            pat::AdtKind::Enum(_) => continue,
+        };
+        for adt_match in per_def.values() {
+            let field_defs = adt_match.field_candidates().fields;
+            for (field_name, bitset) in &adt_match.field_candidates().candidates.candidates {
+                let Some(field_pat) = fields_pat.get(field_name) else {
+                    continue;
+                };
+                let pat::TyKind::TyVar(ty_var) = field_pat.ty.kind() else {
+                    continue;
+                };
+                // Put FieldIdx-ordered field types at the front of the candidate set.
+                let mut typed: Vec<_> = bitset
+                    .iter()
+                    .filter_map(|field_idx| {
+                        let rust_ty = ty.tcx.type_of(field_defs[field_idx].did).instantiate_identity();
+                        ty.match_ty(field_pat.ty, rust_ty).then_some((field_idx, rust_ty))
+                    })
+                    .collect();
+                typed.sort_by_key(|(idx, _)| *idx);
+                let mut cell = ty.ty_vars[ty_var.idx].borrow_mut();
+                let rest: Vec<_> = cell
+                    .iter()
+                    .copied()
+                    .filter(|t| !typed.iter().any(|(_, rt)| rt == t))
+                    .collect();
+                cell.clear();
+                for (_, rust_ty) in typed {
+                    cell.insert(rust_ty);
+                }
+                for t in rest {
+                    cell.insert(t);
+                }
+            }
+        }
+    }
+}
+
+/// Whether every registered `AdtMatch` has resolved all of its pattern field metvars.
+///
+/// Used as a gate before accepting a MIR match candidate: unresolved (ambiguous) fields
+/// mean the match is incomplete and should be discarded.
+pub fn all_adt_fields_resolved(ty: &MatchTyCtxt<'_, '_>) -> bool {
+    ty.adt_matches.borrow().iter().all(|(adt_pat_sym, per_def)| {
+        let Some(adt_pat) = ty.pat.get_adt(*adt_pat_sym) else {
+            return false;
+        };
+        per_def.values().all(|adt_match| match &adt_pat.kind {
+            pat::AdtKind::Struct(variant) => adt_match.all_fields_resolved(&variant.fields),
+            // Enum: FieldCandidates was built for one matched variant; require those metvars.
+            pat::AdtKind::Enum(_) => adt_match
+                .field_candidates()
+                .candidates
+                .matches
+                .values()
+                .all(|m| m.get().is_some()),
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_unique_field_candidates_leaves_ambiguous_unbound() {
+        rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
+            let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
+            let mut candidates = Candidates::new(&fields_pat, &field_defs);
+            let len = FieldIdx::from_u32(1);
+            let capacity = FieldIdx::from_u32(0);
+            let mem = FieldIdx::from_u32(2);
+
+            candidates.candidates[&Symbol::intern("$len")].insert(len);
+            candidates.candidates[&Symbol::intern("$len")].insert(capacity);
+            candidates.candidates[&Symbol::intern("$mem")].insert(mem);
+
+            candidates.commit_unique_field_candidates();
+            assert!(candidates.matches[&Symbol::intern("$len")].get().is_none());
+            assert_eq!(candidates.matches[&Symbol::intern("$mem")].get(), Some(mem));
+        });
+    }
+
+    #[test]
+    fn candidates_match_and_unmatch_field_metavar() {
+        rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
+            let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
+            let candidates = Candidates::new(&fields_pat, &field_defs);
+            let len = FieldIdx::from_u32(1);
+            let capacity = FieldIdx::from_u32(0);
+
+            assert!(candidates.r#match(Symbol::intern("$len"), len));
+            assert_eq!(candidates.matches[&Symbol::intern("$len")].get(), Some(len));
+            // conflicting binding for the same field metavar fails
+            assert!(!candidates.r#match(Symbol::intern("$len"), capacity));
+            // same binding is idempotent (refcounted)
+            assert!(candidates.r#match(Symbol::intern("$len"), len));
+
+            candidates.unmatch(Symbol::intern("$len"), len);
+            // one unmatch decrements refcount; binding remains until count hits zero
+            assert_eq!(candidates.matches[&Symbol::intern("$len")].get(), Some(len));
+            candidates.unmatch(Symbol::intern("$len"), len);
+            assert!(candidates.matches[&Symbol::intern("$len")].get().is_none());
+            // after unmatch, a different field index can bind
+            assert!(candidates.r#match(Symbol::intern("$len"), capacity));
+        });
+    }
+
+    #[test]
+    fn all_fields_resolved_requires_every_metavar() {
+        rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+            // Use empty Field pats via a stub map keyed like Candidates::matches.
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
+            let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
+            let candidates = Candidates::new(&fields_pat, &field_defs);
+            let len = FieldIdx::from_u32(1);
+            let mem = FieldIdx::from_u32(2);
+
+            // Helper: resolved iff every key in matches has a binding (mirrors AdtMatch::all_fields_resolved).
+            let resolved = |c: &Candidates<FieldIdx>| c.matches.values().all(|m| m.get().is_some());
+
+            assert!(!resolved(&candidates));
+            assert!(candidates.r#match(Symbol::intern("$len"), len));
+            assert!(!resolved(&candidates));
+            assert!(candidates.r#match(Symbol::intern("$mem"), mem));
+            assert!(resolved(&candidates));
+        });
+    }
+
+    #[test]
+    fn slab_ambiguous_len_binds_via_field_pat_not_unique_commit() {
+        rustc_span::create_session_if_not_set_then(rustc_span::edition::LATEST_STABLE_EDITION, |_| {
+            // capacity(0) and len(1) are both type-compatible with `$len`; mem(2) is unique.
+            let fields_pat: FxIndexMap<Symbol, ()> = [(Symbol::intern("$len"), ()), (Symbol::intern("$mem"), ())]
+                .into_iter()
+                .collect();
+            let field_defs: IndexVec<FieldIdx, ()> = IndexVec::from_raw(vec![(), (), ()]);
+            let mut candidates = Candidates::new(&fields_pat, &field_defs);
+            let capacity = FieldIdx::from_u32(0);
+            let len = FieldIdx::from_u32(1);
+            let mem = FieldIdx::from_u32(2);
+
+            candidates.candidates[&Symbol::intern("$len")].insert(capacity);
+            candidates.candidates[&Symbol::intern("$len")].insert(len);
+            candidates.candidates[&Symbol::intern("$mem")].insert(mem);
+
+            candidates.commit_unique_field_candidates();
+            assert!(candidates.matches[&Symbol::intern("$len")].get().is_none());
+            assert_eq!(candidates.matches[&Symbol::intern("$mem")].get(), Some(mem));
+
+            // FieldPat visiting `.len` commits the ambiguous metavar.
+            assert!(candidates.r#match(Symbol::intern("$len"), len));
+            assert_eq!(candidates.matches[&Symbol::intern("$len")].get(), Some(len));
+            // Conflicting FieldPat (e.g. capacity) must fail.
+            assert!(!candidates.r#match(Symbol::intern("$len"), capacity));
+        });
     }
 }

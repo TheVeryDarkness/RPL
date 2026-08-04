@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::LazyLock;
 
 use parser::{SpanWrapper, collect_elems_separated_by_comma, pairs};
@@ -94,6 +95,7 @@ impl<'i> DiagSymbolTable<'i> {
     ) {
         let mut name = None;
         let mut level = None;
+        let mut report_in_external_macro = None;
         for item in collect_elems_separated_by_comma!(items) {
             let (key, _, _, value) = item.get_matched();
             let key_str = key.span.as_str();
@@ -109,6 +111,18 @@ impl<'i> DiagSymbolTable<'i> {
                     } else {
                         return errors.push(RPLMetaError::InvalidPropertyInDiag {
                             property: "level",
+                            value: value_str,
+                            span: SpanWrapper::new(value.span, mctx.get_active_path()),
+                        });
+                    }
+                },
+                "report_in_external_macro" => {
+                    let value_str = value.diagMessageInner().span.as_str();
+                    if let Ok(report_in_external_macro_) = bool::from_str(value_str) {
+                        report_in_external_macro = Some(report_in_external_macro_);
+                    } else {
+                        return errors.push(RPLMetaError::InvalidPropertyInDiag {
+                            property: "report_in_external_macro",
                             value: value_str,
                             span: SpanWrapper::new(value.span, mctx.get_active_path()),
                         });
@@ -137,9 +151,17 @@ impl<'i> DiagSymbolTable<'i> {
             });
         };
 
+        let report_in_external_macro = report_in_external_macro.unwrap_or(if cfg!(debug_assertions) {
+            // Only enable in debug mode to avoid emitting errors in external macros.
+            true
+        } else {
+            false
+        });
+
         let lint = rustc_lint::Lint {
             name,
             default_level: level,
+            report_in_external_macro,
             ..rustc_lint::Lint::default_fields_for_macro()
         };
 

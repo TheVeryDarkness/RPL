@@ -101,8 +101,11 @@ impl<T: Float + AddAssign> AddAssign for NotNan<T> {
 /// Panics if the provided value is NaN.
 impl<T: Float + AddAssign> AddAssign<T> for NotNan<T> {
     fn add_assign(&mut self, other: T) {
+        // Deliberately write then check (panic-unsafe). Use a plain assign so MIR
+        // keeps a stable field-write + `is_nan` shape under default MIR inlining.
         self.0 += other;
         assert!(!self.0.is_nan(), "Addition resulted in NaN");
+        //~^ ERROR: mutating `NotNan` then checking `is_nan` is not panic-safe if unwind is caught
     }
 }
 

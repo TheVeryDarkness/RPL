@@ -1,0 +1,39 @@
+error: returning a pointer to a local variable whose lifetime is about to end
+  --> tests/ui/codeql/access_after_lifetime_ended.rs:7:5
+   |
+LL |     &raw const val
+   |     ^^^^^^^^^^^^^^ pointer to local variable created here
+   |
+   = help: consider using `Box::new()` to allocate on the heap instead
+   = note: the local variable will be dropped when the function returns, making the pointer dangling
+   = note: `#[deny(rpl::access_after_lifetime_ended)]` on by default
+
+error: returning a pointer to a local variable whose lifetime is about to end
+  --> tests/ui/codeql/access_after_lifetime_ended.rs:12:5
+   |
+LL |     &raw mut val
+   |     ^^^^^^^^^^^^ pointer to local variable created here
+   |
+   = help: consider using `Box::new()` to allocate on the heap instead
+   = note: the local variable will be dropped when the function returns, making the pointer dangling
+
+error: returning a pointer to a local variable whose lifetime is about to end
+  --> tests/ui/codeql/access_after_lifetime_ended.rs:17:5
+   |
+LL |     &raw const val
+   |     ^^^^^^^^^^^^^^ pointer to local variable created here
+   |
+   = help: consider using `Box::new()` to allocate on the heap instead
+   = note: the local variable will be dropped when the function returns, making the pointer dangling
+
+error: returning a pointer to a local variable whose lifetime is about to end
+  --> tests/ui/codeql/access_after_lifetime_ended.rs:22:5
+   |
+LL |     &raw const val
+   |     ^^^^^^^^^^^^^^ pointer to local variable created here
+   |
+   = help: consider using `Box::new()` to allocate on the heap instead
+   = note: the local variable will be dropped when the function returns, making the pointer dangling
+
+error: aborting due to 4 previous errors
+

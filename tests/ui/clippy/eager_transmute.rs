@@ -25,10 +25,8 @@ fn int_to_opcode(op: u8) -> Option<Opcode> {
 }
 
 fn f(op: u8, op2: Data, unrelated: u8) {
-    true.then_some(unsafe { std::mem::transmute::<_, Opcode>(op) }); // FIXME: false positive
-    //~^ eager_transmute
-    (unrelated < 4).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) }); // FIXME: false positive
-    //~^ eager_transmute
+    true.then_some(unsafe { std::mem::transmute::<_, Opcode>(op) });
+    (unrelated < 4).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) });
     (op < 4).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) });
     //~^ eager_transmute
     (op > 4).then_some(unsafe { std::mem::transmute::<_, Opcode>(op) });
@@ -49,18 +47,15 @@ fn f(op: u8, op2: Data, unrelated: u8) {
 
     // don't lint: wrong index used in the transmute
     let _: Option<Opcode> =
-        (op2.foo[0] > 0 && op2.foo[0] < 10).then_some(unsafe { std::mem::transmute(op2.foo[1]) }); // FIXME: false positive
-    //~^ eager_transmute
+        (op2.foo[0] > 0 && op2.foo[0] < 10).then_some(unsafe { std::mem::transmute(op2.foo[1]) });
 
     // don't lint: no check for the transmutable in the condition
     let _: Option<Opcode> =
-        (op2.foo[0] > 0 && op2.bar[1] < 10).then_some(unsafe { std::mem::transmute(op2.bar[0]) }); // FIXME: false positive
-    //~^ eager_transmute
+        (op2.foo[0] > 0 && op2.bar[1] < 10).then_some(unsafe { std::mem::transmute(op2.bar[0]) });
 
     // don't lint: wrong variable
     let _: Option<Opcode> =
-        (op2.foo[0] > 0 && op2.bar[1] < 10).then_some(unsafe { std::mem::transmute(op) }); // FIXME: false positive
-    //~^ eager_transmute
+        (op2.foo[0] > 0 && op2.bar[1] < 10).then_some(unsafe { std::mem::transmute(op) });
 
     // range contains checks
     let _: Option<Opcode> = (1..=3)
@@ -90,8 +85,7 @@ fn f(op: u8, op2: Data, unrelated: u8) {
     // unrelated binding in contains
     let _: Option<Opcode> = (1..=3)
         .contains(&unrelated)
-        .then_some(unsafe { std::mem::transmute(op) }); // FIXME: false positive
-    //~^ eager_transmute
+        .then_some(unsafe { std::mem::transmute(op) });
 
 }
 
@@ -134,8 +128,7 @@ fn niche_tests(v1: u8, v2: NonZero<u8>, v3: NonZeroNonMaxU8) {
 
     // NonZero<u8> -> u8, don't lint, target type has no niche and therefore a higher validity range
     let _: Option<u8> =
-        (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) }); // FIXME: false positive
-    //~^ eager_transmute
+        (v2 > NonZero::new(1u8).unwrap()).then_some(unsafe { std::mem::transmute(v2) });
 
     // NonZero<u8> -> NonMaxU8, do lint, different niche
     let _: Option<NonMaxU8> =
@@ -144,9 +137,8 @@ fn niche_tests(v1: u8, v2: NonZero<u8>, v3: NonZeroNonMaxU8) {
     //~| eager_transmute
 
     // NonZeroNonMaxU8 -> NonMaxU8, don't lint, target type has more validity
-    let _: Option<NonMaxU8> = (v3 < 255).then_some(unsafe { std::mem::transmute(v2) }); // FIXME: false positive
-    //~^ eager_transmute
-    //~| eager_transmute
+    // (Clippy test uses transmute(v2); place mismatch / niche also filters)
+    let _: Option<NonMaxU8> = (v3 < 255).then_some(unsafe { std::mem::transmute(v2) });
 
     // NonZero<u8> -> NonZeroNonMaxU8, do lint, target type has less validity
     let _: Option<NonZeroNonMaxU8> =

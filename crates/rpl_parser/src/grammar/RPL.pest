@@ -767,6 +767,10 @@ MirDrop = {
     LabelWithColon? ~ kw_drop ~ LeftParen ~ MirPlace ~ RightParen
 }
 
+MirMacro = {
+    LabelWithColon? ~ kw_move ~ Bang ~ LeftParen ~ MirPlace ~ RightParen
+}
+
 MirUnreachable = {
     LabelWithColon? ~ kw_unreachable
 }
@@ -830,6 +834,7 @@ MirStmt = {
   | MirLoop
   | MirSwitchInt
   | MirCopyNonOverlapping ~ SemiColon
+  | MirMacro ~ SemiColon
 }
 
 MirBody = {

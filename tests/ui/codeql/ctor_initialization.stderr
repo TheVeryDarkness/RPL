@@ -1,0 +1,31 @@
+error: calling `std::io::_print` in a `#[ctor]`/`#[dtor]` context is unsafe
+  --> tests/ui/codeql/ctor_initialization.rs:8:5
+   |
+LL |     println!("Hello from ctor!");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ std library function called here
+   |
+   = help: use a non-std alternative such as `libc_print::libc_println!`
+   = note: `std` library functions are not guaranteed to be stable before `main` starts or after it ends
+   = note: `#[deny(rpl::ctor_initialization_print)]` on by default
+
+error: calling `std::io::_print` in a `#[ctor]`/`#[dtor]` context is unsafe
+  --> tests/ui/codeql/ctor_initialization.rs:13:5
+   |
+LL |     print!("Hello from ctor!");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ std library function called here
+   |
+   = help: use a non-std alternative such as `libc_print::libc_println!`
+   = note: `std` library functions are not guaranteed to be stable before `main` starts or after it ends
+
+error: calling `std::io::stdout` in a `#[ctor]`/`#[dtor]` context is unsafe
+  --> tests/ui/codeql/ctor_initialization.rs:19:22
+   |
+LL |     let mut handle = std::io::stdout();
+   |                      ^^^^^^^^^^^^^^^^^ std library function called here
+   |
+   = help: use a non-std alternative such as `libc::STDOUT_FILENO`
+   = note: `std` library functions are not guaranteed to be stable before `main` starts or after it ends
+   = note: `#[deny(rpl::ctor_initialization_stdout)]` on by default
+
+error: aborting due to 3 previous errors
+

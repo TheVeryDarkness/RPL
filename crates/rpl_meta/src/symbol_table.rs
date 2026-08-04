@@ -575,6 +575,7 @@ pub struct FnInner<'i> {
     /// - Type aliases declared in the function scope.
     /// - Paths imported into the function scope.
     types: FlatMap<&'i str, TypeOrPath<'i>>,
+    fn_name: Option<&'i str>,
     // FIXME: remove it when `self` parameter is implemented
     self_value: Option<&'i pairs::Type<'i>>,
     ret_value: Option<&'i pairs::Type<'i>>,
@@ -586,12 +587,18 @@ pub struct FnInner<'i> {
 }
 
 impl<'i> FnInner<'i> {
-    fn new(span: Span<'i>, path: &'i std::path::Path, self_ty: Option<&'i pairs::Type<'i>>) -> Self {
+    fn new(
+        span: Span<'i>,
+        fn_name: Option<&'i str>,
+        path: &'i std::path::Path,
+        self_ty: Option<&'i pairs::Type<'i>>,
+    ) -> Self {
         Self {
             span,
             path,
             // types: imports.iter().map(|(&k, v)| (k, TypeOrPath::Path(v))).collect(),
             types: FlatMap::default(),
+            fn_name,
             self_value: None,
             ret_value: None,
             self_param: None,
@@ -601,20 +608,28 @@ impl<'i> FnInner<'i> {
             symbol_to_local_idx: FlatMap::default(),
         }
     }
+    pub fn get_fn_name(&self) -> Option<&'i str> {
+        self.fn_name
+    }
     pub(crate) fn parse_from(
         mctx: &MetaContext<'i>,
         fn_name: &'i pairs::FnName<'i>,
         self_ty: Option<&'i pairs::Type<'i>>,
     ) -> (Option<FnName<'i>>, Self) {
         match fn_name.deref() {
-            Choice3::_0(_) => (None, Self::new(fn_name.span, mctx.get_active_path(), self_ty)),
+            Choice3::_0(_) => (None, Self::new(fn_name.span, None, mctx.get_active_path(), self_ty)),
             Choice3::_1(meta_var) => (
                 Some(FnName::MetaVariable(meta_var)),
-                FnInner::new(meta_var.span, mctx.get_active_path(), self_ty),
+                FnInner::new(
+                    meta_var.span,
+                    Some(meta_var.span.as_str()),
+                    mctx.get_active_path(),
+                    self_ty,
+                ),
             ),
             Choice3::_2(ident) => (
                 Some(FnName::Identifier(ident)),
-                FnInner::new(ident.span, mctx.get_active_path(), self_ty),
+                FnInner::new(ident.span, Some(ident.span.as_str()), mctx.get_active_path(), self_ty),
             ),
         }
     }

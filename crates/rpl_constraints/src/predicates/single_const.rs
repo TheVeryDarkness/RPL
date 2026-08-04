@@ -19,3 +19,13 @@ pub fn is_null_ptr<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, con
             .unwrap_or_else(|_| false)
     })
 }
+
+/// Returns `false` when the const is proven zero (reject the match).
+/// Returns `true` when non-zero or not evaluable (still lint variable lengths).
+#[instrument(level = "debug", skip(tcx, typing_env), ret)]
+pub fn is_nonzero<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, const_: Const<'tcx>) -> bool {
+    match const_.try_eval_scalar_int(tcx, typing_env) {
+        Some(v) => !v.is_null(),
+        None => true,
+    }
+}

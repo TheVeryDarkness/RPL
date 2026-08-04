@@ -77,18 +77,7 @@ LL |         vec.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:122:28
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^
-   |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
-
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:146:29
+  --> tests/ui/clippy/uninit_vec.rs:145:29
    |
 LL |     let mut vec1: Vec<u8> = Vec::with_capacity(1000);
    |                             ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -99,7 +88,7 @@ LL |         vec1.set_len(200);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:147:29
+  --> tests/ui/clippy/uninit_vec.rs:146:29
    |
 LL |     let mut vec2: Vec<u8> = Vec::with_capacity(1000);
    |                             ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -109,16 +98,146 @@ LL |         vec2.set_len(200);
    |
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
-error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:156:28
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:37:9
    |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ------------------------ `Vec` created here
 ...
-LL |         vec.set_len(0);
-   |         ^^^^^^^^^^^^^^
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
    |
-   = help: initialize the buffer or wrap the content in `MaybeUninit`
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+   = note: `#[deny(rpl::set_len_uninitialized)]` on by default
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:47:9
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ------------------------ `Vec` created here
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:80:9
+   |
+LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                                ------------------------ `Vec` created here
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:87:9
+   |
+LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                                ------------------------ `Vec` created here
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:96:9
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ------------------------ `Vec` created here
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:125:9
+   |
+LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
+   |                            ------------------------ `Vec` created here
+...
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:148:9
+   |
+LL |     let mut vec1: Vec<u8> = Vec::with_capacity(1000);
+   |                             ------------------------ `Vec` created here
+...
+LL |         vec1.set_len(200);
+   |         ^^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:150:9
+   |
+LL |     let mut vec2: Vec<u8> = Vec::with_capacity(1000);
+   |                             ------------------------ `Vec` created here
+...
+LL |         vec2.set_len(200);
+   |         ^^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:132:9
+   |
+LL |         let mut vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(1000);
+   |                                             ------------------------ `Vec` created here
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:136:9
+   |
+LL |         let mut vec: Vec<(MaybeUninit<u8>, MaybeUninit<bool>)> = Vec::with_capacity(1000);
+   |                                                                  ------------------------ `Vec` created here
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:140:9
+   |
+LL |         let mut vec: Vec<(MaybeUninit<u8>, [MaybeUninit<bool>; 2])> = Vec::with_capacity(1000);
+   |                                                                       ------------------------ `Vec` created here
+LL |         vec.set_len(200);
+   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:163:9
+   |
+LL |     let mut vec: Vec<()> = Vec::with_capacity(1000);
+   |                            ------------------------ `Vec` created here
+LL |     unsafe {
+LL |         vec.set_len(10);
+   |         ^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
+
+error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
+  --> tests/ui/clippy/uninit_vec.rs:170:9
+   |
+LL |     let mut vec: Vec<MyOwnMaybeUninit> = Vec::with_capacity(1000);
+   |                                          ------------------------ `Vec` created here
+LL |     unsafe {
+LL |         vec.set_len(10);
+   |         ^^^^^^^^^^^^^^^ `Vec::set_len` called here
+   |
+   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
   --> tests/ui/clippy/uninit_vec.rs:108:9
@@ -265,160 +384,8 @@ LL |         vec.set_len(200);
    |
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:37:9
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |                            ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-   = note: `#[deny(rpl::set_len_uninitialized)]` on by default
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:47:9
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |                            ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:80:9
-   |
-LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |                                ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:87:9
-   |
-LL |         let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |                                ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:96:9
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000);
-   |                            ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:126:9
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-   |                            ------------------------ `Vec` created here
-...
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:149:9
-   |
-LL |     let mut vec1: Vec<u8> = Vec::with_capacity(1000);
-   |                             ------------------------ `Vec` created here
-...
-LL |         vec1.set_len(200);
-   |         ^^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:151:9
-   |
-LL |     let mut vec2: Vec<u8> = Vec::with_capacity(1000);
-   |                             ------------------------ `Vec` created here
-...
-LL |         vec2.set_len(200);
-   |         ^^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:159:9
-   |
-LL |     let mut vec: Vec<u8> = Vec::with_capacity(1000); // FIXME: false positive
-   |                            ------------------------ `Vec` created here
-...
-LL |         vec.set_len(0);
-   |         ^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:133:9
-   |
-LL |         let mut vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(1000);
-   |                                             ------------------------ `Vec` created here
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:137:9
-   |
-LL |         let mut vec: Vec<(MaybeUninit<u8>, MaybeUninit<bool>)> = Vec::with_capacity(1000);
-   |                                                                  ------------------------ `Vec` created here
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:141:9
-   |
-LL |         let mut vec: Vec<(MaybeUninit<u8>, [MaybeUninit<bool>; 2])> = Vec::with_capacity(1000);
-   |                                                                       ------------------------ `Vec` created here
-LL |         vec.set_len(200);
-   |         ^^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:166:9
-   |
-LL |     let mut vec: Vec<()> = Vec::with_capacity(1000);
-   |                            ------------------------ `Vec` created here
-LL |     unsafe {
-LL |         vec.set_len(10);
-   |         ^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
-error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:173:9
-   |
-LL |     let mut vec: Vec<MyOwnMaybeUninit> = Vec::with_capacity(1000);
-   |                                          ------------------------ `Vec` created here
-LL |     unsafe {
-LL |         vec.set_len(10);
-   |         ^^^^^^^^^^^^^^^ `Vec::set_len` called here
-   |
-   = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
-
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:181:31
+  --> tests/ui/clippy/uninit_vec.rs:178:31
    |
 LL |         let mut vec: Vec<T> = Vec::with_capacity(1000);
    |                               ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -429,7 +396,7 @@ LL |             vec.set_len(10);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:185:13
+  --> tests/ui/clippy/uninit_vec.rs:182:13
    |
 LL |         let mut vec: Vec<T> = Vec::with_capacity(1000);
    |                               ------------------------ `Vec` created here
@@ -440,7 +407,7 @@ LL |             vec.set_len(10);
    = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:194:13
+  --> tests/ui/clippy/uninit_vec.rs:191:13
    |
 LL |         let mut vec: Vec<MaybeUninit<T>> = Vec::with_capacity(1000);
    |                                            ------------------------ `Vec` created here
@@ -451,7 +418,7 @@ LL |             vec.set_len(10);
    = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:202:13
+  --> tests/ui/clippy/uninit_vec.rs:199:13
    |
 LL |         let mut vec: Vec<UnsafeCell<MaybeUninit<T>>> = Vec::with_capacity(1);
    |                                                        --------------------- `Vec` created here
@@ -462,7 +429,7 @@ LL |             vec.set_len(1);
    = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:212:42
+  --> tests/ui/clippy/uninit_vec.rs:209:42
    |
 LL |         let mut vec: Vec<Recursive<T>> = Vec::with_capacity(1);
    |                                          ^^^^^^^^^^^^^^^^^^^^^
@@ -473,7 +440,7 @@ LL |             vec.set_len(1);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:216:13
+  --> tests/ui/clippy/uninit_vec.rs:213:13
    |
 LL |         let mut vec: Vec<Recursive<T>> = Vec::with_capacity(1);
    |                                          --------------------- `Vec` created here
@@ -484,7 +451,7 @@ LL |             vec.set_len(1);
    = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
 error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
-  --> tests/ui/clippy/uninit_vec.rs:227:37
+  --> tests/ui/clippy/uninit_vec.rs:224:37
    |
 LL |         let mut vec: Vec<Enum<T>> = Vec::with_capacity(1);
    |                                     ^^^^^^^^^^^^^^^^^^^^^
@@ -495,7 +462,7 @@ LL |             vec.set_len(1);
    = help: initialize the buffer or wrap the content in `MaybeUninit`
 
 error: it violates the precondition of `Vec::set_len` to extend a `Vec`'s length without initializing its content in advance
-  --> tests/ui/clippy/uninit_vec.rs:231:13
+  --> tests/ui/clippy/uninit_vec.rs:228:13
    |
 LL |         let mut vec: Vec<Enum<T>> = Vec::with_capacity(1);
    |                                     --------------------- `Vec` created here
@@ -505,5 +472,5 @@ LL |             vec.set_len(1);
    |
    = help: before calling `set_len` to extend its length, make sure all elements are initialized, using such as `spare_capacity_mut` or `as_mut_ptr`
 
-error: aborting due to 46 previous errors
+error: aborting due to 43 previous errors
 

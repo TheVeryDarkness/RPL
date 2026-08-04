@@ -23,7 +23,7 @@ use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 use thiserror::Error;
 
-use super::Matched;
+use super::{Matched, Spanned};
 use crate::pat::{ConstVarIdx, TyVarIdx};
 
 /// A dynamic error that can be used to report user-defined errors
@@ -210,10 +210,14 @@ impl DynamicError {
     pub const fn lint(&self) -> &'static Lint {
         self.lint
     }
+    #[instrument(level = "trace", skip(span))]
     pub fn default_diagnostic(pat_name: Symbol, span: Span) -> Self {
         const LINT: Lint = Lint {
             name: "rpl::missing_diagnostic",
             default_level: Level::Deny,
+            // Only enable in debug mode to avoid emitting errors in external macros.
+            #[cfg(debug_assertions)]
+            report_in_external_macro: true,
             ..Lint::default_fields_for_macro()
         };
         let primary = (
@@ -332,6 +336,8 @@ pub(crate) struct DynamicErrorBuilder<'i> {
 pub enum ParseError<'i> {
     #[display("Primary message not found:\n{_0}")]
     PrimaryNotFound(SpanWrapper<'i>),
+    #[display("Primary label `{_0}` not found in pattern:\n{_1}")]
+    PrimaryLabelNotFound(&'i str, SpanWrapper<'i>),
     #[display("Lint name not found:\n{_0}")]
     MissingName(SpanWrapper<'i>),
     #[display("Expected an identifier, but found:\n{_0}")]
@@ -368,14 +374,29 @@ fn parse_ident<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> R
     Ok(ident.span.as_str())
 }
 
-fn parse_idents<'i>(path: &'i std::path::Path, attrs: &pairs::diagAttrs<'i>) -> Result<Vec<&'i str>, ParseError<'i>> {
+/// Parse `primary(...)` label names. Each label must exist in the pattern (any [`Spanned`] kind).
+fn parse_primary_idents<'i>(
+    path: &'i std::path::Path,
+    attrs: &pairs::diagAttrs<'i>,
+    label_map: &FxHashMap<Symbol, Spanned>,
+) -> Result<Vec<&'i str>, ParseError<'i>> {
     let mut idents = Vec::new();
     for attr in collect_elems_separated_by_comma!(attrs) {
         let (ident, arguments_or_value) = attr.get_matched();
         if arguments_or_value.is_some() {
             return Err(ParseError::NotAnIdentifier(SpanWrapper::new(attr.span, path)));
         }
-        idents.push(ident.span.as_str());
+        let name = ident.span.as_str();
+        if !label_map.contains_key(&Symbol::intern(name)) {
+            return Err(ParseError::PrimaryLabelNotFound(
+                name,
+                SpanWrapper::new(attr.span, path),
+            ));
+        }
+        idents.push(name);
+    }
+    if idents.is_empty() {
+        return Err(ParseError::Empty(SpanWrapper::new(attrs.span, path)));
     }
     Ok(idents)
 }
@@ -431,6 +452,7 @@ impl<'i> DynamicErrorBuilder<'i> {
         meta_vars: &NonLocalMetaSymTab<'mcx>,
         consts: &FxHashMap<Symbol, &'i str>,
         locals: &FxHashSet<Symbol>,
+        label_map: &FxHashMap<Symbol, Spanned>,
         table: &DiagSymbolTable,
     ) -> Result<Self, ParseError<'i>> {
         let path = item.path;
@@ -453,9 +475,10 @@ impl<'i> DynamicErrorBuilder<'i> {
 
             match key {
                 "primary" => {
-                    let idents = parse_idents(
+                    let idents = parse_primary_idents(
                         path,
                         args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?,
+                        label_map,
                     )?;
                     primary = Some((SubMsg::parse(message, meta_vars, consts, locals), idents));
                 },
@@ -481,6 +504,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                     name = Some(message);
                 },
                 "level" => (),
+                "report_in_external_macro" => (),
                 "suggestion" => {
                     let args = args.ok_or_else(|| ParseError::Empty(SpanWrapper::new(diag.span, path)))?;
                     let (code, span, applicability) = parse_suggestion(path, args)?;
@@ -515,6 +539,13 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         Ok(builder)
     }
+
+    /// Primary label names in declaration order (used for lint-root selection, last first).
+    pub(crate) fn primary_labels(&self) -> &[&'i str] {
+        &self.primary.1
+    }
+
+    #[instrument(level = "debug", skip(self, source_map, body, decl))]
     pub(crate) fn build<'tcx>(
         &self,
         source_map: &SourceMap,
@@ -548,7 +579,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                             s.push_str(self.fn_name.unwrap().as_str());
                         },
                         SubMsg::Label(local) => {
-                            let local_name = self.matched.span(self.body, self.decl, local.as_str());
+                            let local_name = self.matched.span(self.body, self.decl, local.as_str(), self.source_map);
                             s.push_str(&self.source_map.span_to_snippet(local_name).unwrap());
                         },
                     }
@@ -565,22 +596,36 @@ impl<'i> DynamicErrorBuilder<'i> {
         };
         let primary = (
             formatter.format(&self.primary.0),
-            matched.multi_span(body, decl, &self.primary.1),
+            matched.multi_span(body, decl, &self.primary.1, source_map),
         );
         let labels = self
             .labels
             .iter()
-            .map(|(label, span)| (formatter.format(label), matched.span(body, decl, span)))
+            .filter_map(|(label, span)| {
+                matched
+                    .try_span(body, decl, span, source_map)
+                    .map(|label_span| (formatter.format(label), label_span))
+            })
             .collect();
         let notes = self
             .notes
             .iter()
-            .map(|(note, span)| (formatter.format(note), span.map(|span| matched.span(body, decl, span))))
+            .map(|(note, span)| {
+                (
+                    formatter.format(note),
+                    span.map(|span| matched.span(body, decl, span, source_map)),
+                )
+            })
             .collect();
         let helps = self
             .helps
             .iter()
-            .map(|(help, span)| (formatter.format(help), span.map(|span| matched.span(body, decl, span))))
+            .map(|(help, span)| {
+                (
+                    formatter.format(help),
+                    span.map(|span| matched.span(body, decl, span, source_map)),
+                )
+            })
             .collect();
         let suggestions = self
             .suggestions
@@ -589,7 +634,7 @@ impl<'i> DynamicErrorBuilder<'i> {
                 (
                     formatter.format(suggestion),
                     formatter.format(code),
-                    matched.span(body, decl, span),
+                    matched.span(body, decl, span, source_map),
                     *applicability,
                 )
             })

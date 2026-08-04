@@ -4,9 +4,10 @@ use rustc_hir::FnDecl;
 use rustc_index::IndexVec;
 use rustc_middle::mir::{Body, Local, PlaceRef};
 use rustc_middle::ty::Ty;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
-use super::{Const, Matched, StatementMatch, pat};
+use super::{AdtFieldMap, Const, Matched, StatementMatch, pat};
 
 /// A normalized version of [`Spanned`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -21,9 +22,9 @@ pub enum NormalizedSpanned {
 }
 
 impl NormalizedSpanned {
-    pub fn span(self, body: &Body<'_>, decl: &FnDecl<'_>) -> Span {
+    pub fn span(self, body: &Body<'_>, decl: &FnDecl<'_>, source_map: &SourceMap) -> Span {
         match self {
-            Self::Location(location) => location.span_no_inline(body),
+            Self::Location(location) => location.span_no_inline(body, source_map),
             Self::Local(local) => body.local_decls[local].source_info.span,
             // Special case for the function name, which is not a label.
             Self::Body => body.span,
@@ -34,11 +35,12 @@ impl NormalizedSpanned {
 }
 
 /// A normalized version of [`Matched`].
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedMatched<'tcx> {
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
+    pub adt_fields: AdtFieldMap,
     /// Labels and attributes. Sorted by label.
     extra: Vec<(Symbol, NormalizedSpanned)>,
 }
@@ -50,6 +52,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
         let ty_vars = matched.ty_vars.clone();
         let const_vars = matched.const_vars.clone();
         let place_vars = matched.place_vars.clone();
+        let adt_fields = matched.adt_fields.clone();
         let mut labels: Vec<_> = label_map
             .iter()
             .map(|(label, spanned)| match spanned {
@@ -70,6 +73,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }
@@ -92,6 +96,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| matched_from.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
+        let adt_fields = matched_from.adt_fields.clone();
         let mut labels: Vec<_> = label_map_from
             .iter()
             .map(|(label, spanned)| {
@@ -110,6 +115,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }
@@ -129,6 +135,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             |i| self.place_vars[matched_map.place_vars[i]],
             matched_map.place_vars.len(),
         );
+        let adt_fields = self.adt_fields.clone();
         let mut labels: Vec<_> = self
             .extra
             .iter()
@@ -140,6 +147,7 @@ impl<'tcx> NormalizedMatched<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
             extra: labels,
         }
     }
@@ -156,18 +164,31 @@ impl<'tcx> NormalizedMatched<'tcx> {
                 .zip(&other.extra)
                 .all(|((label1, _), (label2, _))| label1 == label2)
     }
+
+    /// Look up a normalized label by name.
+    pub fn spanned(&self, name: &str) -> Option<NormalizedSpanned> {
+        let labels = &self.extra;
+        labels
+            .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
+            .ok()
+            .map(|i| labels[i].1)
+    }
 }
 
 impl<'tcx> pat::Matched<'tcx> for NormalizedMatched<'tcx> {
-    fn span(&self, body: &Body<'_>, decl: &FnDecl<'tcx>, name: &str) -> Span {
-        let labels = &self.extra;
-        let i = labels
-            .binary_search_by_key(&Symbol::intern(name), |(label, _)| *label)
-            .unwrap_or_else(|_| {
-                panic!("label `{name}` not found in pattern labels: {labels:?}");
-            });
-        labels[i].1.span(body, decl)
+    fn span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
+        self.try_span(body, decl, name, source_map).unwrap_or_else(|| {
+            panic!(
+                "label `{name}` not found in pattern labels: {labels:?}",
+                labels = self.extra
+            );
+        })
     }
+
+    fn try_span(&self, body: &Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Option<Span> {
+        self.spanned(name).map(|s| s.span(body, decl, source_map))
+    }
+
     fn type_meta_var(&self, idx: pat::TyVarIdx) -> Ty<'tcx> {
         self.ty_vars[idx]
     }

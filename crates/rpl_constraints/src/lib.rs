@@ -23,6 +23,7 @@ extern crate rustc_trait_selection;
 #[macro_use]
 extern crate tracing;
 extern crate either;
+extern crate itertools;
 
 use std::ops::Deref;
 

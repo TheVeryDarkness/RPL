@@ -8,9 +8,11 @@ use rustc_span::Symbol;
 // Attention:
 // When you add a new module here,
 // Try to keep all predicate signatures consistent in it.
+mod item_attr;
 mod locals;
 mod multiple_consts;
 mod multiple_tys;
+mod places;
 mod single_const;
 mod single_fn;
 mod single_ty;
@@ -21,6 +23,7 @@ mod ty_const;
 pub use locals::*;
 pub use multiple_consts::*;
 pub use multiple_tys::*;
+pub use places::*;
 pub use single_const::*;
 pub use single_fn::*;
 pub use single_ty::*;
@@ -28,6 +31,8 @@ use thiserror::Error;
 pub use translate::*;
 pub use trivial::*;
 pub use ty_const::*;
+
+use crate::predicates::item_attr::{ItemAttrPredsFnPtr, has_attr};
 
 #[derive(Clone, Debug, Display, Error)]
 pub enum PredicateError<'i> {
@@ -70,16 +75,23 @@ pub const ALL_PREDICATES: &[&str] = &[
     "same_size",
     // single_fn_preds
     "requires_monomorphization",
+    "runs_outside_main",
     // ty_const_preds
     "maybe_misaligned",
     // single_const_preds
     "is_null_ptr",
+    "is_nonzero",
     // multiple_consts_preds
     "usize_lt",
     // single_local_preds
     "is_null",
     // multiple_locals_preds
     "product_of",
+    // multiple_places_preds
+    "mentions_place",
+    // dataflow preds (evaluated specially in PredicateEvaluator)
+    "flows_to",
+    "may_panic",
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -94,6 +106,12 @@ pub enum PredicateKind {
     MultipleConsts(MultipleConstsPredsFnPtr),
     SingleLocal(SingleLocalPredsFnPtr),
     MultipleLocals(MultipleLocalsPredsFnPtr),
+    MultiplePlaces(MultiplePlacesPredsFnPtr),
+    ItemAttr(ItemAttrPredsFnPtr),
+    /// `flows_to($local_or_place, 'src, 'sink)` — DDG reachability; evaluated in matcher.
+    FlowsTo,
+    /// `may_panic('sink)` — potential panic site; evaluated in matcher.
+    MayPanic,
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -123,11 +141,17 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "same_abi_and_pref_align" => Self::MultipleTys(same_abi_and_pref_align),
             "same_size" => Self::MultipleTys(same_size),
             "requires_monomorphization" => Self::Fn(requires_monomorphization),
+            "runs_outside_main" => Self::Fn(runs_outside_main),
             "maybe_misaligned" => Self::TyConst(maybe_misaligned),
             "is_null_ptr" => Self::SingleConst(is_null_ptr),
+            "is_nonzero" => Self::SingleConst(is_nonzero),
             "usize_lt" => Self::MultipleConsts(usize_lt),
             "product_of" => Self::MultipleLocals(product_of),
             "is_null" => Self::SingleLocal(is_null),
+            "mentions_place" => Self::MultiplePlaces(mentions_place),
+            "has_attr" => Self::ItemAttr(has_attr),
+            "flows_to" => Self::FlowsTo,
+            "may_panic" => Self::MayPanic,
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),

@@ -518,6 +518,80 @@ impl<BasicBlock: Idx, Local: Idx> DataDepGraph<BasicBlock, Local> {
     pub(crate) fn num_locals(&self) -> usize {
         self.num_locals
     }
+
+    /// Returns true if the definition/effect of `local` at `(from_bb, from_stmt)` can reach
+    /// a use at `(to_bb, to_stmt)` along data-dependence edges labeled with `local`.
+    ///
+    /// Unlike subgraph isomorphism (`match_ddg`), this only checks reachability between two
+    /// anchors and allows arbitrary intermediate statements.
+    pub fn flows_to(
+        &self,
+        from_bb: BasicBlock,
+        from_stmt: usize,
+        to_bb: BasicBlock,
+        to_stmt: usize,
+        local: Local,
+    ) -> bool {
+        if from_bb == to_bb && from_stmt == to_stmt {
+            return false;
+        }
+
+        let goal = (to_bb, to_stmt);
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![(from_bb, from_stmt)];
+        visited.insert((from_bb.index(), from_stmt));
+
+        while let Some((bb, stmt)) = stack.pop() {
+            for succ in self.successors_via_local(bb, stmt, local) {
+                if succ == goal {
+                    return true;
+                }
+                if visited.insert((succ.0.index(), succ.1)) {
+                    stack.push(succ);
+                }
+            }
+        }
+        false
+    }
+
+    /// Statements that directly depend on `(bb, stmt)` writing `local`.
+    fn successors_via_local(
+        &self,
+        bb: BasicBlock,
+        stmt: usize,
+        local: Local,
+    ) -> impl Iterator<Item = (BasicBlock, usize)> + '_ {
+        let intrablock = self.blocks[bb]
+            .rdeps(stmt)
+            .filter(move |&(_, l)| l == local)
+            .map(move |(next, _)| (bb, next));
+
+        #[cfg(feature = "interblock_edges")]
+        let interblock = self.interblock_successors_via_local(bb, stmt, local);
+        #[cfg(not(feature = "interblock_edges"))]
+        let interblock = std::iter::empty();
+
+        intrablock.chain(interblock)
+    }
+
+    #[cfg(feature = "interblock_edges")]
+    fn interblock_successors_via_local(
+        &self,
+        from_bb: BasicBlock,
+        from_stmt: usize,
+        local: Local,
+    ) -> impl Iterator<Item = (BasicBlock, usize)> + '_ {
+        let from_loc = Location::new(from_bb, from_stmt);
+        self.interblock_edges.iter_enumerated().flat_map(move |(bb, edges)| {
+            edges.deps.iter().enumerate().filter_map(move |(stmt, entry)| {
+                entry
+                    .entry
+                    .get(&from_loc)
+                    .copied()
+                    .and_then(|l| (l == local).then_some((bb, stmt)))
+            })
+        })
+    }
 }
 
 #[cfg(feature = "interblock_edges")]
@@ -751,5 +825,66 @@ impl Access {
             },
             NonUse(_) => Self::NoAccess,
         }
+    }
+}
+
+#[cfg(test)]
+mod flows_to_tests {
+    use rustc_middle::mir::visit::{MutatingUseContext, NonMutatingUseContext, PlaceContext};
+
+    use super::*;
+
+    fn write_pcx() -> PlaceContext {
+        PlaceContext::MutatingUse(MutatingUseContext::Store)
+    }
+
+    fn read_pcx() -> PlaceContext {
+        PlaceContext::NonMutatingUse(NonMutatingUseContext::Copy)
+    }
+
+    #[test]
+    fn flows_to_same_block_direct() {
+        // stmt0 writes local0; stmt1 writes local1; stmt2 reads local0
+        let mut g = DataDepGraph::<u32, u32>::new(1, |_| 3, 2);
+        g.blocks[0u32].access_local(0u32, write_pcx(), 0);
+        g.blocks[0u32].update_deps(0);
+        g.blocks[0u32].access_local(1u32, write_pcx(), 1);
+        g.blocks[0u32].update_deps(1);
+        g.blocks[0u32].access_local(0u32, read_pcx(), 2);
+        g.blocks[0u32].update_deps(2);
+
+        assert!(g.flows_to(0u32, 0, 0u32, 2, 0u32));
+        assert!(!g.flows_to(0u32, 0, 0u32, 2, 1u32));
+        assert!(!g.flows_to(0u32, 1, 0u32, 2, 0u32));
+        assert!(!g.flows_to(0u32, 0, 0u32, 0, 0u32));
+    }
+
+    #[test]
+    fn flows_to_same_block_transitive() {
+        // stmt0 writes local0; stmt1 reads+writes local0; stmt2 reads local0
+        let mut g = DataDepGraph::<u32, u32>::new(1, |_| 3, 1);
+        g.blocks[0u32].access_local(0u32, write_pcx(), 0);
+        g.blocks[0u32].update_deps(0);
+        g.blocks[0u32].access_local(0u32, read_pcx(), 1);
+        g.blocks[0u32].access_local(0u32, write_pcx(), 1);
+        g.blocks[0u32].update_deps(1);
+        g.blocks[0u32].access_local(0u32, read_pcx(), 2);
+        g.blocks[0u32].update_deps(2);
+
+        assert!(g.flows_to(0u32, 0, 0u32, 1, 0u32));
+        assert!(g.flows_to(0u32, 1, 0u32, 2, 0u32));
+        // Transitive: 0 -> 1 -> 2 along local0 edges
+        assert!(g.flows_to(0u32, 0, 0u32, 2, 0u32));
+    }
+
+    #[test]
+    fn flows_to_unrelated_read_is_false() {
+        let mut g = DataDepGraph::<u32, u32>::new(1, |_| 2, 2);
+        g.blocks[0u32].access_local(0u32, write_pcx(), 0);
+        g.blocks[0u32].update_deps(0);
+        g.blocks[0u32].access_local(1u32, read_pcx(), 1);
+        g.blocks[0u32].update_deps(1);
+
+        assert!(!g.flows_to(0u32, 0, 0u32, 1, 0u32));
     }
 }

@@ -32,9 +32,16 @@ pub fn is_copy<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<
 }
 
 /// Check if ty is not unpin.
+///
+/// `PhantomData<_>` is treated as Unpin here: rustc's `is_unpin` often returns false for
+/// `PhantomData<$E>` when `$E` is an unconstrained param (fail-open), which would otherwise
+/// make inert marker fields compete with real `!Unpin` fields in ADT matching.
 #[instrument(level = "debug", skip(tcx), ret)]
 #[allow(unused_variables)]
 pub fn is_not_unpin<'tcx>(tcx: TyCtxt<'tcx>, typing_env: ty::TypingEnv<'tcx>, ty: Ty<'tcx>) -> bool {
+    if ty.is_phantom_data() {
+        return false;
+    }
     !ty.is_unpin(tcx, typing_env)
 }
 

@@ -34,9 +34,9 @@ fn cross_function() {
 fn cross_statement() {
     unsafe {
         let v = vec![0u8];
+        let v = transmute::<_, Vec<u32>>(v);
         //~^ unsound_collection_transmute
         // wrong size
-        let v = transmute::<_, Vec<u32>>(v);
         dbg!(v);
     }
 }

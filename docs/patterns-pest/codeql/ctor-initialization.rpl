@@ -1,0 +1,60 @@
+pattern ctor-initialization
+
+patt {
+    use std::fmt::Arguments;
+    use std::io::Stdout;
+    use std::io::Stderr;
+
+    #[diag = "ctor_initialization_print"]
+    ctor_println = fn $f(..) {
+        'call:
+        _ = std::io::_print(_);
+    } where {
+        runs_outside_main($f)
+    }
+
+    #[diag = "ctor_initialization_stdout"]
+    ctor_stdout = fn $f(..) {
+        'call:
+        let $handle: Stdout = std::io::stdout();
+    } where {
+        runs_outside_main($f)
+    }
+
+    #[diag = "ctor_initialization_stderr"]
+    ctor_stderr = fn $f(..) {
+        'call:
+        let $handle: Stderr = std::io::stderr();
+    } where {
+        runs_outside_main($f)
+    }
+}
+
+diag {
+    ctor_initialization_print = {
+        primary(call) = "calling `std::io::_print` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc_print::libc_println!`",
+        name = "ctor_initialization_print",
+        level = "deny",
+    }
+
+    ctor_initialization_stdout = {
+        primary(call) = "calling `std::io::stdout` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc::STDOUT_FILENO`",
+        name = "ctor_initialization_stdout",
+        level = "deny",
+    }
+
+    ctor_initialization_stderr = {
+        primary(call) = "calling `std::io::stderr` in a `#[ctor]`/`#[dtor]` context is unsafe",
+        label(call) = "std library function called here",
+        note = "`std` library functions are not guaranteed to be stable before `main` starts or after it ends",
+        help = "use a non-std alternative such as `libc::STDERR_FILENO`",
+        name = "ctor_initialization_stderr",
+        level = "deny",
+    }
+}

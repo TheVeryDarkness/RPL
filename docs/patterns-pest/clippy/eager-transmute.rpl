@@ -19,11 +19,12 @@ patt {
     //     !niche_ordered($T, $U)
     // }
     #[diag = "eager_transmute"]
-    and_then[$T: type, $U: type, $src: place($T)] = unsafe? fn _(..) {
+    and_then[$T: type, $U: type, $src: place($T), $cond: place(bool)] = unsafe? fn _(..) {
         'dst:
         let $dst: $U = move $src as $U (Transmute);
-        _ = bool::then_some::<$U>(_, move $dst);
+        _ = bool::then_some::<$U>(copy $cond, move $dst);
     } where {
+        mentions_place($cond, $src),
         !niche_ordered($T, $U)
     }
 }

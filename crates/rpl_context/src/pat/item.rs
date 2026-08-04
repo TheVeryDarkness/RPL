@@ -148,6 +148,8 @@ pub struct FnPatterns<'pcx> {
     pub named_fns: FxHashMap<Symbol, &'pcx FnPattern<'pcx>>,
     /// fn _ (..) -> _ { .. }
     pub unnamed_fns: Vec<&'pcx FnPattern<'pcx>>,
+    /// All function patterns in source order (supports multiple patterns with the same name).
+    pub all_fns: Vec<&'pcx FnPattern<'pcx>>,
 }
 
 pub struct FnPattern<'pcx> {
@@ -330,6 +332,19 @@ impl<'pcx> FnPattern<'pcx> {
             Some(mir_body) => mir_body,
             _ => panic!("expected MIR body"),
         }
+    }
+
+    /// Returns true when the pattern has no MIR statements to match (signature-only).
+    pub fn is_signature_only(&self) -> bool {
+        self.body.is_none_or(|body| {
+            body.basic_blocks.iter().all(|bb| {
+                bb.statements.is_empty()
+                    && matches!(
+                        bb.terminator,
+                        Some(super::mir::TerminatorKind::Return) | Some(super::mir::TerminatorKind::PatEnd)
+                    )
+            })
+        })
     }
 }
 

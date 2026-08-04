@@ -149,12 +149,33 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
             (
                 &pat::StatementKind::Assign(place_pat, ref rvalue_pat),
                 &mir::StatementKind::Assign(box (place, ref rvalue)),
-            ) => self.match_rvalue(rvalue_pat, rvalue) && self.match_place(place_pat, place),
+            ) => {
+                // Rvalue first (needed so probe locals come from successful FieldPat sites).
+                // If the destination then fails, roll back FieldPat / place side effects from
+                // the rvalue — otherwise a deferred `$field` commit from a wrong candidate
+                // poisons later attempts (CVE-35902 `next_item`).
+                if !self.match_rvalue(rvalue_pat, rvalue) {
+                    false
+                } else if self.match_place(place_pat, place) {
+                    true
+                } else {
+                    self.unmatch_rvalue(rvalue_pat, rvalue);
+                    false
+                }
+            },
             (pat::StatementKind::Intrinsic(intrinsic_pat), mir::StatementKind::Intrinsic(intrinsic)) => {
                 self.match_intrinsic(intrinsic_pat, intrinsic)
             },
             (
-                pat::StatementKind::Assign(..) | pat::StatementKind::Intrinsic(..),
+                pat::StatementKind::Move(place_pat),
+                mir::StatementKind::Assign(box (
+                    _,
+                    mir::Rvalue::Use(mir::Operand::Move(place)) | mir::Rvalue::Repeat(mir::Operand::Move(place), _),
+                )),
+                // FIXME: there may be other cases of `Take`.
+            ) => self.match_place(*place_pat, *place),
+            (
+                pat::StatementKind::Assign(..) | pat::StatementKind::Intrinsic(..) | pat::StatementKind::Move(..),
                 mir::StatementKind::Assign(..)
                 | mir::StatementKind::FakeRead(..)
                 | mir::StatementKind::SetDiscriminant { .. }
@@ -410,6 +431,68 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         matched
     }
 
+    /// Undo place / FieldPat side effects from a successful [`Self::match_rvalue`].
+    fn unmatch_rvalue(&self, pat: &pat::Rvalue<'pcx>, rvalue: &mir::Rvalue<'tcx>) {
+        match (pat, rvalue) {
+            (
+                &pat::Rvalue::Len(place_pat),
+                &mir::Rvalue::UnaryOp(mir::UnOp::PtrMetadata, mir::Operand::Copy(place)),
+            ) => {
+                if let [pat::PlaceElem::Deref, projection @ ..] = place_pat.projection {
+                    let place_pat = pat::Place {
+                        base: place_pat.base,
+                        projection,
+                    };
+                    self.unmatch_place(place_pat, place);
+                }
+            },
+            (
+                &pat::Rvalue::UnaryOp(mir::UnOp::PtrMetadata, pat::Operand::Copy(place_pat)),
+                &mir::Rvalue::Len(place),
+            ) => {
+                if let [mir::PlaceElem::Deref, projection @ ..] = place.as_ref().projection {
+                    let place = mir::PlaceRef {
+                        local: place.local,
+                        projection,
+                    };
+                    self.unmatch_place_ref(place_pat, place);
+                }
+            },
+            (pat::Rvalue::Use(operand_pat), mir::Rvalue::Use(operand)) => {
+                self.unmatch_operand(operand_pat, operand);
+            },
+            (pat::Rvalue::Repeat(operand_pat, _), mir::Rvalue::Repeat(operand, _)) => {
+                self.unmatch_operand(operand_pat, operand);
+            },
+            (&pat::Rvalue::Ref(_, _, place_pat), &mir::Rvalue::Ref(_, _, place))
+            | (&pat::Rvalue::RawPtr(_, place_pat), &mir::Rvalue::RawPtr(_, place))
+            | (&pat::Rvalue::Len(place_pat), &mir::Rvalue::Len(place))
+            | (&pat::Rvalue::Discriminant(place_pat), &mir::Rvalue::Discriminant(place))
+            | (&pat::Rvalue::CopyForDeref(place_pat), &mir::Rvalue::CopyForDeref(place)) => {
+                self.unmatch_place(place_pat, place);
+            },
+            (pat::Rvalue::Cast(_, operand_pat, _), mir::Rvalue::Cast(_, operand, _)) => {
+                self.unmatch_operand(operand_pat, operand);
+            },
+            (pat::Rvalue::UnaryOp(_, operand_pat), mir::Rvalue::UnaryOp(_, operand)) => {
+                self.unmatch_operand(operand_pat, operand);
+            },
+            (pat::Rvalue::ShallowInitBox(operand_pat, _), mir::Rvalue::ShallowInitBox(operand, _)) => {
+                self.unmatch_operand(operand_pat, operand);
+            },
+            (pat::Rvalue::BinaryOp(_, box [lhs_pat, rhs_pat]), mir::Rvalue::BinaryOp(_, box (lhs, rhs))) => {
+                self.unmatch_operand(lhs_pat, lhs);
+                self.unmatch_operand(rhs_pat, rhs);
+            },
+            (pat::Rvalue::Aggregate(_, operands_pat), mir::Rvalue::Aggregate(_, operands)) => {
+                for (operand_pat, operand) in operands_pat.iter().zip(operands) {
+                    self.unmatch_operand(operand_pat, operand);
+                }
+            },
+            _ => {},
+        }
+    }
+
     /// Match operands in [`pat::Operand`] and [`mir::Operand`].
     ///
     /// If `is_copy` is `true`, the `Copy` and `Move` variants of [`mir::Operand`] are considered
@@ -446,6 +529,16 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         };
         debug!(?pat, ?operand, matched, "match_operand");
         matched
+    }
+
+    fn unmatch_operand(&self, pat: &pat::Operand<'pcx>, operand: &mir::Operand<'tcx>) {
+        match (pat, operand) {
+            (&pat::Operand::Copy(place_pat), &mir::Operand::Copy(place) | &mir::Operand::Move(place))
+            | (&pat::Operand::Move(place_pat), &mir::Operand::Copy(place) | &mir::Operand::Move(place)) => {
+                self.unmatch_place_ref(place_pat, place.as_ref());
+            },
+            _ => {},
+        }
     }
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -855,6 +948,15 @@ pub(crate) trait MatchStatement<'pcx, 'tcx> {
         let mut matched = false;
         self.ty()
             .for_variant_and_match(adt_pat, adt, |_variant_pat, variant_match, _variant| {
+                // Require type-compatible candidate; FieldPat is the authority that commits
+                // (or re-validates) the metavar → FieldIdx binding.
+                if !variant_match
+                    .candidates
+                    .get(&field_pat)
+                    .is_some_and(|bitset| bitset.contains(field))
+                {
+                    return;
+                }
                 matched |= variant_match.r#match(field_pat, field);
             });
         matched

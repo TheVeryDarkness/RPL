@@ -94,6 +94,38 @@ impl<'pcx> PatternItem<'pcx> {
             PatternItem::RPLPatternOperation(_) => panic!("Expected RustItems, found PatternOperation"),
         }
     }
+
+    /// Collect label → [`Spanned`] kinds for diagnostic primary validation.
+    fn label_map(&self) -> FxHashMap<Symbol, Spanned> {
+        match self {
+            PatternItem::RustItems(items) => {
+                let mut map = FxHashMap::default();
+                for fn_pat in &items.fns {
+                    if let Some(body) = fn_pat.body {
+                        map.extend(body.labels.iter().map(|(&k, &v)| (k, v)));
+                    }
+                }
+                for impl_pat in items.impls.values() {
+                    for fn_pat in impl_pat.fns.values() {
+                        if let Some(body) = fn_pat.body {
+                            map.extend(body.labels.iter().map(|(&k, &v)| (k, v)));
+                        }
+                    }
+                }
+                map
+            },
+            PatternItem::RPLPatternOperation(op) => {
+                let mut map = FxHashMap::default();
+                for (_, item, matched_map) in &op.positive {
+                    for (label, spanned) in item.label_map() {
+                        let mapped = *matched_map.labels.get(&label).unwrap_or(&label);
+                        map.insert(mapped, spanned);
+                    }
+                }
+                map
+            },
+        }
+    }
 }
 
 pub struct RustItems<'pcx> {
@@ -157,6 +189,7 @@ impl<'pcx> RustItems<'pcx> {
         let fn_pat = FnPattern::from(rust_fn, self.pcx, fn_symbol_table, meta, constraints);
         let fn_pat = self.pcx.alloc_fn(fn_pat);
         let fn_name = fn_pat.name;
+        self.fns.all_fns.push(fn_pat);
         match fn_name.as_str() {
             "_" => {
                 // unnamed function, add it to the unnamed_fns
@@ -376,6 +409,7 @@ impl<'pcx> Pattern<'pcx> {
         }
     }
 
+    #[instrument(level = "debug", skip(self, source_map, body, decl))]
     pub fn get_diag<'tcx>(
         &self,
         pat_name: Symbol,
@@ -571,11 +605,13 @@ impl<'pcx> Pattern<'pcx> {
             let diag_name = pat_item.diag_name().unwrap_or(*name);
             if let Some(diag_item) = items.get(&diag_name) {
                 let labels = symbol_table.labels().map(Symbol::intern);
+                let label_map = pat_item.label_map();
                 let diag = DynamicErrorBuilder::<'pcx>::from_item(
                     WithPath::new(diag.path, diag_item),
                     &symbol_table.meta_vars,
                     pat_item.consts(),
                     &labels.collect(),
+                    &label_map,
                     diag_symbol_tables
                         .get(&diag_name.as_str())
                         .unwrap_or_else(|| panic!("No diagnostic symbol table found for {diag_name}")),
@@ -587,5 +623,10 @@ impl<'pcx> Pattern<'pcx> {
                 warn!("No diagnostic found for pattern item {:?} ({:?})", name, diag_name);
             }
         }
+    }
+
+    /// Primary label names for a pattern's diagnostic, in declaration order.
+    pub fn primary_labels(&self, pat_name: Symbol) -> Option<&[&str]> {
+        self.diag_block.get(&pat_name).map(|diag| diag.primary_labels())
     }
 }

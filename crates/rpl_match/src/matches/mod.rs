@@ -14,9 +14,14 @@ use rustc_index::{Idx, IndexVec};
 use rustc_middle::mir::visit::PlaceContext;
 use rustc_middle::mir::{self, PlaceRef};
 use rustc_middle::ty::Ty;
+use rustc_span::source_map::SourceMap;
 use rustc_span::{Span, Symbol};
 
 use crate::CountedMatch;
+use crate::adt::{
+    AdtFieldMap, all_adt_fields_resolved, collect_adt_field_bindings, reset_adt_field_bindings_after_probe,
+    seed_ty_vars_from_adt_field_candidates,
+};
 use crate::mir::{CheckMirCtxt, pat};
 use crate::statement::MatchStatement as _;
 use crate::ty::MatchTy as _;
@@ -24,13 +29,14 @@ use crate::ty::MatchTy as _;
 pub mod artifact;
 mod color;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Matched<'tcx> {
     pub basic_blocks: IndexVec<pat::BasicBlock, MatchedBlock>,
     pub locals: IndexVec<pat::Local, mir::Local>,
     pub ty_vars: IndexVec<pat::TyVarIdx, Ty<'tcx>>,
     pub const_vars: IndexVec<pat::ConstVarIdx, Const<'tcx>>,
     pub place_vars: IndexVec<pat::PlaceVarIdx, PlaceRef<'tcx>>,
+    pub adt_fields: AdtFieldMap,
 }
 
 impl Matched<'_> {
@@ -61,9 +67,15 @@ impl Matched<'_> {
         }
     }
 
-    fn span_spanned<'tcx>(&self, spanned: Spanned, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>) -> Span {
+    fn span_spanned<'tcx>(
+        &self,
+        spanned: Spanned,
+        body: &mir::Body<'tcx>,
+        decl: &FnDecl<'tcx>,
+        source_map: &SourceMap,
+    ) -> Span {
         match spanned {
-            Spanned::Location(location) => self[location].span_no_inline(body),
+            Spanned::Location(location) => self[location].span_no_inline(body, source_map),
             Spanned::Local(local) => body.local_decls[self[local]].source_info.span,
             // Special case for the function name, which is not a label.
             Spanned::Body => body.span,
@@ -76,12 +88,12 @@ impl Matched<'_> {
 pub struct MatchedWithLabelMap<'a, 'tcx>(pub &'a LabelMap, pub &'a Matched<'tcx>, pub &'a ExtraSpan<'tcx>);
 
 impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
-    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str) -> Span {
+    fn span(&self, body: &mir::Body<'tcx>, decl: &FnDecl<'tcx>, name: &str, source_map: &SourceMap) -> Span {
         let MatchedWithLabelMap(labels, matched, attr) = self;
         let name = Symbol::intern(name);
         labels
             .get(&name)
-            .map(|spanned| matched.span_spanned(*spanned, body, decl))
+            .map(|spanned| matched.span_spanned(*spanned, body, decl, source_map))
             .or_else(|| attr.get(&name).map(|attr| attr.span))
             .unwrap_or_else(|| {
                 panic!("label `{name}` not found in:\n    pattern labels: {labels:?}\n    attributes: {attr:?}");
@@ -98,7 +110,7 @@ impl<'tcx> pat::Matched<'tcx> for MatchedWithLabelMap<'_, 'tcx> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchedBlock {
     pub statements: Vec<StatementMatch>,
     pub start: Option<mir::BasicBlock>,
@@ -338,16 +350,27 @@ impl StatementMatch {
         self.source_info(body).span
     }
 
-    pub fn span_no_inline(self, body: &mir::Body<'_>) -> Span {
+    pub fn span_no_inline(self, body: &mir::Body<'_>, source_map: &SourceMap) -> Span {
         let source_info = self.source_info(body);
         let mut scope = source_info.scope;
+
         while let Some(parent_scope) = body.source_scopes[scope].inlined_parent_scope {
             scope = parent_scope;
         }
-        if let Some((_instance, span)) = body.source_scopes[scope].inlined {
-            return span;
+        let mut span = if let Some((_, span)) = body.source_scopes[scope].inlined {
+            span
+        } else {
+            source_info.span
+        };
+
+        if span.in_external_macro(source_map) {
+            span = span.source_callsite();
+            if let Some(inner) = span.find_ancestor_inside(body.span) {
+                span = inner;
+            }
         }
-        source_info.span
+
+        span
     }
 
     pub fn is_arg(self, body: &mir::Body<'_>) -> bool {
@@ -500,6 +523,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                 matches.candidates.insert(only_candidate);
             }
         }
+        // Re-seed ty-vars from ADT field bitsets before taking them into Matching,
+        // so FieldPat probe locking cannot drop alternate field types.
+        seed_ty_vars_from_adt_field_candidates(&self.cx.ty);
         for (candidates, matches) in core::iter::zip(&self.cx.ty.ty_vars, &mut self.matching.ty_vars) {
             matches.candidates = std::mem::take(&mut *candidates.borrow_mut());
         }
@@ -509,6 +535,9 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
         for (candidates, matches) in core::iter::zip(&self.cx.places, &mut self.matching.place_vars) {
             matches.candidates = std::mem::take(&mut *candidates.borrow_mut());
         }
+        // Candidate probing may have bound FieldPat matches as a side effect; clear them
+        // so actual matching starts from structure + unique commits only.
+        reset_adt_field_bindings_after_probe(&self.cx.ty);
     }
     #[instrument(level = "info", skip(self), fields(?pat_name = self.cx.pat_name, ?fn_name = self.cx.fn_pat.name))]
     fn do_match(&mut self) {
@@ -572,6 +601,13 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_const_var_free();
             return;
         }
+        if self.matching[ty_var].candidates.is_empty() {
+            if self.match_ty_var(ty_var, self.cx.ty.tcx().types.never) {
+                ensure_sufficient_stack(|| self.match_ty_var_candidates(ty_var.plus(1), loc_pats));
+                self.unmatch_ty_var(ty_var);
+            }
+            return;
+        }
         for &cand in &self.matching[ty_var].candidates {
             let _span = debug_span!("match_ty_var_candidates", ?ty_var, ?cand).entered();
             if self.match_ty_var(ty_var, cand) {
@@ -587,6 +623,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_place_var_free();
             self.match_place_var_candidates(pat::PlaceVarIdx::ZERO, loc_pats);
             self.assert_place_var_free();
+            return;
+        }
+        if self.matching[const_var].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_const_var_candidates(const_var.plus(1), loc_pats));
             return;
         }
         for &cand in &self.matching[const_var].candidates {
@@ -606,6 +646,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_local_free();
             return;
         }
+        if self.matching[place_var].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_place_var_candidates(place_var.plus(1), loc_pats));
+            return;
+        }
         for &cand in &self.matching[place_var].candidates {
             let _span = debug_span!("match_place_var_candidates", ?place_var, ?cand).entered();
             if self.match_place_var(place_var, cand) {
@@ -623,6 +667,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             self.assert_stmt_free();
             return;
         }
+        if self.matching[local].candidates.is_empty() {
+            ensure_sufficient_stack(|| self.match_local_candidates(local.plus(1), loc_pats));
+            return;
+        }
         for cand in self.matching[local].candidates.iter() {
             let _span = debug_span!("match_local_candidates", ?local, ?cand).entered();
             if self.match_local(local, cand) {
@@ -635,10 +683,10 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     }
     fn match_stmt_candidates(&self, loc_pats: &[pat::Location]) {
         let Some((&loc_pat, loc_pats)) = loc_pats.split_first() else {
-            if self.match_graph() {
+            if self.match_graph() && all_adt_fields_resolved(&self.cx.ty) {
                 self.matching.log_matched(self.cx);
                 let mut matched = self.matched.take();
-                matched.push(self.matching.to_matched());
+                matched.push(self.matching.to_matched(self.cx));
                 self.matched.set(matched);
             }
             return;
@@ -782,11 +830,28 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     // `bla.len()` to the end of `bb0`.
     #[instrument(level = "debug", skip(self), ret)]
     fn match_block_ends_with(&self, bb_pat: pat::BasicBlock, bb: mir::BasicBlock) -> bool {
-        // FIXME: handle empty blocks
+        // Empty `Goto` arms: distinguish `return` (Goto to return block) from fallthrough.
+        // Pattern `return` is compiled as `Goto(return_bb)` where `return_bb` has `Return`.
+        // Empty fallthrough is `Goto(join)` after a switch arm.
+        //
+        // Important: `match_block` passes the MIR block where the empty `Goto` terminator was
+        // matched as a statement candidate (often some unrelated `goto`). The switch arm's real
+        // MIR target is stored in `matching.start` by `match_block_starts_with`. Use that when
+        // deciding return vs fallthrough.
         if self.cx.mir_pat[bb_pat].statements.is_empty()
-            && matches!(self.cx.mir_pat[bb_pat].terminator(), pat::TerminatorKind::Goto(_))
+            && let pat::TerminatorKind::Goto(target) = self.cx.mir_pat[bb_pat].terminator()
         {
-            return true;
+            let mir_bb = self.matching[bb_pat].start.get().unwrap_or(bb);
+            let mir_is_return = matches!(
+                self.cx.body.basic_blocks[mir_bb].terminator().kind,
+                mir::TerminatorKind::Return
+            );
+            let target_is_return = matches!(self.cx.mir_pat[*target].terminator(), pat::TerminatorKind::Return);
+            if target_is_return {
+                return mir_is_return;
+            }
+            // Fallthrough: reject pure `Return` so `_ => {}` ≠ `_ => { return }`.
+            return !mir_is_return;
         }
         let matching = &self.matching[bb_pat];
         matching.end.get().is_some_and(|block| block == bb)
@@ -965,7 +1030,7 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
                                 .is_some_and(|local_pat| self.matching.locals[local_pat].force_get_matched() == arg)
                                 && matches!(value, pat::Rvalue::Any)
                         },
-                        pat::StatementKind::Intrinsic(_) => false,
+                        pat::StatementKind::Intrinsic(_) | pat::StatementKind::Move(_) => false,
                     }
                 }
             },
@@ -1229,7 +1294,7 @@ impl<'tcx> Matching<'tcx> {
         }
     }
 
-    fn to_matched(&self) -> Matched<'tcx> {
+    fn to_matched(&self, cx: &CheckMirCtxt<'_, '_, 'tcx>) -> Matched<'tcx> {
         let basic_blocks = self
             .basic_blocks
             .iter_enumerated()
@@ -1271,6 +1336,7 @@ impl<'tcx> Matching<'tcx> {
                     .unwrap_or_else(|| panic!("bug: place variable {place_var:?} not matched"))
             })
             .collect();
+        let adt_fields = collect_adt_field_bindings(&cx.ty);
 
         Matched {
             basic_blocks,
@@ -1278,6 +1344,7 @@ impl<'tcx> Matching<'tcx> {
             ty_vars,
             const_vars,
             place_vars,
+            adt_fields,
         }
     }
 }

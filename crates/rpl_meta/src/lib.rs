@@ -49,6 +49,9 @@ pub static DYNAMIC: &Lint = &Lint {
     name: "RPL::DYNAMIC",
     desc: "dynamic RPL pattern",
     default_level: Level::Deny,
+    // Only enable in debug mode to avoid emitting errors in external macros.
+    #[cfg(debug_assertions)]
+    report_in_external_macro: true,
     ..Lint::default_fields_for_macro()
 };
 

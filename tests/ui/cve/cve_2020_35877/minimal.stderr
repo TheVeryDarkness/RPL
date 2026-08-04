@@ -1,3 +1,12 @@
+error: this operation will panic at runtime
+  --> tests/ui/cve/cve_2020_35877/minimal.rs:230:24
+   |
+LL |     unsafe { &*ptr.add(index % 0) }
+   |                        ^^^^^^^^^ attempt to calculate the remainder of `_` with a divisor of zero
+   |
+   = note: `#[deny(unconditional_panic)]` on by default
+
+ WARN rpl_constraints::predicates::multiple_consts Encountered non-integer constants in usize_lt predicate
 error: it is an undefined behavior to offset a pointer using an unchecked integer
   --> tests/ui/cve/cve_2020_35877/minimal.rs:5:15
    |
@@ -113,7 +122,6 @@ LL |     unsafe { &*ptr.add(4) }
    = help: check whether it's in bound before offsetting
    = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
 
- WARN rpl_constraints::predicates::multiple_consts Encountered non-integer constants in usize_lt predicate
 error: it is an undefined behavior to offset a pointer using an unchecked integer
   --> tests/ui/cve/cve_2020_35877/minimal.rs:218:20
    |
@@ -124,14 +132,6 @@ LL |     unsafe { &*ptr.add(N) }
    |
    = help: check whether it's in bound before offsetting
    = note: See the safety section in https://doc.rust-lang.org/std/primitive.pointer.html#method.offset
-
-error: this operation will panic at runtime
-  --> tests/ui/cve/cve_2020_35877/minimal.rs:230:24
-   |
-LL |     unsafe { &*ptr.add(index % 0) }
-   |                        ^^^^^^^^^ attempt to calculate the remainder of `_` with a divisor of zero
-   |
-   = note: `#[deny(unconditional_panic)]` on by default
 
 error: it is an undefined behavior to offset a pointer using an unchecked integer
   --> tests/ui/cve/cve_2020_35877/minimal.rs:269:16

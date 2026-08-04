@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use rpl_context::PatCtxt;
 pub use rpl_context::pat;
 pub use rpl_context::pat::MatchedMap;
+use rustc_abi::FieldIdx;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_index::IndexVec;
 use rustc_index::bit_set::MixedBitSet;
@@ -327,5 +328,27 @@ impl<'pcx, 'tcx> MatchStatement<'pcx, 'tcx> for CheckMirCtxt<'_, 'pcx, 'tcx> {
     fn get_place_ty_from_place_var(&self, var: pat::PlaceVarIdx) -> pat::PlaceTy<'pcx> {
         pat::PlaceTy::from_ty(self.place.places[var])
         // pat::PlaceTy::from_ty(var.ty)
+    }
+
+    /// Candidate probing: accept type-compatible fields without committing FieldPat bindings.
+    ///
+    /// Committing during `build_candidates` locks the first MIR site (e.g. `codec`) and drops
+    /// later sites (`io`) from the candidate list. Real matching commits via [`MatchCtxt`].
+    fn match_place_field_pat(
+        &self,
+        adt_pat: Symbol,
+        adt: ty::AdtDef<'tcx>,
+        field_pat: Symbol,
+        field: FieldIdx,
+    ) -> bool {
+        let mut matched = false;
+        self.ty()
+            .for_variant_and_match(adt_pat, adt, |_variant_pat, variant_match, _variant| {
+                matched |= variant_match
+                    .candidates
+                    .get(&field_pat)
+                    .is_some_and(|bitset| bitset.contains(field));
+            });
+        matched
     }
 }

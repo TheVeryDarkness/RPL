@@ -1,4 +1,9 @@
-//@rustc-env: RPL_PATS=docs/patterns-pest/cve/CVE-2021-15551.rpl
+//@rustc-env: RPL_PATS=docs/patterns-pest/cve/CVE-2019-15551.rpl
+//@revisions: inline regular
+//@[inline]compile-flags: -Z inline-mir=true
+//@[regular]ignore-on-host: not supported yet
+//@[regular]compile-flags: -Z inline-mir=false
+//@check-pass
 //! See <https://github.com/ehuss/rust-smallvec/blob/4ba0d0f689440963e38b8adbe7fc2cabc6e573d5>
 #![allow(deprecated)]
 #![allow(unsafe_op_in_unsafe_fn)]
@@ -254,8 +259,6 @@ impl<A: Array> SmallVec<A> {
                 return;
             }
             deallocate(ptr, cap);
-            //~^double_drop_on_corner_case
-            // FP
         }
     }
 }

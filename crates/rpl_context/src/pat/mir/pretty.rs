@@ -76,6 +76,7 @@ impl fmt::Debug for StatementKind<'_> {
         match self {
             Self::Assign(place, rvalue) => write!(f, "{place:?} = {rvalue:?}"),
             Self::Intrinsic(intrinsic) => write!(f, "{intrinsic:?}"),
+            Self::Move(place) => write!(f, "take {place:?}"),
         }
     }
 }
