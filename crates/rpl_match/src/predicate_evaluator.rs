@@ -249,7 +249,8 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         ddg.flows_to(src.block, src.statement_index, sink.block, sink.statement_index, local)
     }
 
-    /// `may_panic('sink)` — Assert, or Call whose callee is Rudra-unresolvable / Fn* / local generic.
+    /// `may_panic('sink)` — Assert, or Call whose callee is Rudra-unresolvable / Fn* / local
+    /// generic.
     #[instrument(level = "debug", skip(self, args), ret)]
     fn eval_may_panic(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
         assert!(args.len() == 1, "may_panic expects ('sink), got {} args", args.len());
@@ -409,7 +410,7 @@ fn is_known_non_panicking_callee(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
     )
 }
 
-fn arg_has_param<'tcx>(arg: ty::GenericArg<'tcx>) -> bool {
+fn arg_has_param(arg: ty::GenericArg<'_>) -> bool {
     match arg.unpack() {
         ty::GenericArgKind::Type(ty) => ty.has_param(),
         ty::GenericArgKind::Const(ct) => ct.has_param(),
