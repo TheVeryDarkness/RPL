@@ -6717,7 +6717,7 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#MirFnOperand , "Corresponds to expression: `((LeftParen ~ MirOperandCopy ~ RightParen) | (LeftParen ~ MirOperandMove ~ RightParen) | TypePath | LangItemWithArgs | MetaVariable)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirFnOperand , super :: super :: generics :: Choice5 :: < super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperandCopy :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperandMove :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: rules :: r#TypePath :: < 'i , INHERITED > , super :: super :: rules :: r#LangItemWithArgs :: < 'i , INHERITED > , super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#MirFnOperand , "Corresponds to expression: `(PlaceHolder | (LeftParen ~ MirOperandCopy ~ RightParen) | (LeftParen ~ MirOperandMove ~ RightParen) | TypePath | LangItemWithArgs | MetaVariable)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#MirFnOperand , super :: super :: generics :: Choice6 :: < super :: super :: rules :: r#PlaceHolder :: < 'i , INHERITED > , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperandCopy :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#LeftParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MirOperandMove :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#RightParen :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: rules :: r#TypePath :: < 'i , INHERITED > , super :: super :: rules :: r#LangItemWithArgs :: < 'i , INHERITED > , super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#MirFnOperand<'i, INHERITED> {
             #[doc = "A helper function to access [`LangItemWithArgs`]."]
             #[allow(non_snake_case)]
@@ -6727,7 +6727,7 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = res._3().map(|res| res);
+                    let res = res._4().map(|res| res);
                     res
                 }
             }
@@ -6743,14 +6743,14 @@ pub mod rules_impl {
                 {
                     let res = (
                         {
-                            let res = res._0().map(|res| {
+                            let res = res._1().map(|res| {
                                 let res = &res.content.0.matched;
                                 res
                             });
                             res
                         },
                         {
-                            let res = res._1().map(|res| {
+                            let res = res._2().map(|res| {
                                 let res = &res.content.0.matched;
                                 res
                             });
@@ -6767,7 +6767,7 @@ pub mod rules_impl {
             ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#MetaVariable<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = res._4().map(|res| res);
+                    let res = res._5().map(|res| res);
                     res
                 }
             }
@@ -6779,7 +6779,7 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = res._0().map(|res| {
+                    let res = res._1().map(|res| {
                         let res = &res.content.1.matched;
                         res
                     });
@@ -6794,10 +6794,21 @@ pub mod rules_impl {
             {
                 let res = &*self.content;
                 {
-                    let res = res._1().map(|res| {
+                    let res = res._2().map(|res| {
                         let res = &res.content.1.matched;
                         res
                     });
+                    res
+                }
+            }
+            #[doc = "A helper function to access [`PlaceHolder`]."]
+            #[allow(non_snake_case)]
+            pub fn r#PlaceHolder<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#PlaceHolder<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = res._0().map(|res| res);
                     res
                 }
             }
@@ -6813,14 +6824,14 @@ pub mod rules_impl {
                 {
                     let res = (
                         {
-                            let res = res._0().map(|res| {
+                            let res = res._1().map(|res| {
                                 let res = &res.content.2.matched;
                                 res
                             });
                             res
                         },
                         {
-                            let res = res._1().map(|res| {
+                            let res = res._2().map(|res| {
                                 let res = &res.content.2.matched;
                                 res
                             });
@@ -6837,7 +6848,7 @@ pub mod rules_impl {
             ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#TypePath<'i, INHERITED>> {
                 let res = &*self.content;
                 {
-                    let res = res._2().map(|res| res);
+                    let res = res._3().map(|res| res);
                     res
                 }
             }

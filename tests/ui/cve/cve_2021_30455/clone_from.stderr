@@ -1,128 +1,26 @@
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:13:1
+error: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2021_30455/clone_from.rs:59:34
    |
-LL | / fn drop_one<T>(p: *mut T) {
-LL | |     unsafe {
-LL | |         ptr::drop_in_place(p);
-LL | |     }
-LL | | }
-   | |_^ invariant potentially broken here
+LL |                     let src = ptr::read(other.values.as_ptr().add(id));
+   |                               ---------------------------------------- lifetime bypass here
+LL |                     let cloned = (<T as Clone>::clone)(&src);
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ unresolvable generic or `drop_in_place` here
    |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
    = note: `#[deny(rpl::panic_safety)]` on by default
 
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:20:1
+error: weak lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2021_30455/clone_from.rs:59:34
    |
-LL | / fn clone_t<T: Clone>(x: &T) -> T {
-LL | |     x.clone()
-LL | | }
-   | |_^ potentially panicking call here
+LL |                     let cloned = (<T as Clone>::clone)(&src);
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ unresolvable generic or `drop_in_place` here
+...
+LL |                     ptr::write(self.values.as_mut_ptr().add(id), cloned);
+   |                     ---------------------------------------------------- lifetime bypass here
    |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
+   = note: `-D rpl::panic-safety` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(rpl::panic_safety)]`
 
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:20:1
-   |
-LL | / fn clone_t<T: Clone>(x: &T) -> T {
-LL | |     x.clone()
-LL | | }
-   | |_^ invariant potentially broken here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:54:21
-   |
-LL |                     drop_one(self.values.as_mut_ptr().add(id));
-   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |                     |
-   |                     invariant potentially broken here
-   |                     potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:50:5
-   |
-LL | /     fn drop_values(&mut self) {
-LL | |         for (id, live) in self.occupied.iter().enumerate() {
-LL | |             if *live {
-LL | |                 unsafe {
-...  |
-LL | |     }
-   | |_____^ potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:50:5
-   |
-LL | /     fn drop_values(&mut self) {
-LL | |         for (id, live) in self.occupied.iter().enumerate() {
-LL | |             if *live {
-LL | |                 unsafe {
-...  |
-LL | |     }
-   | |_____^ invariant potentially broken here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:62:5
-   |
-LL | /     fn clone(&self) -> Self {
-LL | |         let mut out = IdMap::new();
-LL | |         out.clone_from(self);
-LL | |         out
-LL | |     }
-   | |_____^ potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:62:5
-   |
-LL | /     fn clone(&self) -> Self {
-LL | |         let mut out = IdMap::new();
-LL | |         out.clone_from(self);
-LL | |         out
-LL | |     }
-   | |_____^ invariant potentially broken here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:69:9
-   |
-LL |         self.drop_values();
-   |         ^^^^^^^^^^^^^^^^^^
-   |         |
-   |         invariant potentially broken here
-   |         potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:86:9
-   |
-LL |         self.drop_values();
-   |         ^^^^^^^^^^^^^^^^^^
-   |         |
-   |         invariant potentially broken here
-   |         potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: calling code that may panic after temporarily breaking container invariants
-  --> tests/ui/cve/cve_2021_30455/clone_from.rs:85:5
-   |
-LL | /     fn drop(&mut self) {
-LL | |         self.drop_values();
-LL | |     }
-   | |_____^ potentially panicking call here
-   |
-   = help: restore invariants (or use a drop guard) before calling user/generic code that may panic
-
-error: aborting due to 11 previous errors
+error: aborting due to 2 previous errors
 
