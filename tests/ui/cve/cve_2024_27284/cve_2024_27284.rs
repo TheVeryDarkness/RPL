@@ -1,9 +1,9 @@
-//@ignore-on-host
+//@only-target: windows
 //@compile-flags: -Z deduplicate-diagnostics=yes
 use cassandra_cpp_sys::CassIterator as _CassIterator;
 use cassandra_cpp_sys::{
-    cass_false, cass_iterator_get_aggregate_meta, cass_iterator_next, cass_true,
-    CassAggregateMeta as _CassAggregateMeta,
+    CassAggregateMeta as _CassAggregateMeta, cass_false, cass_iterator_get_aggregate_meta,
+    cass_iterator_next, cass_true,
 };
 
 use std::iter::Iterator;
