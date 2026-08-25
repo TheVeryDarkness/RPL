@@ -20,14 +20,15 @@ use ui_test::{Args, Config, Match, error_on_output_conflict};
 
 extern crate byte_slice_cast;
 extern crate bytes;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+extern crate cassandra_cpp_sys;
 extern crate ctor;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-extern crate mach;
-// extern crate cassandra_cpp_sys;
 extern crate futures;
 extern crate if_chain;
 extern crate itertools;
 extern crate libc;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+extern crate mach;
 extern crate memmap;
 extern crate num_derive;
 extern crate num_rational;
@@ -51,6 +52,8 @@ mod test_utils;
 static TEST_DEPENDENCIES: &[&str] = &[
     "byte_slice_cast",
     "bytes",
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    "cassandra_cpp_sys",
     "ctor",
     "futures",
     "if_chain",
