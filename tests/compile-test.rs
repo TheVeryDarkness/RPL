@@ -20,7 +20,7 @@ use ui_test::{Args, Config, Match, error_on_output_conflict};
 
 extern crate byte_slice_cast;
 extern crate bytes;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux"))]
 extern crate cassandra_cpp_sys;
 extern crate ctor;
 extern crate futures;

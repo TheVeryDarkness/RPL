@@ -139,7 +139,7 @@ bytes.workspace = true
 winapi.workspace = true
 ctor.workspace = true
 
-[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dev-dependencies.cassandra-cpp-sys]
+[target.'cfg(any(target_os = "linux"))'.dev-dependencies.cassandra-cpp-sys]
 workspace = true
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dev-dependencies.mach]
