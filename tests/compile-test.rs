@@ -52,7 +52,8 @@ mod test_utils;
 static TEST_DEPENDENCIES: &[&str] = &[
     "byte_slice_cast",
     "bytes",
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    // for cve_2024_27284
+    #[cfg(any(target_os = "linux"))]
     "cassandra_cpp_sys",
     "ctor",
     "futures",
@@ -80,7 +81,6 @@ static TEST_DEPENDENCIES: &[&str] = &[
     "tracing",
     "tokio",
     "tokio_util",
-    // "cassandra_cpp_sys", for cve_2024_27284
     #[cfg(target_os = "windows")]
     "winapi",
 ];
