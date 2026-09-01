@@ -1,4 +1,4 @@
-//@only-target: windows
+//@only-target: linux
 //@compile-flags: -Z deduplicate-diagnostics=yes
 use cassandra_cpp_sys::CassIterator as _CassIterator;
 use cassandra_cpp_sys::{
