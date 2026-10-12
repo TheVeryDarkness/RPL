@@ -1,0 +1,21 @@
+pattern without-macro
+
+patt {
+    copy_without_copy_back[
+        $T: type,
+    ] = fn _ (..) -> _ {
+        let $x: $T = _;
+        'use:
+        let $y: $T = copy $x;
+        without!($x = copy $y);
+    }
+}
+
+diag {
+    copy_without_copy_back = {
+        primary(use) = "value copied out without a copy back",
+        label(use)   = "copied here",
+        name         = "copy_without_copy_back",
+        level        = "deny",
+    }
+}
