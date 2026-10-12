@@ -1,21 +1,23 @@
 pattern without-macro
 
 patt {
-    copy_without_copy_back[
+    use std::vec::Vec;
+
+    set_len_zero_only[
         $T: type,
     ] = fn _ (..) -> _ {
-        let $x: $T = _;
-        'use:
-        let $y: $T = copy $x;
-        without!($x = copy $y);
+        let $vec: &mut Vec<$T> = _;
+        'sink:
+        _ = Vec::set_len(copy $vec, const 0usize);
+        without!(_ = Vec::set_len(copy $vec, const 1usize));
     }
 }
 
 diag {
-    copy_without_copy_back = {
-        primary(use) = "value copied out without a copy back",
-        label(use)   = "copied here",
-        name         = "copy_without_copy_back",
-        level        = "deny",
+    set_len_zero_only = {
+        primary(sink) = "`Vec::set_len(0)` without a following `set_len(1)`",
+        label(sink)   = "`set_len(0)` called here",
+        name          = "set_len_zero_only",
+        level         = "deny",
     }
 }
