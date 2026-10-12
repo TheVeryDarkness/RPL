@@ -363,9 +363,81 @@ impl<'i> CheckFnCtxt<'i, '_> {
                 self.check_mir_copy_non_overlapping(mctx, mir_copy_non_overlapping.get_matched().0);
             },
             Choice9::_8(mir_macro) => {
-                let place = mir_macro.get_matched().0.MirPlace();
+                self.check_mir_macro(mctx, mir_macro.get_matched().0);
+            },
+        }
+    }
+
+    fn check_mir_macro(&mut self, mctx: &MetaContext<'i>, mir_macro: &'i pairs::MirMacro<'i>) {
+        match mir_macro.deref() {
+            Choice4::_0(move_) => {
+                let (_, _, _, _, place, _) = move_.get_matched();
                 self.check_mir_place(mctx, place);
             },
+            Choice4::_1(without_) => {
+                let (_, _, _, fragment, _) = without_.get_matched();
+                self.check_mir_macro_fragment(mctx, fragment);
+            },
+            Choice4::_2(or_) => {
+                let (_, _, _, alternatives, _) = or_.get_matched();
+                self.check_mir_macro_alternatives(mctx, alternatives);
+            },
+            Choice4::_3(panic_) => {
+                let (_, _, _, _, fragment, _) = panic_.get_matched();
+                self.check_mir_macro_fragment(mctx, fragment);
+            },
+        }
+    }
+
+    fn check_mir_macro_fragment(&mut self, mctx: &MetaContext<'i>, fragment: &'i pairs::MirMacroFragment<'i>) {
+        let (first, following) = fragment.MirMacroStmt();
+        self.check_mir_macro_stmt(mctx, first);
+        for stmt in following {
+            self.check_mir_macro_stmt(mctx, stmt);
+        }
+    }
+
+    fn check_mir_macro_alternatives(
+        &mut self,
+        mctx: &MetaContext<'i>,
+        alternatives: &'i pairs::MirMacroAlternatives<'i>,
+    ) {
+        let (first, following) = alternatives.MirMacroAlternative();
+        self.check_mir_macro_alternative(mctx, first);
+        for alternative in following {
+            self.check_mir_macro_alternative(mctx, alternative);
+        }
+    }
+
+    fn check_mir_macro_alternative(&mut self, mctx: &MetaContext<'i>, alternative: &'i pairs::MirMacroAlternative<'i>) {
+        match alternative.deref() {
+            Choice2::_0(block) => self.check_mir_macro_block(mctx, block),
+            Choice2::_1(stmt) => self.check_mir_macro_stmt(mctx, stmt),
+        }
+    }
+
+    fn check_mir_macro_block(&mut self, mctx: &MetaContext<'i>, block: &'i pairs::MirMacroBlock<'i>) {
+        let (first, following) = block.MirMacroStmt();
+        self.check_mir_macro_stmt(mctx, first);
+        for stmt in following {
+            self.check_mir_macro_stmt(mctx, stmt);
+        }
+    }
+
+    fn check_mir_macro_stmt(&mut self, mctx: &MetaContext<'i>, stmt: &'i pairs::MirMacroStmt<'i>) {
+        match stmt.deref() {
+            Choice9::_0(call) => self.check_mir_call(mctx, call.MirCall()),
+            Choice9::_1(drop_) => self.check_mir_place(mctx, drop_.MirPlace()),
+            Choice9::_2(_unreachable) => {},
+            Choice9::_3(control) => self.check_mir_control(mctx, control),
+            Choice9::_4(assign) => {
+                self.check_mir_place(mctx, assign.MirPlace());
+                self.check_mir_rvalue_or_call(mctx, assign.MirRvalueOrCall());
+            },
+            Choice9::_5(mir_loop) => self.check_mir_loop(mctx, mir_loop),
+            Choice9::_6(switch_int) => self.check_mir_switch_int(mctx, switch_int),
+            Choice9::_7(copy_non_overlapping) => self.check_mir_copy_non_overlapping(mctx, copy_non_overlapping),
+            Choice9::_8(mir_macro) => self.check_mir_macro(mctx, mir_macro),
         }
     }
 

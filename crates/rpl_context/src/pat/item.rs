@@ -4,6 +4,7 @@ use std::sync::Arc;
 use derive_more::derive::Debug;
 use rpl_constraints::Constraints;
 use rpl_constraints::attributes::{ExtraSpan, Safety, Visibility};
+use rpl_constraints::predicates::{PredicateArg, PredicateClause, PredicateConjunction, PredicateKind, PredicateTerm};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::symbol_table::{WithMetaTable, WithPath};
 use rpl_meta::utils::self_param_ty;
@@ -25,6 +26,33 @@ pub type Struct<'pcx> = WithMetaTable<'pcx, StructInner<'pcx>>;
 
 pub type EnumInner<'pcx> = FxIndexMap<Symbol, Variant<'pcx>>;
 pub type Enum<'pcx> = WithMetaTable<'pcx, EnumInner<'pcx>>;
+
+/// Collect the user-provided labels of every `'p: panic!(..)` statement, recursively.
+fn collect_panic_labels(stmts: &[RawStatement<'_>]) -> Vec<Symbol> {
+    fn visit(stmts: &[RawStatement<'_>], out: &mut Vec<Symbol>) {
+        for stmt in stmts {
+            match stmt {
+                RawStatement::Panic(label, inner) => {
+                    out.push(*label);
+                    visit(inner, out);
+                },
+                RawStatement::Loop(inner) => visit(inner, out),
+                RawStatement::SwitchInt { targets, otherwise, .. } => {
+                    for (_, inner) in targets {
+                        visit(inner, out);
+                    }
+                    if let Some(inner) = otherwise {
+                        visit(inner, out);
+                    }
+                },
+                _ => {},
+            }
+        }
+    }
+    let mut labels = Vec::new();
+    visit(stmts, &mut labels);
+    labels
+}
 
 #[derive(Debug)]
 pub struct Adt<'pcx> {
@@ -179,25 +207,74 @@ impl<'pcx> FnPattern<'pcx> {
 
         let (decls, stmts) = if let Some(body) = body.MirBody() {
             let (decls, stmts) = body.get_matched();
-            (decls.iter_matched().collect(), stmts.iter_matched().collect())
+            (
+                decls.iter_matched().collect::<Vec<_>>(),
+                stmts.iter_matched().collect::<Vec<_>>(),
+            )
         } else {
             (Vec::new(), Vec::new())
         };
 
         let raw_stmts = stmts
             .into_iter()
-            .map(|stmt| RawStatement::from(WithPath::new(p, stmt), pcx, fn_sym_tab));
+            .map(|stmt| RawStatement::from(WithPath::new(p, stmt), pcx, fn_sym_tab))
+            .collect();
         let raw_decls = decls
             .into_iter()
-            .map(|decl| RawDecleration::from(WithPath::new(p, decl), pcx, fn_sym_tab));
+            .map(|decl| RawDecleration::from(WithPath::new(p, decl), pcx, fn_sym_tab))
+            .collect();
+
+        Self::build(
+            name,
+            params,
+            ret,
+            raw_decls,
+            raw_stmts,
+            pcx,
+            fn_sym_tab,
+            meta,
+            constraints,
+        )
+    }
+
+    /// Build a function pattern from already-lowered declarations and statements.
+    ///
+    /// Used by `without!` / `or!` desugaring to build each expanded body from a subset of the
+    /// original function's statements while sharing the same signature and symbol table.
+    #[allow(clippy::too_many_arguments)]
+    pub fn build(
+        name: Symbol,
+        params: Params<'pcx>,
+        ret: Option<Ty<'pcx>>,
+        raw_decls: Vec<RawDecleration<'pcx>>,
+        raw_stmts: Vec<RawStatement<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        fn_sym_tab: &'pcx FnSymbolTable<'pcx>,
+        meta: Arc<NonLocalMetaVars<'pcx>>,
+        mut constraints: Constraints,
+    ) -> Self {
+        // `'p: panic!(..)` desugars to a labeled fragment plus `may_panic('p)`.
+        let panic_labels = collect_panic_labels(&raw_stmts);
 
         let mut builder = FnPatternBody::builder();
         builder.mk_locals(fn_sym_tab, pcx);
-        builder.mk_raw_decls(raw_decls);
-        builder.mk_raw_stmts(raw_stmts);
+        builder.mk_raw_decls(raw_decls.into_iter());
+        builder.mk_raw_stmts(raw_stmts.into_iter());
         let mir = builder.build(name, constraints.attrs.output_name);
         debug!(self_idx = ?mir.self_idx, return_idx = ?mir.return_idx, params_idx = ?mir.params_idx, "create mir pattern");
         let body = Some(pcx.mk_mir_pattern(mir));
+
+        for label in panic_labels {
+            constraints.preds.push(PredicateConjunction {
+                clauses: vec![PredicateClause {
+                    terms: vec![PredicateTerm {
+                        kind: PredicateKind::MayPanic,
+                        args: vec![PredicateArg::Label(label)],
+                        is_neg: false,
+                    }],
+                }],
+            });
+        }
 
         Self {
             meta,

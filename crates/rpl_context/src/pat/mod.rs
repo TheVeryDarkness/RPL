@@ -6,10 +6,11 @@ use std::sync::Arc;
 pub use error::DynamicError;
 use error::DynamicErrorBuilder;
 use rpl_constraints::Constraints;
+use rpl_constraints::attributes::{Safety, Visibility};
 use rpl_meta::collect_elems_separated_by_comma;
 use rpl_meta::meta::PattSymbolTables;
 use rpl_meta::symbol_table::WithPath;
-use rpl_parser::generics::{Choice2, Choice3, Choice4};
+use rpl_parser::generics::{Choice2, Choice3, Choice4, Choice9};
 use rpl_parser::pairs;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_hir::FnDecl;
@@ -403,6 +404,8 @@ pub struct Pattern<'pcx> {
     pub patt_block: FxIndexMap<Symbol, PatternItem<'pcx>>, // indexed by pat_name
     pub util_block: FxIndexMap<Symbol, &'pcx PatternItem<'pcx>>, // indexed by pat_name
     diag_block: FxHashMap<Symbol, DynamicErrorBuilder<'pcx>>,
+    /// Counter for synthesizing unique util-pattern names during macro desugaring.
+    next_macro_util: usize,
 }
 
 impl<'pcx> Pattern<'pcx> {
@@ -412,6 +415,7 @@ impl<'pcx> Pattern<'pcx> {
             patt_block: Default::default(),
             util_block: Default::default(),
             diag_block: Default::default(),
+            next_macro_util: 0,
         }
     }
 
@@ -474,14 +478,20 @@ impl<'pcx> Pattern<'pcx> {
         let p = item_or_patt_op.path;
         match &***item_or_patt_op {
             Choice3::_0(item) => {
-                self.add_items(
-                    pat_name,
-                    attr,
-                    with_path(p, std::iter::once(item)),
-                    symbol_table,
-                    meta,
-                    block_type,
-                );
+                if let Some(rust_fn) = item.RustItem().Fn()
+                    && fn_has_body_macro(rust_fn)
+                {
+                    self.add_fn_macro_op(pat_name, attr, with_path(p, item), symbol_table, meta, block_type);
+                } else {
+                    self.add_items(
+                        pat_name,
+                        attr,
+                        with_path(p, std::iter::once(item)),
+                        symbol_table,
+                        meta,
+                        block_type,
+                    );
+                }
             },
             Choice3::_1(items) => {
                 self.add_items(
@@ -497,6 +507,166 @@ impl<'pcx> Pattern<'pcx> {
                 self.add_patt_op(pat_name, attr, with_path(p, patt_op), meta, block_type);
             },
         }
+    }
+
+    /// Desugar a single function whose body contains `without!` / `or!` macros into a
+    /// [`PatternOperation`] over synthesized util patterns.
+    fn add_fn_macro_op(
+        &mut self,
+        pat_name: Symbol,
+        attr: impl Iterator<Item = &'pcx pairs::Attr<'pcx>>,
+        item: WithPath<'pcx, &'pcx pairs::RustItemWithConstraint<'pcx>>,
+        symbol_table: &'pcx rpl_meta::symbol_table::SymbolTable<'pcx>,
+        meta: Arc<NonLocalMetaVars<'pcx>>,
+        block_type: PattOrUtil,
+    ) {
+        let p = item.path;
+        let (_, rust_item, where_block) = item.get_matched();
+        let Choice4::_0(rust_fn) = rust_item.deref() else {
+            unreachable!("`add_fn_macro_op` expects a function item");
+        };
+
+        let fn_name = rust_fn.FnSig().FnName().span.as_str();
+        let fn_symbol_table = symbol_table.get_fn(fn_name).unwrap();
+
+        let (sig, body) = rust_fn.get_matched();
+        let (safety, visibility, name, _, _) = FnPattern::from_sig(WithPath::new(p, sig), self.pcx, fn_symbol_table);
+
+        let (decls, stmts) = if let Some(body) = body.MirBody() {
+            let (decls, stmts) = body.get_matched();
+            (
+                decls.iter_matched().collect::<Vec<_>>(),
+                stmts.iter_matched().collect::<Vec<_>>(),
+            )
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
+        let items = collect_body_items(stmts);
+        let (positive, negative) = expand_body_items(&items);
+
+        let positive = positive
+            .into_iter()
+            .map(|stmts| {
+                self.register_macro_util(
+                    pat_name,
+                    p,
+                    sig,
+                    &decls,
+                    stmts,
+                    where_block,
+                    safety,
+                    visibility,
+                    name,
+                    fn_symbol_table,
+                    &meta,
+                )
+            })
+            .collect();
+        let negative = negative
+            .into_iter()
+            .map(|stmts| {
+                self.register_macro_util(
+                    pat_name,
+                    p,
+                    sig,
+                    &decls,
+                    stmts,
+                    where_block,
+                    safety,
+                    visibility,
+                    name,
+                    fn_symbol_table,
+                    &meta,
+                )
+            })
+            .collect();
+
+        let attr = PatAttr::parse_all(attr);
+        let pat_ops = PatternOperation {
+            pcx: self.pcx,
+            meta,
+            positive,
+            negative,
+            attr,
+        };
+        match block_type {
+            PattOrUtil::Patt => self
+                .patt_block
+                .entry(pat_name)
+                .or_insert(PatternItem::RPLPatternOperation(pat_ops)),
+            PattOrUtil::Util => *self
+                .util_block
+                .entry(pat_name)
+                .or_insert_with(|| self.pcx.alloc_pattern_item(PatternItem::RPLPatternOperation(pat_ops))),
+        }
+        .table_head();
+    }
+
+    /// Lower one expansion of a macro-desugared function into a synthesized util pattern.
+    #[allow(clippy::too_many_arguments)]
+    fn register_macro_util(
+        &mut self,
+        pat_name: Symbol,
+        p: &'pcx std::path::Path,
+        sig: &'pcx pairs::FnSig<'pcx>,
+        decls: &[&'pcx pairs::MirDecl<'pcx>],
+        stmts: Vec<FragStmt<'pcx>>,
+        where_block: &Option<pairs::WhereBlock<'pcx>>,
+        safety: Safety,
+        visibility: Visibility,
+        name: Symbol,
+        fn_symbol_table: &'pcx FnSymbolTable<'pcx>,
+        meta: &Arc<NonLocalMetaVars<'pcx>>,
+    ) -> (Symbol, &'pcx PatternItem<'pcx>, MatchedMap) {
+        let util_name = Symbol::intern(&format!("@{}${}", pat_name.as_str(), self.next_macro_util));
+        self.next_macro_util += 1;
+
+        let (_, _, _, params, ret) = FnPattern::from_sig(WithPath::new(p, sig), self.pcx, fn_symbol_table);
+
+        let raw_decls = decls
+            .iter()
+            .map(|decl| RawDecleration::from(WithPath::new(p, *decl), self.pcx, fn_symbol_table))
+            .collect::<Vec<_>>();
+        let raw_stmts = stmts
+            .into_iter()
+            .map(|stmt| match stmt {
+                FragStmt::Body(s) => RawStatement::from(WithPath::new(p, s), self.pcx, fn_symbol_table),
+                FragStmt::Frag(s) => RawStatement::from_macro_stmt(WithPath::new(p, s), self.pcx, fn_symbol_table),
+            })
+            .collect::<Vec<_>>();
+
+        let mut constraints = Constraints::from_where_block_opt(std::iter::empty(), where_block, p)
+            .expect("unexpected error in constraints");
+        constraints.attrs.add_safety(safety);
+        constraints.attrs.add_visibility(visibility);
+
+        let fn_pat = FnPattern::build(
+            name,
+            params,
+            ret,
+            raw_decls,
+            raw_stmts,
+            self.pcx,
+            fn_symbol_table,
+            Arc::clone(meta),
+            constraints,
+        );
+        let fn_pat = self.pcx.alloc_fn(fn_pat);
+
+        let mut rust_items = RustItems::new(self.pcx, Arc::clone(meta), PatAttr::default());
+        rust_items.fns.all_fns.push(fn_pat);
+        match name.as_str() {
+            "_" => rust_items.fns.unnamed_fns.push(fn_pat),
+            _ => {
+                rust_items.fns.named_fns.insert(name, fn_pat);
+            },
+        }
+
+        let item = self.pcx.alloc_pattern_item(PatternItem::RustItems(rust_items));
+        self.util_block.insert(util_name, item);
+        let map = MatchedMap::new(meta, item.meta(), None);
+        (util_name, item, map)
     }
 
     fn patt_op(
@@ -635,4 +805,137 @@ impl<'pcx> Pattern<'pcx> {
     pub fn primary_labels(&self, pat_name: Symbol) -> Option<&[&str]> {
         self.diag_block.get(&pat_name).map(|diag| diag.primary_labels())
     }
+}
+
+/// A statement reference inside a macro fragment: either a top-level body statement
+/// (`MirStmt`, carries its trailing `;`) or a fragment statement head (`MirMacroStmt`).
+#[derive(Clone, Copy)]
+enum FragStmt<'pcx> {
+    Body(&'pcx pairs::MirStmt<'pcx>),
+    Frag(&'pcx pairs::MirMacroStmt<'pcx>),
+}
+
+enum BodyItem<'pcx> {
+    Plain(FragStmt<'pcx>),
+    Without(Vec<FragStmt<'pcx>>),
+    Or(Vec<Vec<FragStmt<'pcx>>>),
+}
+
+/// Detect whether a function body contains a top-level `without!` / `or!` macro.
+fn fn_has_body_macro(rust_fn: &pairs::Fn<'_>) -> bool {
+    let (_, body) = rust_fn.get_matched();
+    let Some(mir) = body.MirBody() else {
+        return false;
+    };
+    let (_, stmts) = mir.get_matched();
+    stmts.iter_matched().any(stmt_has_body_macro)
+}
+
+fn stmt_has_body_macro(stmt: &pairs::MirStmt<'_>) -> bool {
+    matches!(stmt.deref(), Choice9::_8(m) if is_body_macro(m.get_matched().0))
+}
+
+fn is_body_macro(mac: &pairs::MirMacro<'_>) -> bool {
+    matches!(mac.deref(), Choice4::_1(_) | Choice4::_2(_))
+}
+
+fn frag_stmts_from_fragment<'pcx>(fragment: &'pcx pairs::MirMacroFragment<'pcx>) -> Vec<FragStmt<'pcx>> {
+    let (first, following) = fragment.MirMacroStmt();
+    std::iter::once(FragStmt::Frag(first))
+        .chain(following.into_iter().map(FragStmt::Frag))
+        .collect()
+}
+
+fn frag_stmts_from_alternatives<'pcx>(
+    alternatives: &'pcx pairs::MirMacroAlternatives<'pcx>,
+) -> Vec<Vec<FragStmt<'pcx>>> {
+    let (first, following) = alternatives.MirMacroAlternative();
+    std::iter::once(frag_stmts_from_alternative(first))
+        .chain(following.into_iter().map(|alt| frag_stmts_from_alternative(alt)))
+        .collect()
+}
+
+fn frag_stmts_from_alternative<'pcx>(alternative: &'pcx pairs::MirMacroAlternative<'pcx>) -> Vec<FragStmt<'pcx>> {
+    match alternative.deref() {
+        Choice2::_0(block) => {
+            let (first, following) = block.MirMacroStmt();
+            std::iter::once(FragStmt::Frag(first))
+                .chain(following.into_iter().map(FragStmt::Frag))
+                .collect()
+        },
+        Choice2::_1(stmt) => vec![FragStmt::Frag(stmt)],
+    }
+}
+
+/// Split the top-level body statements into plain statements and macro items.
+fn collect_body_items<'pcx>(stmts: Vec<&'pcx pairs::MirStmt<'pcx>>) -> Vec<BodyItem<'pcx>> {
+    stmts
+        .into_iter()
+        .map(|stmt| match stmt.deref() {
+            Choice9::_8(m) => {
+                let mac = m.get_matched().0;
+                match mac.deref() {
+                    Choice4::_1(w) => {
+                        let (_, _, _, fragment, _) = w.get_matched();
+                        BodyItem::Without(frag_stmts_from_fragment(fragment))
+                    },
+                    Choice4::_2(o) => {
+                        let (_, _, _, alternatives, _) = o.get_matched();
+                        BodyItem::Or(frag_stmts_from_alternatives(alternatives))
+                    },
+                    _ => BodyItem::Plain(FragStmt::Body(stmt)),
+                }
+            },
+            _ => BodyItem::Plain(FragStmt::Body(stmt)),
+        })
+        .collect()
+}
+
+/// Expand the macro items into concrete statement sequences.
+///
+/// Returns `(positive, negative)`:
+/// - `positive`: every `or!` alternative choice is combined (cartesian product), `without!`
+///   fragments dropped.
+/// - `negative`: for each `without!`, one body per `or!` combination with that fragment restored.
+fn expand_body_items<'pcx>(items: &[BodyItem<'pcx>]) -> (Vec<Vec<FragStmt<'pcx>>>, Vec<Vec<FragStmt<'pcx>>>) {
+    fn expand<'pcx>(items: &[BodyItem<'pcx>], restore: Option<usize>) -> Vec<Vec<FragStmt<'pcx>>> {
+        let mut partials: Vec<Vec<FragStmt<'pcx>>> = vec![Vec::new()];
+        for (idx, item) in items.iter().enumerate() {
+            match item {
+                BodyItem::Plain(s) => {
+                    for p in &mut partials {
+                        p.push(*s);
+                    }
+                },
+                BodyItem::Without(frag) => {
+                    if restore == Some(idx) {
+                        for p in &mut partials {
+                            p.extend(frag.iter().copied());
+                        }
+                    }
+                },
+                BodyItem::Or(alts) => {
+                    let mut next = Vec::new();
+                    for p in partials {
+                        for alt in alts {
+                            let mut q = p.clone();
+                            q.extend(alt.iter().copied());
+                            next.push(q);
+                        }
+                    }
+                    partials = next;
+                },
+            }
+        }
+        partials
+    }
+
+    let positive = expand(items, None);
+    let negative = items
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, item)| matches!(item, BodyItem::Without(_)).then_some(idx))
+        .flat_map(|idx| expand(items, Some(idx)))
+        .collect();
+    (positive, negative)
 }

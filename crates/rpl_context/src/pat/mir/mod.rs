@@ -482,6 +482,9 @@ pub enum RawStatement<'pcx> {
     Unreachable(Option<Label>),
     Drop(Option<Label>, Place<'pcx>),
     Move(Option<Label>, Place<'pcx>),
+    /// `'p: panic!(B)` — the fragment's first statement is labeled `'p` and
+    /// `may_panic('p)` is added to the function's `where` block.
+    Panic(Label, Vec<RawStatement<'pcx>>),
     Break,
     Continue,
     Return,
@@ -585,18 +588,71 @@ impl<'pcx> RawStatement<'pcx> {
     }
 
     pub fn from_macro(
-        move_: WithPath<'pcx, &pairs::MirMacro<'pcx>>,
+        mac: WithPath<'pcx, &'pcx pairs::MirMacro<'pcx>>,
         pcx: PatCtxt<'pcx>,
-        sym_tab: &FnSymbolTable<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
     ) -> Self {
-        let (label, _, _, _, place, _) = move_.get_matched();
-        let place = Place::from(WithPath::new(move_.path, place), pcx, sym_tab);
-        Self::Move(
-            label
-                .as_ref()
-                .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
-            place,
-        )
+        match mac.inner.deref() {
+            Choice4::_0(move_) => {
+                let (label, _, _, _, place, _) = move_.get_matched();
+                let place = Place::from(WithPath::new(mac.path, place), pcx, sym_tab);
+                Self::Move(
+                    label
+                        .as_ref()
+                        .map(|label| Symbol::intern(label.Label().LabelName().span.as_str())),
+                    place,
+                )
+            },
+            Choice4::_1(_without) => {
+                unimplemented!("`without!` must be desugared at the pattern-item level")
+            },
+            Choice4::_2(_or) => {
+                unimplemented!("`or!` must be desugared at the pattern-item level")
+            },
+            Choice4::_3(panic_) => {
+                let (label, _, _, _, fragment, _) = panic_.get_matched();
+                let label = Symbol::intern(label.Label().LabelName().span.as_str());
+                let stmts = Self::from_macro_fragment(WithPath::new(mac.path, fragment), pcx, sym_tab);
+                Self::Panic(label, stmts)
+            },
+        }
+    }
+
+    fn from_macro_fragment(
+        fragment: WithPath<'pcx, &'pcx pairs::MirMacroFragment<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Vec<Self> {
+        let p = fragment.path;
+        let (first, following) = fragment.MirMacroStmt();
+        std::iter::once(Self::from_macro_stmt(with_path(p, first), pcx, sym_tab))
+            .chain(
+                following
+                    .iter()
+                    .map(|stmt| Self::from_macro_stmt(with_path(p, stmt), pcx, sym_tab)),
+            )
+            .collect()
+    }
+
+    pub fn from_macro_stmt(
+        stmt: WithPath<'pcx, &'pcx pairs::MirMacroStmt<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Self {
+        let p = stmt.path;
+        match stmt.inner.deref() {
+            Choice9::_0(call_ignore_ret) => Self::from_call_ignore_ret(with_path(p, call_ignore_ret), pcx, sym_tab),
+            Choice9::_1(drop_) => Self::from_drop(with_path(p, drop_), pcx, sym_tab),
+            Choice9::_2(unreachable_) => Self::from_unreachable(with_path(p, unreachable_), pcx, sym_tab),
+            Choice9::_3(control) => Self::from_control(control),
+            Choice9::_4(assign) => Self::from_assign(with_path(p, assign), pcx, sym_tab),
+            Choice9::_5(loop_) => Self::from_loop(with_path(p, loop_), pcx, sym_tab),
+            Choice9::_6(switch_int) => Self::from_switch_int(with_path(p, switch_int), pcx, sym_tab),
+            Choice9::_7(copy_non_overlapping) => {
+                Self::from_copy_non_overlapping(with_path(p, copy_non_overlapping), pcx, sym_tab)
+            },
+            Choice9::_8(macro_) => Self::from_macro(with_path(p, macro_), pcx, sym_tab),
+        }
     }
 
     pub fn from_unreachable(
@@ -1357,6 +1413,15 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
             ),
             RawStatement::Drop(label, place) => self.mk_drop(label, place),
             RawStatement::Move(label, place) => self.mk_move(label, place),
+            RawStatement::Panic(label, mut stmts) => {
+                let first = stmts.remove(0);
+                let loc = self.mk_raw_stmt(first);
+                self.pattern.labels.insert(label, Spanned::Location(loc));
+                for stmt in stmts {
+                    self.mk_raw_stmt(stmt);
+                }
+                loc
+            },
             RawStatement::Unreachable(label) => self.mk_unreachable(label),
             RawStatement::Break => self.mk_break(),
             RawStatement::Continue => self.mk_continue(),
