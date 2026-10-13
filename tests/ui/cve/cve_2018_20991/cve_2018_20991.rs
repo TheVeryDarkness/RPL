@@ -1,5 +1,4 @@
 //@revisions: inline normal
-//@check-pass: no pattern yet
 // Copied and modified from https://github.com/servo/rust-smallvec/blob/bfdd7ee/lib.rs
 
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -687,6 +686,7 @@ impl<A: Array> SmallVec<A> {
             let ptr = self.as_mut_ptr().offset(index as isize);
             ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
             for (off, element) in iter.enumerate() {
+                //~^ ERROR: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
                 if off < lower_size_bound {
                     ptr::write(ptr.offset(off as isize), element);
                     let len = self.len() + 1;

@@ -12,6 +12,11 @@ const STRONG_BYPASS_SUFFIXES: &[&[&str]] = &[
     &["ptr", "copy_nonoverlapping"],
     &["intrinsics", "copy"],
     &["intrinsics", "copy_nonoverlapping"],
+    // `-Z inline-mir=true` inlines `intrinsics::copy` (re-exported as `ptr::copy`) down to the
+    // nested `rust-intrinsic` function, whose def-path is `core::intrinsics::copy::copy`
+    // (extra trailing segment). (`copy_nonoverlapping` has no such entry because inlining
+    // lowers it to a `NonDivergingIntrinsic::CopyNonOverlapping` *statement*, not a call.)
+    &["intrinsics", "copy", "copy"],
     &["vec", "Vec", "set_len"],
     &["vec", "Vec", "from_raw_parts"],
 ];

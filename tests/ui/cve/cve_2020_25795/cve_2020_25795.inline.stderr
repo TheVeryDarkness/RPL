@@ -138,5 +138,50 @@ LL | |     }
    = help: See https://matklad.github.io/2021/07/09/inline-in-rust.html and https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
    = note: generic functions are always `#[inline]` (monomorphization)
 
-error: aborting due to 9 previous errors
+error: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2020_25795/cve_2020_25795.rs:136:30
+   |
+LL |                 Chunk::force_copy(self.left, self.left - insert_size, left_size, self);
+   |                 ---------------------------------------------------------------------- lifetime bypass here
+LL |                 let mut write_index = real_index - insert_size;
+LL |                 for value in iter {
+   |                              ^^^^ unresolvable generic or `drop_in_place` here
+   |
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
+   = note: `#[deny(rpl::panic_safety_strong)]` on by default
+
+error: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2020_25795/cve_2020_25795.rs:147:30
+   |
+LL |                 Chunk::force_copy(real_index, real_index + insert_size, right_size, self);
+   |                 ------------------------------------------------------------------------- lifetime bypass here
+LL |                 let mut write_index = real_index;
+LL |                 for value in iter {
+   |                              ^^^^ unresolvable generic or `drop_in_place` here
+   |
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
+
+error: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2020_25795/cve_2020_25795.rs:159:30
+   |
+LL |                 Chunk::force_copy(self.left, 0, left_size, self);
+   |                 ------------------------------------------------ lifetime bypass here
+...
+LL |                 for value in iter {
+   |                              ^^^^ unresolvable generic or `drop_in_place` here
+   |
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
+
+error: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+  --> tests/ui/cve/cve_2020_25795/cve_2020_25795.rs:159:30
+   |
+LL |                 Chunk::force_copy(real_index, left_size + insert_size, right_size, self);
+   |                 ------------------------------------------------------------------------ lifetime bypass here
+LL |                 let mut write_index = left_size;
+LL |                 for value in iter {
+   |                              ^^^^ unresolvable generic or `drop_in_place` here
+   |
+   = help: restore container invariants (or use a drop guard) before calling code that may panic
+
+error: aborting due to 13 previous errors
 
