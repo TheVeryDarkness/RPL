@@ -1,3 +1,6 @@
+//@revisions: inline regular
+//@[inline]compile-flags: -Z inline-mir=true
+//@[regular]compile-flags: -Z inline-mir=false
 use std::{mem::MaybeUninit, ptr};
 
 pub trait Unsigned: Copy + Default + 'static {

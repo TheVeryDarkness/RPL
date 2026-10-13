@@ -1,4 +1,7 @@
-//@compile-flags: -Z inline-mir=false
+//@revisions: inline regular
+//@[inline]compile-flags: -Z inline-mir=true
+//@[inline]check-pass: no pattern yet
+//@[regular]compile-flags: -Z inline-mir=false
 
 //! Minimal CVE-2020-25795 / sized-chunks `insert_from` panic-safety motif:
 //! relocate elements (holes), then user/generic code may panic before fill.
@@ -17,8 +20,8 @@ where
         let mut write = dst;
         loop {
             let opt = iter.next();
-            //~^ ERROR: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
-            //~| ERROR: weak lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+            //~[regular]^ ERROR: lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
+            //~[regular]| ERROR: weak lifetime-bypassing operation reaches potentially panicking / unresolvable generic code
             match opt {
                 Some(value) => {
                     ptr::write(write, value);
