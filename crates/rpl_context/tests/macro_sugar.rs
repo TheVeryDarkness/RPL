@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use pest_typed::ParsableTypedNode;
-use rpl_constraints::predicates::PredicateKind;
+use rpl_constraints::predicates::{PredicateArg, PredicateKind};
 use rpl_context::{PatternCtxt, pat};
 use rpl_meta::arena::Arena;
 use rpl_meta::context::MetaContext;
@@ -92,4 +92,62 @@ fn panic_macro_adds_may_panic_predicate() {
             _ => panic!("expected rust items"),
         },
     );
+}
+
+#[test]
+fn without_macro_nested_in_loop_desugars_to_difference() {
+    with_pattern_item(
+        "p[$T: type] = fn _ (..) -> _ { let $x: $T = _; loop { 'sink: _ = $f(copy $x); without!(_ = $g(copy $x)); } }",
+        |item| match item {
+            pat::PatternItem::RPLPatternOperation(op) => {
+                assert_eq!(op.positive.len(), 1, "one positive body");
+                assert_eq!(op.negative.len(), 1, "one negative body");
+            },
+            _ => panic!("expected a pattern operation"),
+        },
+    );
+}
+
+#[test]
+fn without_macro_labeled_fragment_splits_where() {
+    // `!set_len('reset)` references a label that exists only inside the `without!` fragment, so it
+    // must survive in the negative util pattern and be dropped from the positive one.
+    let source = concat!(
+        "p[$T: type] = fn _ (..) -> _ { ",
+        "  let $x: $T = _; 'sink: _ = $f(copy $x); ",
+        "  without!('reset: _ = $g(copy $x)); ",
+        "} where { set_len('sink), !set_len('reset) }",
+    );
+    with_pattern_item(source, |item| match item {
+        pat::PatternItem::RPLPatternOperation(op) => {
+            assert_eq!(op.positive.len(), 1);
+            assert_eq!(op.negative.len(), 1);
+
+            fn constraints_of<'a, 'pcx>(item: &'a pat::PatternItem<'pcx>) -> &'a rpl_constraints::Constraints {
+                match item {
+                    pat::PatternItem::RustItems(items) => &items.fns.all_fns[0].constraints,
+                    _ => panic!("expected rust items"),
+                }
+            }
+            fn refers_label(item: &pat::PatternItem<'_>, label: &str) -> bool {
+                constraints_of(item).preds.iter().any(|conj| {
+                    conj.clauses.iter().any(|clause| {
+                        clause.terms.iter().any(|term| {
+                            term.args
+                                .iter()
+                                .any(|arg| matches!(arg, PredicateArg::Label(l) if l.as_str() == label))
+                        })
+                    })
+                })
+            }
+
+            let positive = op.positive[0].1;
+            let negative = op.negative[0].1;
+            assert!(refers_label(positive, "sink"), "positive keeps `set_len('sink)`");
+            assert!(!refers_label(positive, "reset"), "positive drops the `reset` predicate");
+            assert!(refers_label(negative, "sink"), "negative keeps `set_len('sink)`");
+            assert!(refers_label(negative, "reset"), "negative keeps the `reset` predicate");
+        },
+        _ => panic!("expected a pattern operation"),
+    });
 }

@@ -410,6 +410,7 @@ impl<'pcx> PlaceTy<'pcx> {
 }
 
 /// Refer to [`mir::CopyNonOverlapping`] for more details.
+#[derive(Clone)]
 pub struct CopyNonOverlapping<'pcx> {
     pub src: Operand<'pcx>,
     pub dst: Operand<'pcx>,
@@ -417,6 +418,7 @@ pub struct CopyNonOverlapping<'pcx> {
 }
 
 /// Refer to [`mir::NonDivergingIntrinsic`] for more details.
+#[derive(Clone)]
 pub enum NonDivergingIntrinsic<'pcx> {
     /// Refer to [`mir::NonDivergingIntrinsic::CopyNonOverlapping`] for more details.
     CopyNonOverlapping(CopyNonOverlapping<'pcx>),
@@ -434,6 +436,7 @@ pub enum StatementKind<'pcx> {
     Move(Place<'pcx>),
 }
 
+#[derive(Clone)]
 pub enum RawDecleration<'pcx> {
     TypeAlias(Symbol, Ty<'pcx>),
     LocalInit(Option<Label>, Local, Option<RvalueOrCall<'pcx>>), /* In meta pass, we have already collect the local
@@ -474,6 +477,7 @@ impl<'pcx> RawDecleration<'pcx> {
     }
 }
 
+#[derive(Clone)]
 pub enum RawStatement<'pcx> {
     Assign(Option<Label>, Place<'pcx>, Rvalue<'pcx>),
     Call(Option<Label>, Place<'pcx>, Call<'pcx>),
@@ -485,6 +489,10 @@ pub enum RawStatement<'pcx> {
     /// `'p: panic!(B)` — the fragment's first statement is labeled `'p` and
     /// `may_panic('p)` is added to the function's `where` block.
     Panic(Label, Vec<RawStatement<'pcx>>),
+    /// `without!(B)` — fragment `B` must not match; desugared at the pattern-item level.
+    Without(Vec<RawStatement<'pcx>>),
+    /// `or!(B, C)` — one of the alternatives must match; desugared at the pattern-item level.
+    Or(Vec<Vec<RawStatement<'pcx>>>),
     Break,
     Continue,
     Return,
@@ -603,11 +611,13 @@ impl<'pcx> RawStatement<'pcx> {
                     place,
                 )
             },
-            Choice4::_1(_without) => {
-                unimplemented!("`without!` must be desugared at the pattern-item level")
+            Choice4::_1(without_) => {
+                let (_, _, _, fragment, _) = without_.get_matched();
+                Self::Without(Self::from_macro_fragment(WithPath::new(mac.path, fragment), pcx, sym_tab))
             },
-            Choice4::_2(_or) => {
-                unimplemented!("`or!` must be desugared at the pattern-item level")
+            Choice4::_2(or_) => {
+                let (_, _, _, alternatives, _) = or_.get_matched();
+                Self::Or(Self::from_macro_alternatives(WithPath::new(mac.path, alternatives), pcx, sym_tab))
             },
             Choice4::_3(panic_) => {
                 let (label, _, _, _, fragment, _) = panic_.get_matched();
@@ -625,6 +635,50 @@ impl<'pcx> RawStatement<'pcx> {
     ) -> Vec<Self> {
         let p = fragment.path;
         let (first, following) = fragment.MirMacroStmt();
+        std::iter::once(Self::from_macro_stmt(with_path(p, first), pcx, sym_tab))
+            .chain(
+                following
+                    .iter()
+                    .map(|stmt| Self::from_macro_stmt(with_path(p, stmt), pcx, sym_tab)),
+            )
+            .collect()
+    }
+
+    fn from_macro_alternatives(
+        alternatives: WithPath<'pcx, &'pcx pairs::MirMacroAlternatives<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Vec<Vec<Self>> {
+        let p = alternatives.path;
+        let (first, following) = alternatives.MirMacroAlternative();
+        std::iter::once(Self::from_macro_alternative(with_path(p, first), pcx, sym_tab))
+            .chain(
+                following
+                    .iter()
+                    .map(|alt| Self::from_macro_alternative(with_path(p, alt), pcx, sym_tab)),
+            )
+            .collect()
+    }
+
+    fn from_macro_alternative(
+        alternative: WithPath<'pcx, &'pcx pairs::MirMacroAlternative<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Vec<Self> {
+        let p = alternative.path;
+        match alternative.inner.deref() {
+            Choice2::_0(block) => Self::from_macro_block(with_path(p, block), pcx, sym_tab),
+            Choice2::_1(stmt) => vec![Self::from_macro_stmt(with_path(p, stmt), pcx, sym_tab)],
+        }
+    }
+
+    fn from_macro_block(
+        block: WithPath<'pcx, &'pcx pairs::MirMacroBlock<'pcx>>,
+        pcx: PatCtxt<'pcx>,
+        sym_tab: &'pcx FnSymbolTable<'pcx>,
+    ) -> Vec<Self> {
+        let p = block.path;
+        let (first, following) = block.MirMacroStmt();
         std::iter::once(Self::from_macro_stmt(with_path(p, first), pcx, sym_tab))
             .chain(
                 following
@@ -834,6 +888,7 @@ impl<'i> Cast<CoercionSource> for &'i pairs::CoercionSource<'i> {
 /// A value that can be used in an rvalue.
 ///
 /// See [`mir::Rvalue`] for more details.
+#[derive(Clone)]
 pub enum Rvalue<'pcx> {
     Any,
     Use(Operand<'pcx>),
@@ -1027,6 +1082,7 @@ impl<'pcx> Operand<'pcx> {
     }
 }
 
+#[derive(Clone)]
 pub struct Call<'pcx>(Operand<'pcx>, Vec<Operand<'pcx>>);
 
 impl<'pcx> Call<'pcx> {
@@ -1043,6 +1099,7 @@ impl<'pcx> Call<'pcx> {
     }
 }
 
+#[derive(Clone)]
 pub enum RvalueOrCall<'pcx> {
     Rvalue(Rvalue<'pcx>),
     Call(Call<'pcx>),
@@ -1421,6 +1478,12 @@ impl<'pcx> FnPatternBodyBuilder<'pcx> {
                     self.mk_raw_stmt(stmt);
                 }
                 loc
+            },
+            RawStatement::Without(_) => {
+                unreachable!("`without!` should have been desugared at the pattern-item level")
+            },
+            RawStatement::Or(_) => {
+                unreachable!("`or!` should have been desugared at the pattern-item level")
             },
             RawStatement::Unreachable(label) => self.mk_unreachable(label),
             RawStatement::Break => self.mk_break(),

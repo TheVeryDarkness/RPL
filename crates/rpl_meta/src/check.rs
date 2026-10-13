@@ -384,8 +384,38 @@ impl<'i> CheckFnCtxt<'i, '_> {
             },
             Choice4::_3(panic_) => {
                 let (_, _, _, _, fragment, _) = panic_.get_matched();
-                self.check_mir_macro_fragment(mctx, fragment);
+                self.check_panic_fragment(mctx, fragment);
             },
+        }
+    }
+
+    /// A `panic!` fragment may contain plain statements and nested `panic!`/`move!`, but not
+    /// `without!`/`or!` (which are pattern-level operations).
+    fn check_panic_fragment(&mut self, mctx: &MetaContext<'i>, fragment: &'i pairs::MirMacroFragment<'i>) {
+        let (first, following) = fragment.MirMacroStmt();
+        self.check_mir_macro_stmt_in_panic(mctx, first);
+        for stmt in following {
+            self.check_mir_macro_stmt_in_panic(mctx, stmt);
+        }
+    }
+
+    fn check_mir_macro_stmt_in_panic(&mut self, mctx: &MetaContext<'i>, stmt: &'i pairs::MirMacroStmt<'i>) {
+        if let Choice9::_8(mir_macro) = stmt.deref() {
+            match mir_macro.deref() {
+                Choice4::_1(_) | Choice4::_2(_) => {
+                    let name = match mir_macro.deref() {
+                        Choice4::_1(_) => "without!",
+                        _ => "or!",
+                    };
+                    self.errors.push(RPLMetaError::BodyMacroInPanicFragment {
+                        name,
+                        span: SpanWrapper::new(mir_macro.span, mctx.get_active_path()),
+                    });
+                },
+                _ => self.check_mir_macro(mctx, mir_macro),
+            }
+        } else {
+            self.check_mir_macro_stmt(mctx, stmt);
         }
     }
 

@@ -11,6 +11,7 @@ patt {
         unsafe? fn _(..) -> _ {
             'src:
             _ = _(..);
+            without!('reset: _ = _(..));
             'sink:
             _ = _(..);
         } where {
@@ -18,7 +19,7 @@ patt {
             (unresolvable_generic('sink) || generic_drop('sink)),
             cfg_reaches('src, 'sink),
             !bypass_on_copy('src),
-            !set_len('src),
+            !set_len('reset),
         }
     }
 
@@ -27,6 +28,7 @@ patt {
         unsafe? fn _(..) -> _ {
             'src:
             _ = _(..);
+            without!('reset: _ = _(..));
             'sink:
             _ = _(..);
         } where {
@@ -34,7 +36,7 @@ patt {
             (unresolvable_generic('sink) || generic_drop('sink)),
             cfg_reaches('src, 'sink),
             !bypass_on_copy('src),
-            !set_len('src),
+            !set_len('reset),
         }
     }
 }

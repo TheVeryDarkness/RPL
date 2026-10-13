@@ -718,6 +718,9 @@ impl<A: Array> SmallVec<A> {
             for element in iter {
                 //~^ panic_safety_strong
                 //~| panic_safety_strong
+                // FP: The set_len above ensures that the vector's length
+                // is always <= the number of initialized elements, so that
+                // if the iterator panics, the Drop impl will only drop initialized elements.
                 let mut cur = ptr.offset(num_added as isize);
                 if num_added >= lower_size_bound {
                     // Iterator provided more elements than the hint.  Move trailing items again.
