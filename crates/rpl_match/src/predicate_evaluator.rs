@@ -237,7 +237,7 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
             }),
             PredicateKind::CfgReaches => self.eval_cfg_reaches(&arg_instance),
             PredicateKind::BypassOnCopy => self.eval_bypass_on_copy(&arg_instance),
-            PredicateKind::SetLenToZero => self.eval_set_len_to_zero(&arg_instance),
+            PredicateKind::SetLen => self.eval_set_len(&arg_instance),
         };
         if term.is_neg { !result } else { result }
     }
@@ -353,16 +353,13 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
     }
 
     #[instrument(level = "debug", skip(self, args), ret)]
-    fn eval_set_len_to_zero(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
-        assert!(
-            args.len() == 1,
-            "set_len_to_zero expects ('loc), got {} args",
-            args.len()
-        );
-        let PredicateArgInstance::Location(loc) = &args[0] else {
-            panic!("set_len_to_zero expects a Location label, got {:?}", args[0]);
+    fn eval_set_len(&self, args: &[PredicateArgInstance<'tcx>]) -> bool {
+        let (loc, len) = match args {
+            [PredicateArgInstance::Location(loc)] => (*loc, None),
+            [PredicateArgInstance::Location(loc), PredicateArgInstance::Const(len)] => (*loc, Some(len)),
+            _ => panic!("set_len expects ('loc, len) or ('loc), got {:?}", args),
         };
-        let Some((def_id, _, call_args)) = call_fn_def(self.tcx, self.body, *loc) else {
+        let Some((def_id, _, call_args)) = call_fn_def(self.tcx, self.body, loc) else {
             return false;
         };
         if !rudra_paths::is_vec_set_len(self.tcx, def_id) {
@@ -370,14 +367,19 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
         }
         // `Vec::set_len(self, new_len)` — new_len is the second arg.
         let Some(len_arg) = call_args.get(1) else {
+            info!("set_len: no length argument found in call to Vec::set_len at {:?}", loc);
             return false;
         };
-        match &len_arg.node {
-            Operand::Constant(c) => c
-                .const_
-                .try_eval_target_usize(self.tcx, self.typing_env)
-                .is_some_and(|v| v == 0),
-            _ => false,
+        match len {
+            None => true, // no length specified, so any length is fine
+            Some(Const::MIR(len)) => matches!(&len_arg.node, Operand::Constant(c) if &c.const_ == len),
+            Some(Const::Param(len)) => match &len_arg.node {
+                Operand::Constant(box mir::ConstOperand {
+                    const_: mir::Const::Ty(_, const_),
+                    ..
+                }) if let ty::ConstKind::Param(const_) = const_.kind() => const_ == *len,
+                _ => false,
+            },
         }
     }
 

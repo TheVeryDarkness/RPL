@@ -135,8 +135,8 @@ pub enum PredicateKind {
     CfgReaches,
     /// `bypass_on_copy('loc)` — read/write bypass on a Copy pointed-to type (Rudra skip).
     BypassOnCopy,
-    /// `set_len_to_zero('loc)` — `Vec::set_len(0)` (Rudra skip; leak is safe).
-    SetLenToZero,
+    /// `set_len('loc, len)` — `Vec::set_len(len)` (Rudra skip; leak is safe).
+    SetLen,
 }
 
 impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
@@ -184,7 +184,7 @@ impl<'i> TryFrom<SpanWrapper<'i>> for PredicateKind {
             "generic_drop" => Self::GenericDrop,
             "cfg_reaches" => Self::CfgReaches,
             "bypass_on_copy" => Self::BypassOnCopy,
-            "set_len_to_zero" => Self::SetLenToZero,
+            "set_len" => Self::SetLen,
             _ => {
                 return Err(PredicateError::InvalidPredicate {
                     pred: span.inner().as_str(),
