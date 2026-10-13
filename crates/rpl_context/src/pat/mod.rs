@@ -226,7 +226,10 @@ impl<'pcx> RustItems<'pcx> {
                 let (vis, name, _, ty) = field.get_matched();
                 let name = Symbol::intern(name.span.as_str());
                 let ty = Ty::from(with_path(rust_struct.path, ty), self.pcx, symbol_table);
-                let field = Field { ty, vis: Visibility::parse(vis.as_ref()) };
+                let field = Field {
+                    ty,
+                    vis: Visibility::parse(vis.as_ref()),
+                };
                 struct_inner.fields.insert(name, field);
             }
         }
@@ -260,7 +263,10 @@ impl<'pcx> RustItems<'pcx> {
                                 let (vis, name, _, ty) = field.get_matched();
                                 let name = Symbol::intern(name.span.as_str());
                                 let ty = Ty::from(with_path(rust_enum.path, ty), self.pcx, symbol_table);
-                                let field = Field { ty, vis: Visibility::parse(vis.as_ref()) };
+                                let field = Field {
+                                    ty,
+                                    vis: Visibility::parse(vis.as_ref()),
+                                };
                                 enum_variant.fields.insert(name, field);
                             }
                         }
@@ -270,7 +276,10 @@ impl<'pcx> RustItems<'pcx> {
                         let (name, _, ty, _) = variant.get_matched();
                         let name = Symbol::intern(name.span.as_str());
                         let ty = Ty::from(with_path(rust_enum.path, ty), self.pcx, symbol_table);
-                        let field = Field { ty, vis: Visibility::Unspecified };
+                        let field = Field {
+                            ty,
+                            vis: Visibility::Unspecified,
+                        };
                         enum_variant.fields.insert(name, field);
                         variant.get_matched().0
                     },
