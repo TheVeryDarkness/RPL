@@ -173,6 +173,29 @@ impl<'tcx> NormalizedMatched<'tcx> {
         self.extra == other.extra
     }
 
+    /// Whether a label exists in the normalized label map.
+    pub fn has_label(&self, label: Symbol) -> bool {
+        self.extra.binary_search_by_key(&label, |(l, _)| *l).is_ok()
+    }
+
+    /// Whether `self` and `other` agree on every column they *share* (their intersection).
+    ///
+    /// Meta-variable bindings (`ty_vars`/`const_vars`/`place_vars`/`adt_fields`) must match
+    /// exactly, but labels present on only one side — e.g. a `without!` fragment label such as
+    /// `'reset` — are ignored. This is the comparison used by pattern subtraction (`P - N`), so a
+    /// fragment-local label does not prevent two otherwise-identical MIR sites from subtracting.
+    pub fn same_common_columns(&self, other: &Self) -> bool {
+        self.ty_vars == other.ty_vars
+            && self.const_vars == other.const_vars
+            && self.place_vars == other.place_vars
+            && self.adt_fields == other.adt_fields
+            && self
+                .extra
+                .iter()
+                .filter(|(label, _)| other.has_label(*label))
+                .eq(other.extra.iter().filter(|(label, _)| self.has_label(*label)))
+    }
+
     /// Look up a normalized label by name.
     pub fn spanned(&self, name: &str) -> Option<NormalizedSpanned> {
         let labels = &self.extra;

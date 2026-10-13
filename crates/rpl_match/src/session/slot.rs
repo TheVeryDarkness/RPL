@@ -178,9 +178,11 @@ impl<'tcx> SessionResult<'tcx> {
             if assignment_def_id(a) != assignment_def_id(neg_a) {
                 return false;
             }
-            // Different MIR subgraphs must not subtract each other.
+            // Different MIR subgraphs must not subtract each other. Compare only the columns
+            // shared between positive and negative, so a fragment-local label (e.g. `'reset` in
+            // `without!('reset: ...)`) does not block the subtraction.
             if let (SlotCandidate::Fn(pos_fn), SlotCandidate::Fn(neg_fn)) = (&a.candidate, &neg_a.candidate)
-                && pos_fn.normalized != neg_fn.normalized
+                && !pos_fn.normalized.same_common_columns(&neg_fn.normalized)
             {
                 return false;
             }
