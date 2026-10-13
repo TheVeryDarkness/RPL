@@ -912,7 +912,7 @@ FnRet = {
 Fn = { FnSig ~ FnBody }
 
 Field = {
-    MetaVariable ~ Colon ~ Type
+    Visibility? ~ MetaVariable ~ Colon ~ Type
 }
 
 FieldsSeparatedByComma = {

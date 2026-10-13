@@ -9317,14 +9317,14 @@ pub mod rules_impl {
                 }
             }
         }
-        :: pest_typed :: rule ! (r#Field , "Corresponds to expression: `(MetaVariable ~ Colon ~ Type)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Field , super :: super :: generics :: Seq3 :: < (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Colon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
+        :: pest_typed :: rule ! (r#Field , "Corresponds to expression: `(Visibility? ~ MetaVariable ~ Colon ~ Type)`. Normal rule." "" , super :: super :: Rule , super :: super :: Rule :: r#Field , super :: super :: generics :: Seq4 :: < (:: pest_typed :: predefined_node :: Skipped < :: pest_typed :: re_exported :: Option :: < super :: super :: rules :: r#Visibility :: < 'i , INHERITED > > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#MetaVariable :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Colon :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , (:: pest_typed :: predefined_node :: Skipped < super :: super :: rules :: r#Type :: < 'i , INHERITED > , super :: super :: generics :: Skipped < 'i > , INHERITED >) , > , super :: super :: generics :: Skipped :: < 'i > , INHERITED , Both , true);
         impl<'i, const INHERITED: ::core::primitive::usize> r#Field<'i, INHERITED> {
             #[doc = "A helper function to access [`Colon`]."]
             #[allow(non_snake_case)]
             pub fn r#Colon<'s>(&'s self) -> &'s super::super::rules::r#Colon<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.1.matched;
+                    let res = &res.content.2.matched;
                     res
                 }
             }
@@ -9333,7 +9333,7 @@ pub mod rules_impl {
             pub fn r#MetaVariable<'s>(&'s self) -> &'s super::super::rules::r#MetaVariable<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.0.matched;
+                    let res = &res.content.1.matched;
                     res
                 }
             }
@@ -9342,8 +9342,22 @@ pub mod rules_impl {
             pub fn r#Type<'s>(&'s self) -> &'s super::super::rules::r#Type<'i, INHERITED> {
                 let res = &*self.content;
                 {
-                    let res = &res.content.2.matched;
+                    let res = &res.content.3.matched;
                     res
+                }
+            }
+            #[doc = "A helper function to access [`Visibility`]."]
+            #[allow(non_snake_case)]
+            pub fn r#Visibility<'s>(
+                &'s self,
+            ) -> ::pest_typed::re_exported::Option<&'s super::super::rules::r#Visibility<'i, INHERITED>> {
+                let res = &*self.content;
+                {
+                    let res = &res.content.0.matched;
+                    {
+                        let res = res.as_ref().map(|res| res);
+                        res
+                    }
                 }
             }
         }

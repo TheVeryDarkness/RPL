@@ -140,7 +140,7 @@ pub struct Variant<'pcx> {
 
 impl<'pcx> Variant<'pcx> {
     pub fn add_field(&mut self, name: Symbol, ty: Ty<'pcx>) {
-        self.fields.insert(name, Field { ty });
+        self.fields.insert(name, Field { ty, vis: Visibility::Unspecified });
     }
     pub fn field_and_index(&self, name: Symbol) -> (&Field<'pcx>, usize) {
         let (index, _, field) = self
@@ -160,6 +160,7 @@ impl<'pcx> Variant<'pcx> {
 #[derive(Debug)]
 pub struct Field<'pcx> {
     pub ty: Ty<'pcx>,
+    pub vis: Visibility,
 }
 
 pub struct Impl<'pcx> {

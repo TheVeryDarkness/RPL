@@ -217,7 +217,7 @@ impl<'a, 'pcx, 'tcx> MatchAdtCtxt<'a, 'pcx, 'tcx> {
     ) -> bool {
         let pat_ty = field_pat.ty;
         let ty = self.ty.tcx.type_of(field.did).instantiate(self.ty.tcx, args);
-        self.ty.match_ty(pat_ty, ty)
+        field_pat.vis.check(field.vis) && self.ty.match_ty(pat_ty, ty)
     }
 }
 

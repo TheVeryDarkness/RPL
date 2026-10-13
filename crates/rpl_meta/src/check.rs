@@ -889,7 +889,7 @@ impl<'i> CheckVariantCtxt<'i, '_> {
     }
 
     fn check_field(&mut self, mctx: &MetaContext<'i>, field: &'i pairs::Field<'i>) {
-        let (ident, _, ty) = field.get_matched();
+        let (_, ident, _, ty) = field.get_matched();
         self.variant_def.add_field(mctx, ident, ty, self.errors);
         self.check_meta_var(mctx, ident);
         self.check_type(mctx, ty);
