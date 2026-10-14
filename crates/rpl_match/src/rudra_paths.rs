@@ -40,7 +40,9 @@ const WEAK_BYPASS_SUFFIXES: &[&[&str]] = &[
 
 const GENERIC_DROP_SUFFIXES: &[&[&str]] = &[&["ptr", "drop_in_place"], &["ptr", "mut_ptr", "drop_in_place"]];
 
-const SET_LEN_SUFFIX: &[&str] = &["vec", "Vec", "set_len"];
+/// `set_len` predicate: match any method whose name is `set_len` (e.g. `Vec::set_len`,
+/// `SmallVec::set_len`, or a container's own `set_len`), not just `std::vec::Vec::set_len`.
+const SET_LEN_SUFFIX: &[&str] = &["set_len"];
 const PTR_READ_SUFFIXES: &[&[&str]] = &[&["ptr", "read"], &["ptr", "const_ptr", "read"]];
 const PTR_WRITE_SUFFIXES: &[&[&str]] = &[&["ptr", "write"], &["ptr", "mut_ptr", "write"]];
 
@@ -83,7 +85,7 @@ pub fn is_generic_drop(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
     path_matches_any(&def_path_names(tcx, def_id), GENERIC_DROP_SUFFIXES)
 }
 
-pub fn is_vec_set_len(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
+pub fn is_set_len(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
     path_ends_with(&def_path_names(tcx, def_id), SET_LEN_SUFFIX)
 }
 

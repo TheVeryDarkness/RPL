@@ -359,28 +359,33 @@ impl<'e, 'm, 'tcx> PredicateEvaluator<'e, 'm, 'tcx> {
             [PredicateArgInstance::Location(loc), PredicateArgInstance::Const(len)] => (*loc, Some(len)),
             _ => panic!("set_len expects ('loc, len) or ('loc), got {:?}", args),
         };
-        let Some((def_id, _, call_args)) = call_fn_def(self.tcx, self.body, loc) else {
-            return false;
-        };
-        if !rudra_paths::is_vec_set_len(self.tcx, def_id) {
-            return false;
+
+        // Direct (non-inlined) `set_len` call.
+        if let Some((def_id, _, call_args)) = call_fn_def(self.tcx, self.body, loc) {
+            if rudra_paths::is_set_len(self.tcx, def_id) {
+                // `set_len(self, new_len)` — new_len is the second arg.
+                let Some(len_arg) = call_args.get(1) else {
+                    info!("set_len: no length argument found in call to set_len at {:?}", loc);
+                    return false;
+                };
+                return match len {
+                    None => true, // no length specified, so any length is fine
+                    Some(Const::MIR(len)) => matches!(&len_arg.node, Operand::Constant(c) if &c.const_ == len),
+                    Some(Const::Param(len)) => match &len_arg.node {
+                        Operand::Constant(box mir::ConstOperand {
+                            const_: mir::Const::Ty(_, const_),
+                            ..
+                        }) if let ty::ConstKind::Param(const_) = const_.kind() => const_ == *len,
+                        _ => false,
+                    },
+                };
+            }
         }
-        // `Vec::set_len(self, new_len)` — new_len is the second arg.
-        let Some(len_arg) = call_args.get(1) else {
-            info!("set_len: no length argument found in call to Vec::set_len at {:?}", loc);
-            return false;
-        };
-        match len {
-            None => true, // no length specified, so any length is fine
-            Some(Const::MIR(len)) => matches!(&len_arg.node, Operand::Constant(c) if &c.const_ == len),
-            Some(Const::Param(len)) => match &len_arg.node {
-                Operand::Constant(box mir::ConstOperand {
-                    const_: mir::Const::Ty(_, const_),
-                    ..
-                }) if let ty::ConstKind::Param(const_) = const_.kind() => const_ == *len,
-                _ => false,
-            },
-        }
+
+        // Inlined `set_len`: the call itself was inlined away, but the surviving statement keeps
+        // rustc's `SourceScopeData::inlined` pointing at the `set_len` callee. Only the one-arg
+        // form is supported here (the length lives in the inlined write, not in the call).
+        len.is_none() && is_inlined_from_set_len(self.tcx, self.body, loc)
     }
 
     fn instantiate_arg(&self, arg: &'m PredicateArg) -> Result<PredicateArgInstance<'tcx>, String> {
@@ -472,6 +477,29 @@ fn call_fn_def<'a, 'tcx>(
         Some((def_id, gargs, args))
     } else {
         None
+    }
+}
+
+/// Whether the statement/terminator at `loc` was inlined from a `set_len` function.
+///
+/// When `set_len` is inlined (e.g. `SmallVec::set_len` → `triple_mut()` + a length write), the
+/// call itself disappears from MIR, but rustc records the inlined callee's `DefId` in the
+/// `SourceScopeData::inlined` of the surviving statements. Walking the scope chain lets us
+/// recognize those statements as having originated from a `set_len` call.
+fn is_inlined_from_set_len(tcx: TyCtxt<'_>, body: &mir::Body<'_>, loc: mir::Location) -> bool {
+    let source_info = body.source_info(loc);
+    let mut scope = source_info.scope;
+    loop {
+        let data = &body.source_scopes[scope];
+        if let Some((callee, _)) = data.inlined
+            && rudra_paths::is_set_len(tcx, callee.def_id())
+        {
+            return true;
+        }
+        match data.inlined_parent_scope.or(data.parent_scope) {
+            Some(parent) => scope = parent,
+            None => return false,
+        }
     }
 }
 
