@@ -480,27 +480,27 @@ fn call_fn_def<'a, 'tcx>(
     }
 }
 
-/// Whether the statement/terminator at `loc` was inlined from a `set_len` function.
+/// The functions this MIR location's code was inlined from, innermost first.
 ///
-/// When `set_len` is inlined (e.g. `SmallVec::set_len` → `triple_mut()` + a length write), the
-/// call itself disappears from MIR, but rustc records the inlined callee's `DefId` in the
-/// `SourceScopeData::inlined` of the surviving statements. Walking the scope chain lets us
-/// recognize those statements as having originated from a `set_len` call.
-fn is_inlined_from_set_len(tcx: TyCtxt<'_>, body: &mir::Body<'_>, loc: mir::Location) -> bool {
-    let source_info = body.source_info(loc);
-    let mut scope = source_info.scope;
-    loop {
-        let data = &body.source_scopes[scope];
-        if let Some((callee, _)) = data.inlined
-            && rudra_paths::is_set_len(tcx, callee.def_id())
-        {
-            return true;
-        }
-        match data.inlined_parent_scope.or(data.parent_scope) {
-            Some(parent) => scope = parent,
-            None => return false,
+/// rustc records the inlined callee's `Instance` in `SourceScopeData::inlined` for every statement
+/// that originated from an inlined call. Walking the scope chain lets us recover those callees even
+/// though the call itself no longer appears in MIR.
+pub(crate) fn inlined_instances<'tcx>(body: &mir::Body<'tcx>, loc: mir::Location) -> Vec<ty::Instance<'tcx>> {
+    let mut out = Vec::new();
+    let mut scope = Some(body.source_info(loc).scope);
+    while let Some(s) = scope {
+        let data = &body.source_scopes[s];
+        scope = data.inlined_parent_scope.or(data.parent_scope);
+        if let Some((inst, _)) = data.inlined {
+            out.push(inst);
         }
     }
+    out
+}
+
+/// Whether the statement/terminator at `loc` was inlined from a `set_len` function.
+fn is_inlined_from_set_len(tcx: TyCtxt<'_>, body: &mir::Body<'_>, loc: mir::Location) -> bool {
+    inlined_instances(body, loc).into_iter().any(|inst| rudra_paths::is_set_len(tcx, inst.def_id()))
 }
 
 fn location_unresolvable_generic<'tcx>(

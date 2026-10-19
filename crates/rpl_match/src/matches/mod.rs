@@ -981,6 +981,14 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
     #[instrument(level = "debug", skip(self), ret)]
     fn match_block_successors(&self, bb_pat: pat::BasicBlock, bb: mir::BasicBlock) -> bool {
         use TerminatorEdges::{AssignOnReturn, Double, Single, SwitchInt};
+        // An inlined call matches a target *statement*, not a terminator: the inlined body does not
+        // introduce a control-flow edge, so the call's target block simply continues in the same MIR
+        // block instead of branching to a successor.
+        if let pat::TerminatorKind::Call { target, .. } = self.cx.mir_pat[bb_pat].terminator()
+            && self.terminator_matched_statement(bb_pat)
+        {
+            return self.match_block_starts_with(*target, bb);
+        }
         debug!(term_pat = ?self.cx.pat_cfg[bb_pat], term = ?self.cx.mir_cfg[bb]);
         match (&self.cx.pat_cfg[bb_pat], &self.cx.mir_cfg[bb]) {
             (TerminatorEdges::None, _) => true,
@@ -1014,6 +1022,15 @@ impl<'a, 'pcx, 'tcx> MatchCtxt<'a, 'pcx, 'tcx> {
             },
             _ => false,
         }
+    }
+
+    /// Whether the pattern block's terminator was matched against a target *statement* — i.e. the
+    /// terminator is an inlined call whose surviving MIR is a plain statement (not a terminator).
+    fn terminator_matched_statement(&self, bb_pat: pat::BasicBlock) -> bool {
+        matches!(
+            self.matching[bb_pat].terminator().get(),
+            Some(StatementMatch::Location(loc)) if loc.statement_index < self.cx.body[loc.block].statements.len()
+        )
     }
 
     /// Used in [`MatchCtxt::match_candidates`].
