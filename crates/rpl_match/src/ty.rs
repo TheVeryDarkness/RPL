@@ -439,13 +439,21 @@ pub(crate) trait MatchTy<'pcx, 'tcx> {
             (pat::Const::ConstVar(const_var), _) => self.match_ty_const_var(const_var, konst),
             //(pat::Const::Value(_value_pat), ty::Value(_ty, ty::ValTree::Leaf(_value))) => todo!(),
             (
-                pat::Const::Value(_value_pat),
+                pat::Const::Value(value_pat),
                 ty::ConstKind::Value(ty::Value {
-                    ty: _ty,
-                    valtree: _valtree,
+                    ty: konst_ty,
+                    valtree,
                 }),
-            ) if matches!(*_valtree, ValTreeKind::Leaf(_val)) => {
-                todo!()
+            ) if let ValTreeKind::Leaf(scalar) = *valtree => {
+                // Concrete integer const generic (e.g. `[u8; 4]`): match width/signedness, then bits.
+                (match (value_pat.ty, *konst_ty.kind()) {
+                    (pat::IntTy::AnyInt, ty::Int(_) | ty::Uint(_)) => true,
+                    (pat::IntTy::NegInt(ty_pat), ty::Int(ty)) => ty_pat == ty,
+                    (pat::IntTy::Int(ty_pat), ty::Int(ty)) => ty_pat == ty,
+                    (pat::IntTy::Uint(ty_pat), ty::Uint(ty)) => ty_pat == ty,
+                    (pat::IntTy::Bool, ty::Bool) => true,
+                    _ => false,
+                }) && value_pat.normalize(self.tcx().data_layout.pointer_size.bytes()) == scalar.to_bits_unchecked()
             },
             (
                 // pat::Const::ConstVar(_)
